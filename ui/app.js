@@ -247,6 +247,9 @@ function renderReadouts() {
     ? `${brain.label} · ${why[brain.why] || "ONLINE"}`.toUpperCase()
     : model.name ? `${model.name}${model.placement ? " · " + model.placement : ""}${brain.why && brain.why !== "off" ? ` · ${why[brain.why] || brain.why}` : ""}` : "…";
   $("#ro-latency").textContent = state.latency_ms ? `${(state.latency_ms / 1000).toFixed(1)} S` : "—";
+  const timing = state.timing || {};
+  $("#ro-latency").title = timing.summary ? `Last answer: ${timing.summary}` : "";
+  $("#timing-last").textContent = timing.summary ? `Last answer${timing.local ? " (the model on this PC)" : ""}: first words after ${(timing.latency_ms / 1000).toFixed(1)} s · ${timing.summary}` : "";
   const heart = state.heart || {};
   $("#ro-heart-row").hidden = !heart.on;
   const weatherNow = state.weather_now;
@@ -813,6 +816,7 @@ function renderGoogleMcp() {
     $("#google-mcp-desktop").value = mcp.claude_desktop || "";
   }
   $("#need-claude-apps-state").textContent = ready ? "on" : "";
+  if (document.activeElement !== $("#node-path")) $("#node-path").value = (state.settings || {}).node_path || "";
   $("#google-mcp-info").textContent = mcp.usb ? "Not on the USB Edition."
     : mcp.error ? `Not serving: ${mcp.error}.`
     : !mcp.on ? "Off."
@@ -1588,6 +1592,7 @@ $("#gmail-toggle").onclick = async () => {
       [{ label: "OK", value: null, primary: true, cancel: true }]);
   }
 };
+$("#node-path-save").onclick = () => act("node_path", { path: $("#node-path").value });
 $("#drive-connect").onclick = () => {
   toast("Google opens in your browser: allow Drive too. If it says the Drive API is off, enable it in Google Cloud Console for your project first.", "info");
   act("gmail", { drive: true });

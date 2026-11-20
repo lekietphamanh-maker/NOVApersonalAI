@@ -13,7 +13,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -21,6 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
+import node_runtime
 from claude_code import API_KEY_VARIABLES, find as find_claude
 
 REA_PACKAGE = "rea-agents@6.9.0"  # pinned: a new REA version is a change to Nova, reviewed like any other
@@ -35,16 +35,15 @@ INSTRUCTIONS = ("You are reverse engineering something for Nova's owner, who is 
                 "about works, with the evidence for each conclusion, and what you couldn't determine.\n\n")
 
 
-def node_version(run: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> tuple[int, int, int] | None:
-    node = shutil.which("node")
+def node_version(run: Callable[..., subprocess.CompletedProcess] = subprocess.run, choice: str = "") -> tuple[int, int, int] | None:
+    """The version of the Node.js Nova finds (see node_runtime), which then goes first on PATH for npx."""
+    node = node_runtime.find(choice)
     if node is None:
         return None
-    try:
-        text = run([node, "--version"], capture_output=True, text=True, timeout=10).stdout
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    found = re.match(r"v(\d+)\.(\d+)\.(\d+)", text.strip())
-    return tuple(int(part) for part in found.groups()) if found else None  # type: ignore[return-value]
+    found = node_runtime.version(node, run)
+    if found is not None:
+        node_runtime.use(node)
+    return found
 
 
 def node_ok(version: tuple[int, int, int] | None) -> bool:
@@ -106,8 +105,12 @@ class ReverseEngineering:
         """Why it can't run on this PC right now ("" when it can)."""
         if self.command() is None:
             return "Claude Code isn't installed on this PC (claude.com/product/claude-code)"
-        if not node_ok(self.node()):
-            return "REA needs Node.js 22.23 or newer: install the LTS from nodejs.org, then try again"
+        found = self.node()
+        if found is None:
+            return ("Nova can't find Node.js (REA needs Node.js 22.23 or newer): install the LTS from nodejs.org, or "
+                    "point Nova to node.exe in Settings → Need to → Reverse engineering")
+        if not node_ok(found):
+            return f"Node.js {'.'.join(map(str, found))} is too old for REA: it needs 22.23 or newer (the LTS from nodejs.org)"
         return ""
 
     def start(self, target: str, goal: str = "") -> str:

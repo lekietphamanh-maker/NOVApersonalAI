@@ -32,7 +32,10 @@ INSTRUCTIONS = ("You are doing a piece of work for Nova's owner. The current fol
 
 
 def find() -> str | None:
-    """The claude command, if Claude Code is installed (npm or the native installer)."""
+    """The claude command, if Claude Code is installed (npm or the native installer). PATH is read again from Windows
+    first, so Claude Code (or Node) installed while Nova was running is found too."""
+    import node_runtime
+    node_runtime.refresh_path()
     found = shutil.which("claude")
     if found:
         return found

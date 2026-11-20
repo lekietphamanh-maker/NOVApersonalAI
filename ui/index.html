@@ -437,10 +437,14 @@
         <summary><span class="folder" aria-hidden="true"></span>Reverse engineering · REA</summary>
         <ol class="need-steps">
           <li>Set up Claude Code (the Claude folder above).</li>
-          <li>Install <b>Node.js</b> 22.23 or newer (nodejs.org → LTS). Check in a new terminal: <code>node --version</code>.</li>
+          <li>Install <b>Node.js</b> 22.23 or newer (nodejs.org → LTS: run the downloaded <b>.msi</b>; the file alone isn't an install). Nova finds it without a restart.</li>
+          <li>Unzipped Node.js, or Nova still says it can't find it? Paste where <b>node.exe</b> is below (e.g. <code>C:\Tools\node-v24\node.exe</code> or its folder) and click <b>Save</b>.</li>
           <li>Tasks → Reverse engineering → <b>Turn on</b>, and read what it does.</li>
           <li>Say “reverse engineer &lt;app, site, file or folder&gt; and tell me how &lt;part&gt; works”. Only on things you're allowed to analyse. The report lands in outputs/ and the Library.</li>
         </ol>
+        <div class="row"><input id="node-path" class="field" maxlength="400" autocomplete="off" spellcheck="false"
+            placeholder="Where node.exe is (only if Nova can't find it)">
+          <button class="box" id="node-path-save">Save</button></div>
       </details>
       <details class="sub" id="need-ollama-cloud">
         <summary><span class="folder" aria-hidden="true"></span>Ollama Cloud · free online brain</summary>
@@ -657,6 +661,7 @@
         <div><span>VRAM</span><b id="live-vram">—</b><i class="meter"><i id="live-vram-bar"></i></i></div>
       </div>
       <p class="small" id="live-model"></p>
+      <p class="muted small" id="timing-last"></p>
       <div class="row wrap"><button class="box" id="model-load">Load model</button>
         <button class="box" id="model-unload">Unload (free graphics memory)</button></div>
       <p class="muted small" id="gpu-tip"></p>

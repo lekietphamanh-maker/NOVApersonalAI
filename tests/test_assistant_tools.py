@@ -152,9 +152,9 @@ class AgentToolTests(unittest.TestCase):
             offered: list = []
             agent._chat = lambda _messages, tools: offered.append([t["function"]["name"] for t in tools]) or {
                 "message": {"role": "assistant", "content": "ok"}}
-            agent.ask("hi", lambda *_: False)
+            agent.ask("open the camera", lambda *_: False)
             agent.creative = object()
-            agent.ask("hi", lambda *_: False)
+            agent.ask("open the camera", lambda *_: False)
         self.assertNotIn("creative_mode", offered[0])
         self.assertIn("creative_mode", offered[1])
         self.assertNotIn("ask_claude", offered[1])

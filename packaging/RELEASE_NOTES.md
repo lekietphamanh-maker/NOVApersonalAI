@@ -1,3 +1,12 @@
+## New in v2.6.0
+
+- **Faster answers**:
+  - With Screen assist on, Nova used to read your screen before *every* question and keep every question on this PC, even with Claude chosen. Now she reads the screen only when the question is about it ("this", "here", "click…", "my homework"). Everything else goes to the brain you chose.
+  - The AI on this PC is sent only the tools the question needs: about 1,200 tokens instead of 6,000. Earlier conversation is trimmed to fit its context, so Ollama can reuse what it already read instead of reading it all again.
+  - Nova thinks before answering only on hard questions or long ones (40 words or more, up from 25).
+- **Where the time goes**: SETTINGS → This PC shows the last answer's timings (hover the latency at the top left too): loading the model, reading the prompt, writing speed, reading the screen. They're also kept in `timings.jsonl` in Nova's data folder, so slowness can be traced to its real cause.
+- **Fixed: Node.js not found.** Nova now reads Windows' PATH again each time, so a Node.js installed while Nova was running counts. She also looks in the usual install places (the official installer, nvm, fnm, Volta, Scoop, Chocolatey). For an unzipped Node.js, paste where node.exe is in SETTINGS → Need to → Reverse engineering. Nova also says whether Node.js is missing or just too old.
+
 ## New in v2.5.0
 
 - **Nova has a new home**: github.com/lekietphamanh-maker/NOVApersonalAI. A Nova installed from the old repository can't see new versions: install **Nova-Setup.exe** from this release once (your settings, memory and models stay), and updates arrive by themselves from then on.

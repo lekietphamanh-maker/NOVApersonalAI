@@ -36,6 +36,7 @@ import daily_brief
 import gmail_tools
 import calendar_tools
 import drive_tools
+import node_runtime
 import google_mcp
 import world_monitor
 import hotkeys
@@ -68,6 +69,7 @@ from news_intel import assistant as news_assistant, pipeline as news_pipeline, s
 from news_intel.config import NewsConfig, data_dir as news_data_dir
 from news_intel.store import Store as NewsStore
 from brain_router import spoken_answer, spoken_place
+import agent as agent_module
 from agent import SCREEN_STEP_TOOLS, Agent, OllamaError, _http_json
 from screen_assist import risky_step
 from creative_mode import CreativeServer
@@ -291,7 +293,8 @@ class AlfredApp:
         self.reverse = reverse_engineering.ReverseEngineering(
             save=self.skills.save_output, library=self._file_reverse_engineering,
             done=lambda title, result, ok: self.events.put(("deep_work_done", (title, result, ok))),
-            workspace=Path.home() / "Documents" / "Nova Projects" / "Reverse engineering")
+            workspace=Path.home() / "Documents" / "Nova Projects" / "Reverse engineering",
+            node=lambda: reverse_engineering.node_version(choice=str(self.settings.get("node_path") or "")))
         self.agent.reverse = self.reverse.start if self.settings.get("reverse_on") else None
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
@@ -419,7 +422,8 @@ class AlfredApp:
                          "ask_by_voice": bool(self.settings.get("ask_by_voice", True)),
                          "screen_vision": bool(self.settings.get("screen_vision", True)),
                          "keep_running": self.settings.get("keep_running", True),
-                         "mini_orb": self.settings.get("mini_orb", True)},
+                         "mini_orb": self.settings.get("mini_orb", True),
+                         "node_path": self.settings.get("node_path", "")},
             "brief": None,
             "brief_loading": False,
             "notes": self._notes_state(),
@@ -694,7 +698,7 @@ class AlfredApp:
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
-               "world", "claude_connectors", "google_mcp"}
+               "world", "claude_connectors", "google_mcp", "node_path"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -1864,7 +1868,7 @@ class AlfredApp:
             if self.settings.get("reverse_on") or self.settings.get("google_mcp_on"):
                 add(id="node", name="Node.js (LTS)", why="Runs REA for reverse engineering, and the bridge Claude Desktop "
                     "uses to reach Nova's Gmail and Drive.", size="about 30 MB", optional=True, url="https://nodejs.org/en/download",
-                    done=shutil.which("node") is not None)
+                    done=node_runtime.find(str(self.settings.get("node_path") or "")) is not None)
             if brain_choice == "free":
                 status = (self.state.get("free_cloud") or {}).get("status", "")
                 add(id="ollama_signin", name="Ollama sign-in", why="For Ollama Cloud, Nova's chosen brain (free account).",
@@ -1960,6 +1964,18 @@ class AlfredApp:
         return None
 
     # ---------- who answered, and this PC's live load (Settings → Model and This PC) ----------
+
+    def _log_timing(self, latency_ms: int) -> None:
+        """Where the last answer's time went (shown in Settings → This PC, kept in timings.jsonl for comparing)."""
+        stats = dict(self.agent.turn_stats)
+        summary = agent_module.describe_timing(stats)
+        self._update(timing={"latency_ms": latency_ms, "summary": summary, "local": bool(stats.get("eval_count"))})
+        try:
+            with (_data_dir() / "timings.jsonl").open("a", encoding="utf-8") as log:
+                log.write(json.dumps({"time": datetime.now().isoformat(timespec="seconds"), "latency_ms": latency_ms,
+                                      **stats}) + "\n")
+        except OSError:
+            pass  # the record is a convenience; the answer is what matters
 
     def _log_answer(self, label: str, why: str) -> None:
         entry = {"time": datetime.now().strftime("%H:%M"), "brain": label, "why": why}
@@ -2682,6 +2698,22 @@ class AlfredApp:
         except Exception:  # no vault right now: the report is still in outputs/
             pass
 
+    def _act_node_path(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        """The owner points Nova at node.exe (or its folder), for a Node.js that isn't installed the usual way."""
+        text = str(args.get("path") or "").strip()
+        if text and node_runtime.chosen(text) is None:
+            return {"ok": False, "error": "That isn't node.exe or a folder with node.exe in it."}
+        self._save_setting("node_path", text)
+        self._update(settings={"node_path": text})
+        node = node_runtime.find(text)
+        found = node_runtime.version(node) if node is not None else None
+        self._update(discover=self._discover_state(), downloads=self._downloads_state())
+        if found is None:
+            return {"ok": False, "error": "Nova still can't find Node.js."}
+        node_runtime.use(node)
+        self._toast(f"Node.js {'.'.join(map(str, found))} found: {node}", "ok")
+        return None
+
     def _act_reverse_toggle(self, args: dict[str, Any]) -> dict[str, Any] | None:
         on = bool(args.get("on"))
         if on and not self.settings.get("reverse_consented") and not args.get("consented"):
@@ -3221,6 +3253,7 @@ class AlfredApp:
             self._append_chat("NOVA", reply, "assistant")
             self._finish_skill(reply)
             self._update(busy=False, latency_ms=latency, reminders=self._reminders_state())
+            self._log_timing(latency)
             self._refresh_tasks()
             self._set_idle_voice()
             threading.Thread(target=self._status_worker, daemon=True).start()
