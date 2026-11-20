@@ -1,3 +1,9 @@
+## New in v2.8.1
+
+- **Rea, redrawn as an orbit**: the app you analyse is a small glowing core, and its parts orbit it on tilted rings, each leaving a faint trail, with their links arcing through the core. Around the edges: the app's name, the counts, the chosen part's card (what Rea found, what it talks to), the stages, and a live timeline of what Rea is doing. Drag to spin and tilt it, scroll or pinch to zoom, click a part to bring it round to the front; ← → go part by part.
+- **Shannon, redrawn as a shield**: your app is a hexagon shield with a glowing heart, and Shannon's attacks swirl around it, faster while it works. Every hole it proved is a bracketed spot on the shield: **red and pulsing means look at it first** (critical and high), amber is medium, yellow is low. When you've fixed one, press **Mark fixed** and it calms to green; Nova remembers, and the banner counts what's still open.
+- **Webcam gestures** move Rea and Shannon while they're open: swipe for the next or previous part or spot, 👍/👎 to zoom, ✊ to open (in Shannon: mark the spot fixed), ✌ to close.
+
 ## New in v2.8.0
 
 - **Tuned for your PC, after every update**: Nova measures the models on your PC and runs the strongest one that stays smooth. Your graphics card gets the whole model, Ollama gets flash attention and a compact memory (twice the context in the same graphics memory), and a Radeon that Ollama left on the processor is switched to Vulkan. A bigger model downloads by itself when your PC can run it, and Nova takes the longest context (up to 32K) that still fits on the card, so she remembers more of the conversation. SETTINGS → This PC shows what was measured (speed, how much is on the graphics card) and has **Tune now**.
