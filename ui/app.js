@@ -6,6 +6,7 @@ import { createWorld } from "./world.js";
 import { createRoute } from "./route.js";
 import { createRea } from "./rea.js";
 import { createShannon } from "./shannon.js";
+import { createSkills } from "./skills.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -33,6 +34,7 @@ const world = createWorld($("#world"), { act: (...args) => act(...args), onOpenC
   if (open && library.isOpen()) library.close();
   if (open && mapOpen) openMap(false);
   if (open) closeLabs();
+  if (open && routeView.isOpen()) routeView.close();
 } });
 const routeView = createRoute($("#route"), { act: (...args) => act(...args), onOpenChange: (open) => {
   $("[data-act=route]").classList.toggle("on", open);
@@ -40,16 +42,47 @@ const routeView = createRoute($("#route"), { act: (...args) => act(...args), onO
   if (open && library.isOpen()) library.close();
   if (open) closeLabs();
 } });
+// A route starts on the globe: it flies to the city while the roads are worked out, then dives into the street map.
+const ROUTE_FLIGHT_MS = 2200, DIVE_MS = 450;
+let routeFlight = 0;
+const calm = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+function routeFocus(place) {
+  if (calm()) return;
+  if (!world.isOpen()) world.open();
+  world.flyTo(place.lon, place.lat, 6, ROUTE_FLIGHT_MS);
+  routeFlight = performance.now();
+}
+function showRoute(route) {
+  if (calm()) { routeView.show(route); return; }
+  if (!routeFlight) {  // no focus came first (an old Nova, or a cached route): fly now
+    const middle = (key) => route.places.reduce((sum, place) => sum + place[key], 0) / route.places.length;
+    routeFocus({ lon: middle("lon"), lat: middle("lat") });
+  }
+  const wait = Math.max(0, ROUTE_FLIGHT_MS + 100 - (performance.now() - routeFlight));
+  routeFlight = 0;
+  setTimeout(() => {
+    $("#world").classList.add("dive-out");
+    setTimeout(() => {
+      $("#world").classList.remove("dive-out");
+      routeView.show(route);  // opening the route closes the globe
+      $("#route").classList.add("dive-in");
+      setTimeout(() => $("#route").classList.remove("dive-in"), 1000);
+    }, DIVE_MS);
+  }, wait);
+}
+
 // Full-screen views: opening one closes the others.
 function labOpened(name, open) {
   $(`[data-act=${name}]`).classList.toggle("on", open);
   if (!open) return;
-  for (const other of [world, routeView, library, rea, shannon]) if (other && other !== labs[name] && other.isOpen()) other.close();
+  for (const other of [world, routeView, library, rea, shannon, skills]) if (other && other !== labs[name] && other.isOpen()) other.close();
 }
 const labs = {};
 function closeLabs() { for (const lab of Object.values(labs)) if (lab.isOpen()) lab.close(); }
 const rea = labs.rea = createRea($("#rea"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("rea", open) });
 const shannon = labs.shannon = createShannon($("#shannon"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("shannon", open) });
+const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
+  ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
 let online = false;
 let offlineTimer = 0;
 let openPane = null;
@@ -134,8 +167,9 @@ function handle(event) {
     case "library_changed": library.reload(); break;
     case "world_focus": world.open(event); break;
     case "world_data": if (world.isOpen()) world.setData(event); break;
-    case "route_view": routeView.show(event.route); break;
-    case "route_error": routeView.open(); routeView.error(event.text); break;
+    case "route_focus": routeFocus(event); break;
+    case "route_view": showRoute(event.route); break;
+    case "route_error": routeFlight = 0; routeView.open(); routeView.error(event.text); break;
     case "rea_job": rea.job(event.job); break;
     case "rea_step": rea.step(event); break;
     case "rea_ready": rea.ready(event); break;
@@ -1420,6 +1454,7 @@ $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.op
 $("[data-act=route]").onclick = () => (routeView.isOpen() ? routeView.close() : routeView.open());
 $("[data-act=rea]").onclick = () => (rea.isOpen() ? rea.close() : rea.open());
 $("[data-act=shannon]").onclick = () => (shannon.isOpen() ? shannon.close() : shannon.open());
+$("[data-act=skills]").onclick = () => (skills.isOpen() ? skills.close() : skills.open());
 $("#map-add").onclick = () => mindmap.addIdea();
 $("#map-outline-toggle").onclick = () => setPane("notes");
 $("#map-tidy").onclick = () => mindmap.tidy();
@@ -1743,6 +1778,7 @@ document.addEventListener("keydown", (event) => {
     else if (routeView.isOpen()) routeView.close();
     else if (rea.isOpen()) rea.close();
     else if (shannon.isOpen()) shannon.close();
+    else if (skills.isOpen()) skills.close();
     else if (mapOpen) openMap(false);
     else act("stop");
     return;

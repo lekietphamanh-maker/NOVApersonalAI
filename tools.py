@@ -265,6 +265,11 @@ OBS_TOOL = _tool(
     "list_scenes, switch_scene (scene: its name).",
     {"action": {"type": "string", "enum": ["status", "start_recording", "stop_recording", "start_streaming",
                                            "stop_streaming", "list_scenes", "switch_scene"]}, "scene": _TEXT}, ["action"])
+OPTIMIZE_PROMPT_TOOL = _tool(
+    "optimize_prompt", "Rewrite a prompt so an AI answers it better, then test both on the same model and say which "
+    "won. prompt: the prompt itself, word for word. kind: user (a request, default) or system (instructions that set up "
+    "an assistant). test: compare the answers (default true; false is quicker).",
+    {"prompt": _TEXT, "kind": {"type": "string", "enum": ["user", "system"]}, "test": {"type": "boolean"}}, ["prompt"])
 RUN_CODE_TOOL = _tool(
     "run_code", "Work something out with real code instead of guessing: exact maths, statistics, unit and date "
     "calculations, analysing numbers or a table someone gave, a quick simulation. task: what to work out, with all "
@@ -274,7 +279,8 @@ VSCODE_TOOL = _tool(
     "vscode", "Open a project folder or a file in VS Code, at a line if given. target: a path, or a project's name in "
     "Documents/Nova Projects.", {"target": _TEXT, "line": {"type": "integer"}}, ["target"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
-               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL]
+               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
+               OPTIMIZE_PROMPT_TOOL]
 
 
 
@@ -804,6 +810,9 @@ def _run_code(_name: str, _arguments: dict[str, Any], _context: ToolContext) -> 
 
 register([WIKIPEDIA_TOOL], _run_wikipedia)
 register([RUN_CODE_TOOL], _run_code)
+register([OPTIMIZE_PROMPT_TOOL], lambda _name, arguments, context: context.optimize(
+    str(arguments["prompt"])[:8000], str(arguments.get("kind") or "user"), arguments.get("test") is not False)
+    if context.optimize is not None else "The prompt optimizer isn't available here.")
 register([NOTES_TOOL], lambda _name, arguments, context: context.notes_search(_words(arguments["query"], 300))
          if context.notes_search is not None else "Your notes aren't indexed yet: Settings → Offline knowledge.")
 register([DISCOVER_TOOL], _run_discover)

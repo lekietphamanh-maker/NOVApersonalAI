@@ -27,6 +27,7 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("second_brain", "library", "search_my_notes"), r"second brain|notes?|wiki|learn(ed|t)?|watched|read about|obsidian|vault|library|i wrote|i saved|i kept|"
                                   r"projects?|ideas?|repos?"),
     (("mind_map", "add_to_map"), r"map|brainstorm|visuali[sz]e|ideas?"),
+    (("optimize_prompt",), r"prompt"),
     (("run_code",), r"statistic|average|median|standard deviation|regression|percent(age)?|compound|interest rate|"
                     r"probabilit|simulat|analy[sz]e (these|this|the) (numbers|data|table)|convert|how many (days|weeks)|"
                     r"code|python|algorithm|prime|factorial|equation|solve"),

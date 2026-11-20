@@ -32,6 +32,7 @@
     <button class="box" data-act="library" title="Your projects, repos and ideas by topic">Library</button>
     <button class="box" data-act="world" title="What's happening on Earth: quakes, storms, fires, news">World</button>
     <button class="box" data-act="route" title="The fastest way from A to B, with stops">Route</button>
+    <button class="box" data-act="skills" title="Every skill Nova has, and whether it's ready">Skills</button>
     <button class="box" data-act="rea" title="Rea: how an app is built, as a blueprint">Rea</button>
     <button class="box" data-act="shannon" title="Shannon: break into your own app before someone else does">Shannon</button>
     <span class="toolbar-gap" aria-hidden="true"></span>
@@ -167,6 +168,17 @@
     <aside class="world-side route-side" id="route-info" aria-live="polite"><span class="muted small">Say “fastest way from District 12 to District 7 via Ben Thanh”, or type it above.</span></aside>
   </div>
   <p class="lib-hint">roads from OpenStreetMap, worked out on this PC &nbsp;·&nbsp; normal speeds, no live traffic &nbsp;·&nbsp; Esc</p>
+</section>
+
+<section id="skills" class="world lab lab-skills" hidden aria-label="Skills">
+  <header class="lib-head">
+    <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>SKILLS</b><span class="lib-crumb">everything Nova can do</span></div>
+    <input class="field skills-search" id="skills-search" type="search" placeholder="Find a skill: mail, route, timer…" aria-label="Find a skill">
+    <div class="row skills-filters" id="skills-filters" role="group" aria-label="Show"></div>
+    <button class="box small" id="skills-close" type="button" title="Esc">Close</button>
+  </header>
+  <div class="skills-grid" id="skills-grid"></div>
+  <p class="lib-hint" id="skills-keys"></p>
 </section>
 
 <section id="rea" class="world lab lab-rea" hidden aria-label="Rea">

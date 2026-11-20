@@ -45,6 +45,7 @@ class ToolContext:
     notes_search: Callable[[str], str] | None = None
     obs_password: str = ""
     cloud: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # cloud_tools: Claude does it instead
+    optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer, on the brain the owner uses
 
 
 class NotHere(Exception):

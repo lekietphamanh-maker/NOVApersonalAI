@@ -89,6 +89,7 @@ import cloud_relay
 import discover as discovery
 import reverse_engineering
 import auto_tune
+import skills_board
 import shannon_runner
 from lab_jobs import JobLog
 from timers import Timers
@@ -320,6 +321,7 @@ class AlfredApp:
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
         self.agent.route = self._route_tool
+        self.agent.optimize = self._optimize_prompt
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self._apply_knowledge()
         self.agent.web = self.web
@@ -737,7 +739,7 @@ class AlfredApp:
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
                "obs_password", "rea_view", "rea_start", "rea_open", "rea_report",
-               "tune_now", "auto_tune", "cloud_fallback", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report"}
+               "tune_now", "auto_tune", "cloud_fallback", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2315,6 +2317,12 @@ class AlfredApp:
 
     def _route_tool(self, start: str, end: str, stops: list[str], mode: str, best_order: bool) -> str:
         try:
+            first = self.router.geocode(start)  # kept, so route() below doesn't ask again
+            # The globe flies to the city at once, while the roads are worked out.
+            self.ui.emit({"type": "route_focus", "name": first["name"], "lat": first["lat"], "lon": first["lon"]})
+        except (ValueError, OSError):
+            pass  # route() below says what went wrong
+        try:
             found = self.router.route(start, end, stops, mode, best_order)
         except ValueError as exc:
             self.ui.emit({"type": "route_error", "text": f"No route: {exc}."})
@@ -2692,6 +2700,76 @@ class AlfredApp:
             return
         self.agent.num_ctx = int(tuned.get("num_ctx") or 8192)
         self.agent.keep_alive = str(tuned.get("keep_alive") or "30m")
+
+    # ---------- the Skills board: everything Nova can do, and whether it's ready here ----------
+
+    def _skills_status(self) -> dict[str, tuple[str, str]]:
+        READY, SETUP, CLOUD, OFF = skills_board.READY, skills_board.SETUP, skills_board.CLOUD, skills_board.OFF
+        on = lambda flag, note="": (READY, "") if flag else (OFF, note)  # noqa: E731
+        cloud = self.agent.cloud_tools is not None
+        tuned = self.settings.get("tuning") or {}
+        try:
+            notes = self.notes_index.count() > 0
+        except Exception:
+            notes = False
+        reverse_problem = self.reverse.problem() if self.settings.get("reverse_on") else ""
+        return {
+            "mic": (READY, "") if self.voice.available else (SETUP, "no microphone input found"),
+            "claude": (READY, "") if (claude_expert.available() or claude_code.find()) else (SETUP, "SETTINGS → Model → Claude"),
+            "cloud": (READY, "") if cloud else (SETUP, "a Claude API key or Claude Code, and the cloud switch on"),
+            "tune": (READY, f"{tuned.get('model')} · {round(tuned.get('tokens_per_second') or 0)} tokens/s") if tuned
+                    else (SETUP, "not measured yet: SETTINGS → This PC → Tune now"),
+            "wikipedia": (READY, "offline") if self.wikipedia.installed() else
+                         ((CLOUD, "not downloaded: Claude looks it up online") if cloud else (SETUP, "SETTINGS → Offline knowledge")),
+            "notes": (READY, "") if notes else (SETUP, "SETTINGS → Offline knowledge → Index my notes"),
+            "second_brain": on(self.settings.get("second_brain"), "SETTINGS → Second brain"),
+            "news": on(self.settings.get("news_on"), "BRIEF → News desk"),
+            "google": (READY, "") if gmail_tools.connected() else (SETUP, "SETTINGS → Connections → Connect Google"),
+            "calendar": (READY, "") if gmail_tools.connected() and gmail_tools.calendar_granted() else
+                        (SETUP, "SETTINGS → Connections → Add Google Calendar"),
+            "drive": (READY, "") if gmail_tools.connected() and gmail_tools.drive_granted() else
+                     (SETUP, "SETTINGS → Connections → Add Google Drive"),
+            "screen": ((OFF, "Windows only for now") if not IS_WINDOWS else on(self.assist is not None, "Assist button")),
+            "camera": (READY, ""),
+            "claude_code": (READY, "") if self.deep_work.available else (SETUP, "install Claude Code and sign in"),
+            "vscode": (READY, "") if (shutil.which("code") or shutil.which("code.cmd")) else (SETUP, "VS Code's code command"),
+            "reverse": (OFF, "REA screen") if not self.settings.get("reverse_on") else
+                       ((SETUP, reverse_problem) if reverse_problem else (READY, "")),
+            "shannon": (READY, "checks WSL, Docker and the key when it runs") if self.settings.get("shannon_consented")
+                       else (SETUP, "SHANNON screen; needs WSL2, Docker Desktop and an API key"),
+            "telegram": on(self.settings.get("telegram_on"), "SETTINGS → Telegram"),
+            "heart": on(self.settings.get("heart_on"), "SETTINGS → Fitness"),
+        }
+
+    # ---------- the prompt optimizer, on the brain the owner uses ----------
+
+    def _prompt_ask(self, system: str, prompt: str) -> str:
+        """One plain answer: Claude with the API key when Claude is the chosen brain, else the model on this PC."""
+        key = claude_expert.key()
+        if key and self._brain_choice() == "claude":
+            import anthropic
+            reply = anthropic.Anthropic(api_key=key, max_retries=1).messages.create(
+                model=self.settings.get("claude_model", cloud_brain.DEFAULT_MODEL), max_tokens=4000,
+                output_config={"effort": "low"}, messages=[{"role": "user", "content": prompt}],
+                **({"system": system} if system else {}))
+            return "".join(block.text for block in reply.content if block.type == "text")
+        messages = ([{"role": "system", "content": system}] if system else []) + [{"role": "user", "content": prompt}]
+        reply = _http_json(f"{self.agent.base_url}/api/chat", {
+            "model": self.agent.model, "messages": messages, "stream": False, "think": False,
+            "keep_alive": self.agent.keep_alive, "options": {"num_ctx": self.agent.num_ctx, "num_predict": 1500,
+                                                            "temperature": 0.3}}, timeout=300)
+        return str((reply.get("message") or {}).get("content") or "")
+
+    def _optimize_prompt(self, prompt: str, kind: str, test: bool) -> str:
+        import prompt_optimizer
+        result = prompt_optimizer.optimize(prompt, self._prompt_ask, kind, test)
+        saved = self.skills.save_output(f"Prompt {' '.join(prompt.split()[:6])}",
+                                        f"## Original\n\n{result.original}\n\n## Optimized\n\n{result.optimized}\n\n"
+                                        f"Result: {result.winner}. {result.why}")
+        return f"{result.summary()}\n\n(Kept in outputs/{saved.name}.)"
+
+    def _act_skills_board(self, _args: dict[str, Any]) -> dict[str, Any]:
+        return {"ok": True, **skills_board.board(self._skills_status(), self._skills_state()["list"], self._hotkey_state())}
 
     def _act_tune_now(self, _args: dict[str, Any]) -> dict[str, Any] | None:
         if USB:

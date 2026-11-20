@@ -173,8 +173,8 @@ export function createWorld(root, { act, onOpenChange }) {
       event.url ? h("button", { class: "box small", type: "button", onclick: () => act("open_url", { url: event.url }) }, "Open the source") : null);
   }
 
-  function flyTo(lon, lat, zoom = view.zoom) {
-    flight = { from: { ...view }, to: { lon, lat, zoom: Math.max(0.7, Math.min(6, zoom)) }, start: performance.now(), duration: 1400 };
+  function flyTo(lon, lat, zoom = view.zoom, duration = 1400) {
+    flight = { from: { ...view }, to: { lon, lat, zoom: Math.max(0.7, Math.min(6, zoom)) }, start: performance.now(), duration };
     lastTouch = performance.now();
   }
 

@@ -43,3 +43,10 @@
 .route-side b { color: #fff; font: 600 18px/1.2 var(--mono); }
 .route-side i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
 @media (max-width: 900px) { .route-form { flex-wrap: wrap; } }
+
+/* A route: the globe zooms through to the city, and the street map grows out of it. */
+.world.dive-out { animation: route-dive-out 0.45s ease-in forwards; }
+.world.dive-in { animation: route-dive-in 0.9s var(--ease); }
+@keyframes route-dive-out { to { transform: scale(2.6); opacity: 0; filter: blur(3px); } }
+@keyframes route-dive-in { from { transform: scale(0.4); opacity: 0; filter: blur(4px); } }
+@media (prefers-reduced-motion: reduce) { .world.dive-out, .world.dive-in { animation: none; } }
