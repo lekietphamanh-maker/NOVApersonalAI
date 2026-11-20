@@ -6,6 +6,7 @@ open in the user's browser cannot drive Nova (no CSRF, no DNS rebinding).
 from __future__ import annotations
 
 import hmac
+import collections
 import json
 import queue
 import secrets
@@ -59,6 +60,7 @@ class _Handler(SimpleHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:  # noqa: N802 - http.server naming
+        self.server_state.requests.append(self.path.split("?")[0].split("#")[0][:60])  # the smoke test says what came
         if not self._loopback_host():
             self.send_error(403)
             return
@@ -141,6 +143,7 @@ class UiServer:
         self._lock = lock or threading.RLock()
         self._httpd: ThreadingHTTPServer | None = None
         self.ever_connected = threading.Event()
+        self.requests: collections.deque[str] = collections.deque(maxlen=40)
         self.on_replace: Callable[[], None] | None = None
         self.on_show: Callable[[], None] | None = None
 

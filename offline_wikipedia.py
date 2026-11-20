@@ -72,20 +72,29 @@ def article_text(page: str) -> str:
     return "\n".join(line for line in lines if line)
 
 
+FLAVOUR_FALLBACK = ("nopic", "mini", "maxi", "")  # when Kiwix stops offering a pack's own flavour, the nearest one
+
+
 def parse_catalog(feed: bytes | str, pack: Pack) -> dict[str, Any] | None:
-    """The newest download of this pack in Kiwix's OPDS catalog: {"url", "bytes", "updated"}."""
-    best = None
+    """The newest download of this pack in Kiwix's OPDS catalog: {"url", "bytes", "updated", "flavour"}. The pack's own
+    flavour first; if Kiwix no longer lists it, the nearest one it does (no pictures before mini before full)."""
+    by_flavour: dict[str, dict[str, Any]] = {}
     for entry in ElementTree.fromstring(feed).iter(f"{ATOM}entry"):
-        if (entry.findtext(f"{ATOM}name") or "") != pack.name or (entry.findtext(f"{ATOM}flavour") or "") != pack.flavour:
+        if (entry.findtext(f"{ATOM}name") or "") != pack.name:
             continue
         link = next((item for item in entry.iter(f"{ATOM}link") if item.get("rel") == ACQUIRE), None)
         if link is None:
             continue
+        flavour = entry.findtext(f"{ATOM}flavour") or ""
         found = {"url": link.get("href", "").removesuffix(".meta4"), "bytes": int(link.get("length") or 0),
-                 "updated": entry.findtext(f"{ATOM}updated") or ""}
+                 "updated": entry.findtext(f"{ATOM}updated") or "", "flavour": flavour}
+        best = by_flavour.get(flavour)
         if found["url"].endswith(".zim") and (best is None or found["updated"] > best["updated"]):
-            best = found
-    return best
+            by_flavour[flavour] = found
+    for flavour in (pack.flavour, *FLAVOUR_FALLBACK):
+        if flavour in by_flavour:
+            return by_flavour[flavour]
+    return next(iter(by_flavour.values()), None)
 
 
 class Wikipedia:

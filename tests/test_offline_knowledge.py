@@ -171,5 +171,9 @@ class LiveCatalogTests(unittest.TestCase):
         for pack in wiki.PACKS:
             found = reader.find(pack)
             print(pack.key, found)
+            if found is None:  # what Kiwix lists under that name, so a renamed pack is easy to fix
+                query = wiki.urlencode({"name": pack.name, "count": 50})
+                with wiki.urlopen(wiki.Request(f"{wiki.CATALOG}?{query}", headers={"User-Agent": wiki.USER_AGENT}), timeout=30) as response:
+                    print(response.read()[:3000].decode("utf-8", "replace"))
             self.assertIsNotNone(found, pack.key)
             self.assertTrue(found["url"].endswith(".zim") and found["bytes"] > 0)

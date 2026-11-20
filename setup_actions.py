@@ -120,8 +120,9 @@ class SetupActions:
             self.events.put(("downloads", None))
 
     def _act_setup_everything(self, _args: dict[str, Any]) -> dict[str, Any] | None:
-        from dashboard import USB
-        if not self.setup.start(self._setup_steps(USB)):
+        # Not `from dashboard import USB`: run as `python dashboard.py` that module is __main__, and importing it
+        # again loads a second copy of the whole app.
+        if not self.setup.start(self._setup_steps(self.usb_edition)):
             return {"ok": False, "error": "Nova is setting up already."}
         return None
 
@@ -130,8 +131,9 @@ class SetupActions:
         self._toast("Stopping after the current step.", "info")
 
     def _setup_first_run(self) -> None:
-        """The first start after install: Nova sets everything up by herself (the toast can stop it)."""
-        if self.settings.get("setup_started"):
+        """The first start after install: Nova sets everything up by herself (the toast can stop it). Never in a
+        smoke test or CI, where it would really install Ollama on the build machine."""
+        if self.settings.get("setup_started") or not self.auto_setup:
             return
         self._save_setting("setup_started", time.strftime("%Y-%m-%d"))
         self._act_setup_everything({})

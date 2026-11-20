@@ -341,6 +341,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
         self.agent.make_image = self._make_image
         self.docker_apps = separate_apps.Docker()
         self.setup = setup_everything.Setup(self._setup_report)
+        self.usb_edition = USB
+        self.auto_setup = not os.environ.get("CI")  # main() also turns it off for --smoke-test
         self.workplace_board = workplace.WorkplaceBoard(_data_dir() / "workplaces", lambda event: self.ui.emit(event))
         self.agent.open_workplace = self._open_workplace
         self.agent.advance = self._set_advance
@@ -4406,6 +4408,7 @@ def main() -> int:
                 _console_log(f"Nova USB hardware-aware model choice unavailable; using {MODEL or 'qwen2.5:7b'}: {exc}", error=True)
         root = tk.Tk()
         app = AlfredApp(root, startup)
+        app.auto_setup = app.auto_setup and not args.smoke_test
         url = app.start(open_window=not args.no_window)
         _console_log(f"Nova HUD: {url}" if args.no_window else "Nova ready")
         app._status_loop()
@@ -4432,7 +4435,11 @@ def main() -> int:
                         return
                     root.after(500, check_connected)
                 elif time.monotonic() - started > 90:
-                    _console_log("Nova smoke test: the HUD never connected", error=True)
+                    browser = app.window_process
+                    _console_log("Nova smoke test: the HUD never connected. Browser: "
+                                 f"{app_window.find_edge()}; its process: "
+                                 f"{'none' if browser is None else 'running' if browser.poll() is None else f'exited {browser.returncode}'}; "
+                                 f"pages asked for: {list(app.ui.requests) or 'none'}", error=True)
                     app.smoke_failed = True
                     app._close()
                 else:

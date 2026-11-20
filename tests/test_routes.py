@@ -105,7 +105,7 @@ class LiveRouteTests(unittest.TestCase):
     def test_a_real_route_in_ho_chi_minh_city(self) -> None:
         router = routes.Router(Path(tempfile.mkdtemp()), near=lambda: "Ho Chi Minh City, Vietnam")
         route = router.route("Ben Thanh Market", "Saigon Notre-Dame Basilica", mode="motorbike")
-        print(route.summary())
+        print(route.summary().encode("ascii", "replace").decode())  # the runner's console is cp1252
         self.assertLess(route.metres, 5000)
         self.assertGreater(len(route.searched), 10)
 
