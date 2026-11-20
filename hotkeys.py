@@ -20,17 +20,17 @@ _TYPING = set(range(0x30, 0x3A)) | set(range(0x41, 0x5B)) | {0x08, 0x09, 0x0D, 0
 MAC_NAMES = {0x11: "Control", 0x12: "Option", 0x5B: "Command", 0x5C: "Command", 0x08: "Delete", 0x0D: "Return"}
 
 
-def held(code: int, platform: str = sys.platform) -> bool:
+def held(code: int, platform: str | None = None) -> bool:
     """Whether the key is down right now, whichever app is in front."""
-    if platform == "darwin":
+    if (platform or sys.platform) == "darwin":
         import mac
         return mac.key_held(code)
     import ctypes
     return bool(ctypes.windll.user32.GetAsyncKeyState(code) & 0x8000)
 
 
-def key_name(code: int, platform: str = sys.platform) -> str:
-    if platform == "darwin" and code in MAC_NAMES:
+def key_name(code: int, platform: str | None = None) -> str:
+    if (platform or sys.platform) == "darwin" and code in MAC_NAMES:
         return MAC_NAMES[code]
     if code in MODIFIERS:
         return MODIFIERS[code]

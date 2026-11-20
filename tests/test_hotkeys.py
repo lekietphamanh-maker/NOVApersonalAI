@@ -1,10 +1,18 @@
 """Changing Nova's hotkeys: readable names, and no combo that would fire while you type or clash with the other."""
 import unittest
+import unittest.mock
 
 import hotkeys
 
 
 class HotkeyTests(unittest.TestCase):
+    """The names Windows shows (a Mac says Control+Option instead: tests.test_mac)."""
+
+    def setUp(self) -> None:
+        patcher = unittest.mock.patch.object(hotkeys.sys, "platform", "win32")
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_names_read_like_the_keyboard(self) -> None:
         self.assertEqual(hotkeys.label([0x12, 0x11]), "Ctrl+Alt")
         self.assertEqual(hotkeys.label([0x20, 0x10, 0x11]), "Ctrl+Shift+Space")

@@ -323,7 +323,6 @@ class AlfredApp:
         self.agent.route = self._route_tool
         self.agent.optimize = self._optimize_prompt
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
-        self._apply_knowledge()
         self.agent.web = self.web
         self.agent.claude = claude_expert.available()
         self.agent.on_brain = lambda label, why: self.events.put(("brain", (label, why)))
@@ -494,6 +493,7 @@ class AlfredApp:
         if self.settings.get("second_brain") and sys.platform == "win32":
             self.root.after(4000, self._apply_second_brain)
         self._apply_pc_sync()
+        self._apply_knowledge()
         self._apply_claude()
         self._apply_free_cloud()
         self._apply_telegram()
