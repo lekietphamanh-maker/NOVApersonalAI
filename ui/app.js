@@ -625,6 +625,7 @@ function renderCore() {
   if (voice.tone === "error" && renderCore.lastError !== voice.text) { core.flashError(); renderCore.lastError = voice.text; }
   if (state.approval) label = "WAITING FOR YOU";
   core.setMode(mode, label);
+  workplace.setMood(mode);
 }
 
 function renderAccent() {

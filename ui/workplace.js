@@ -2,6 +2,8 @@
 // every question asked while it's open (workplace_sync) and works on it through workplace_command events: highlight
 // words, add her note next to something, point at an item. Closing asks whether to save.
 import { h, screen } from "./lab.js";
+import { createCore } from "./core.js";
+import { createProjector } from "./holo.js";
 
 const MAX_PICTURE = 1600;           // px: pictures are shrunk before they go on the board
 const MAX_FILE_BYTES = 15_000_000;
@@ -11,13 +13,36 @@ const INK = ["#f2f4f7", "#ffb040", "#3be4ff", "#ff3b5c"];
 const SYNC_MS = 700;
 const LABEL = { note: "Note", sketch: "Sketch", picture: "Picture", file: "File", nova: "Nova" };
 const SIZE = { note: [260, 200], sketch: [340, 260], picture: [320, 240], file: [320, 260], nova: [280, 170] };
+const HOLO_BLUE = "90, 190, 255";
 const highlights = typeof Highlight === "function" && globalThis.CSS?.highlights ? CSS.highlights : null;
 
 export function createWorkplace(root, { act, toast, onOpenChange }) {
   const layer = root.querySelector("#wp-layer"), board = root.querySelector("#wp-board"), links = root.querySelector("#wp-links");
   const nameBox = root.querySelector("#wp-name"), picker = root.querySelector("#wp-picker"), reply = root.querySelector("#wp-reply");
   let items = [], selected = new Set(), dirty = false, view = { x: 0, y: 0, zoom: 1 }, syncTimer = 0;
-  const view$ = screen(root, { onOpenChange, onOpen: () => { draw(); sync(); } });
+  const view$ = screen(root, { onOpenChange, onOpen: () => { draw(); sync(); project(items.length > 0); } });
+
+  // The orb starts in the middle; tapped (or as soon as something goes on the board) it drops to the bottom and
+  // becomes the projector: the items appear as see-through holograms with a beam of light following each one.
+  const orbButton = root.querySelector("#wp-orb");
+  let orbCore = null, projecting = false;
+  const projector = createProjector(root.querySelector("#wp-beams"), { targets: () => {
+    const origin = board.getBoundingClientRect();
+    return [...layer.querySelectorAll(".wp-item")].map((element) => {
+      const box = element.getBoundingClientRect();
+      return { box: { left: box.left - origin.left, right: box.right - origin.left, top: box.top - origin.top, bottom: box.bottom - origin.top },
+        selected: element.classList.contains("selected") };
+    });
+  } });
+  function project(on) {
+    if (!orbCore) { orbCore = createCore(orbButton.querySelector("canvas"), { widget: true }); orbCore.setAccent(HOLO_BLUE); }
+    if (on === projecting) return;
+    projecting = on;
+    root.classList.toggle("projecting", on);
+    orbButton.setAttribute("aria-label", on ? "Turn the projector off" : "Start projecting");
+    if (on) { projector.start(); draw(); } else projector.stop();
+  }
+  orbButton.addEventListener("click", () => project(!projecting));
 
   const newId = () => Math.random().toString(36).slice(2, 10);
   function changed() { dirty = true; clearTimeout(syncTimer); syncTimer = setTimeout(sync, SYNC_MS); }
@@ -34,6 +59,7 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
     return { x: (box.width / 2 - view.x) / view.zoom - w / 2 + offset, y: (box.height / 2 - view.y) / view.zoom - h_ / 2 + offset, w, h: h_ };
   }
   function add(kind, fields = {}, near = null) {
+    if (!projecting) project(true);
     const item = { id: newId(), kind, text: "", name: "", image: "", near: near ? near.id : "", marks: [], ...place(kind, near), ...fields };
     if (near && fields.h === undefined) item.y = Math.max(item.y, lowestBeside(near, item));
     items.push(item);
@@ -60,7 +86,11 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
 
   function draw() {
     layer.querySelectorAll(".wp-item").forEach((element) => element.remove());
-    for (const item of items) layer.append(itemElement(item));
+    items.forEach((item, index) => {
+      const element = itemElement(item);
+      element.style.animationDelay = `${index * 70}ms`;  // they materialise one after another
+      layer.append(element);
+    });
     drawLinks();
     paintMarks();
     root.querySelector("#wp-empty").hidden = items.length > 0;
@@ -118,9 +148,9 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
     const context = () => canvas.getContext("2d");
     const save = () => { item.image = canvas.toDataURL("image/png"); changed(); };
     requestAnimationFrame(() => {  // sized once it's on the page: its pixels match the screen
-      const box = canvas.getBoundingClientRect();
-      canvas.width = Math.max(1, Math.round(box.width / view.zoom * devicePixelRatio));
-      canvas.height = Math.max(1, Math.round(box.height / view.zoom * devicePixelRatio));
+      // Layout size, not the on-screen box: the hologram is still unfolding (scaled) when this runs.
+      canvas.width = Math.max(1, Math.round(canvas.offsetWidth * devicePixelRatio));
+      canvas.height = Math.max(1, Math.round(canvas.offsetHeight * devicePixelRatio));
       if (item.image) {
         const picture = new Image();
         picture.onload = () => context().drawImage(picture, 0, 0, canvas.width, canvas.height);
@@ -229,7 +259,12 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
       view.x = box.width / 2 - (item.x + item.w / 2) * view.zoom; view.y = box.height / 2 - (item.y + item.h / 2) * view.zoom; setView();
     }
     element.classList.remove("pulse"); void element.offsetWidth; element.classList.add("pulse");
-    element.dataset.say = note || "";
+    layer.querySelector(`.wp-say[data-for="${item.id}"]`)?.remove();
+    if (note) {
+      const label = h("div", { class: "wp-say", "data-for": item.id, style: `left:${item.x}px;top:${item.y - 36}px` }, note);
+      layer.append(label);
+      setTimeout(() => label.remove(), 4000);
+    }
     setTimeout(() => element.classList.remove("pulse"), 4000);
   }
 
@@ -314,7 +349,8 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
     view = { x: 0, y: 0, zoom: 1 }; setView();
     dirty = false;
     root.querySelector("#wp-open").open = false;
-    draw(); sync();
+    if (projecting) draw(); else project(true);
+    sync();
   }
   function ask(question, ...choices) {  // the board's own question: Save / Don't save / Cancel
     const dialog = root.querySelector("#wp-dialog");
@@ -335,6 +371,7 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
   async function requestClose() {
     if (dirty && items.length && !(await ask("Save this workplace before closing?", ["Save", "save"], ["Don't save", "drop"]))) return;
     items = []; selected.clear(); dirty = false; nameBox.value = ""; reply.hidden = true;
+    project(false);
     view$.close();
     act("workplace_sync", { open: false });
   }
@@ -368,6 +405,7 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
     isOpen: view$.isOpen,
     command,
     showReply,
+    setMood(mode, level = 0) { orbCore?.setMode(mode); projector.setMood(mode, level); },
     handleKey(event) {
       const editing = document.activeElement?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
       if (event.key === "Escape") { if (!root.querySelector("#wp-dialog").hidden) return false; if (editing) { document.activeElement.blur(); return true; } requestClose(); return true; }

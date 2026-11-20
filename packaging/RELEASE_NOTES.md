@@ -1,6 +1,6 @@
 ## New in v2.10.0
 
-- **Workplace** (the new WORKPLACE button, or say "workplace mode"): a board for working on things with Nova beside you.
+- **Workplace** (the new WORKPLACE button, or say "workplace mode"): a blue holo-desk for working on things with Nova beside you. Her orb waits in the middle. Tap it and it drops to the bottom as a projector pad, and everything on the board appears as a see-through hologram. Each item gets its own beam of light, with light running up it, and the beams follow the items as you drag them. The pad glows brighter while Nova thinks or talks.
   - **What goes on it**: notes you type in; sketch notes you draw on with a mouse, pen or finger (four inks and an eraser); pictures, by drop, paste or + Picture; and files, by drop or + File. Text, code, PDF and Word files are read on your PC, so Nova can read them too.
   - **Moving around**: drag items by their top bar, resize them from the corner, drag the empty board to pan and scroll to zoom.
   - **Nova works on the board**: select something and ask, by typing or talking ("explain this", "highlight what matters", "what's in this picture?").

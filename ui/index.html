@@ -150,9 +150,12 @@
     <input type="file" id="wp-picker" multiple hidden>
   </header>
   <div class="wp-board" id="wp-board">
+    <canvas class="wp-beams" id="wp-beams" aria-hidden="true"></canvas>
     <div class="wp-layer" id="wp-layer"><svg class="wp-links" id="wp-links" aria-hidden="true"></svg></div>
     <p class="wp-empty" id="wp-empty">Add a note, a sketch, a picture or a file, or drop them here.<br>
       Select something and ask Nova: “explain this”, “highlight what matters”, “what's in this picture?”</p>
+    <button class="wp-orb" id="wp-orb" type="button" aria-label="Start projecting"><canvas aria-hidden="true"></canvas>
+      <span class="wp-orb-hint">Tap Nova to start projecting</span></button>
   </div>
   <form class="wp-ask" id="wp-ask" autocomplete="off">
     <input id="wp-question" class="field" maxlength="2000" placeholder="Ask Nova about the board (select items to ask about them; or just talk)">
