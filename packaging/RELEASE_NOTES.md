@@ -1,3 +1,18 @@
+## New in v2.10.0
+
+- **Workplace** (the new WORKPLACE button, or say "workplace mode"): a board for working on things with Nova beside you.
+  - **What goes on it**: notes you type in; sketch notes you draw on with a mouse, pen or finger (four inks and an eraser); pictures, by drop, paste or + Picture; and files, by drop or + File. Text, code, PDF and Word files are read on your PC, so Nova can read them too.
+  - **Moving around**: drag items by their top bar, resize them from the corner, drag the empty board to pan and scroll to zoom.
+  - **Nova works on the board**: select something and ask, by typing or talking ("explain this", "highlight what matters", "what's in this picture?").
+    - She highlights the key words in your note or file.
+    - She puts her own note beside the item, linked by a dashed line.
+    - She points at what she means.
+    - She looks at pictures and sketches with the vision model on your PC.
+  - **Saving**: closing asks **Save / Don't save / Cancel**. **Open ▾** brings back a saved board, and Ctrl+S saves.
+  - **Its own window**: open it from Advance → Separate apps.
+  - **Privacy**: the board goes along with your questions only while it's open, and isn't kept in the conversation history. It goes to whichever brain answers, just like anything you type.
+- **Top bar** fits on one row again, down to 1280-pixel-wide screens.
+
 ## New in v2.9.0
 
 - **Set up everything**: on the first start, Nova downloads and turns on what every feature needs by herself, one step after another: Ollama (no administrator prompt), the strongest model for your PC (measured), the meaning-search model, her natural voice, Whisper, the vision model, ffmpeg, Node.js, and the Claude Code, Codex and Gemini CLIs. Anything already there is just turned on. If a step fails, the rest still run, and a step that would fill the disk is skipped. Watch it or run it again from SETTINGS → Downloads → **Set up everything**; the first-start message has **Stop**. Two things can't be automatic: Docker Desktop (it needs an administrator prompt and a restart) and signing in to your accounts.
