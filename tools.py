@@ -6,7 +6,7 @@ from typing import Any, Callable, NamedTuple
 
 import calendar_tools  # noqa: F401  (registers Google Calendar's tools)
 import drive_tools  # noqa: F401  (registers Google Drive's tools)
-from tool_registry import ToolContext, register, run_for
+from tool_registry import NotHere, ToolContext, register, run_for
 from tool_registry import definitions as registered_definitions
 from memory import Memory
 from screen_assist import ScreenSession, send_keys_spec
@@ -265,11 +265,16 @@ OBS_TOOL = _tool(
     "list_scenes, switch_scene (scene: its name).",
     {"action": {"type": "string", "enum": ["status", "start_recording", "stop_recording", "start_streaming",
                                            "stop_streaming", "list_scenes", "switch_scene"]}, "scene": _TEXT}, ["action"])
+RUN_CODE_TOOL = _tool(
+    "run_code", "Work something out with real code instead of guessing: exact maths, statistics, unit and date "
+    "calculations, analysing numbers or a table someone gave, a quick simulation. task: what to work out, with all "
+    "the numbers and data it needs. Runs in Claude's code sandbox in the cloud (this PC doesn't run code for Nova), "
+    "so never put passwords or private data in it.", {"task": _TEXT}, ["task"])
 VSCODE_TOOL = _tool(
     "vscode", "Open a project folder or a file in VS Code, at a line if given. target: a path, or a project's name in "
     "Documents/Nova Projects.", {"target": _TEXT, "line": {"type": "integer"}}, ["target"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
-               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL]
+               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL]
 
 
 
@@ -661,7 +666,10 @@ def _run_reverse(_name: str, arguments: dict[str, Any], context: ToolContext) ->
     target = _words(arguments["target"], 300)
     if not context.approve("reverse_engineer", {"summary": f"Reverse engineer with REA (Claude Code): {target}"}):
         return "The owner declined; nothing was started."
-    return context.reverse(target, _words(arguments.get("goal"), 500))
+    answer = context.reverse(target, _words(arguments.get("goal"), 500))
+    if answer.startswith("Can't reverse engineer here:") and re.match(r"https?://", target):
+        raise NotHere(answer.removeprefix("Can't reverse engineer here: ").split(". Say")[0])  # a public site: Claude reads it
+    return answer
 
 
 def _run_world(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
@@ -672,7 +680,7 @@ def _run_world(_name: str, arguments: dict[str, Any], context: ToolContext) -> s
 
 def _run_route(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
     if context.route is None:
-        return "Routes aren't available here."
+        raise NotHere("routes aren't available in this edition")
     stops = [stop for stop in (" ".join(part.split()) for part in str(arguments.get("stops") or "").split(",")) if stop]
     return context.route(_words(arguments["start"], 120), _words(arguments["end"], 120), stops[:4],
                          str(arguments.get("mode") or "motorbike"), arguments.get("best_order") is not False)
@@ -783,8 +791,19 @@ def _run_vscode(_name: str, arguments: dict[str, Any], _context: ToolContext) ->
 register([DOCUMENT_TOOL], _run_document)
 register([OBS_TOOL], _run_obs)
 register([VSCODE_TOOL], _run_vscode)
-register([WIKIPEDIA_TOOL], lambda _name, arguments, context: context.wikipedia(_words(arguments["query"], 200))
-         if context.wikipedia is not None else "Offline Wikipedia isn't downloaded yet: Settings → Offline knowledge.")
+def _run_wikipedia(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
+    found = context.wikipedia(_words(arguments["query"], 200)) if context.wikipedia is not None else ""
+    if not found or found.startswith("Offline Wikipedia isn't downloaded"):
+        raise NotHere("offline Wikipedia isn't downloaded on this PC (Settings → Offline knowledge)")
+    return found
+
+
+def _run_code(_name: str, _arguments: dict[str, Any], _context: ToolContext) -> str:
+    raise NotHere("this PC doesn't run code for Nova")
+
+
+register([WIKIPEDIA_TOOL], _run_wikipedia)
+register([RUN_CODE_TOOL], _run_code)
 register([NOTES_TOOL], lambda _name, arguments, context: context.notes_search(_words(arguments["query"], 300))
          if context.notes_search is not None else "Your notes aren't indexed yet: Settings → Offline knowledge.")
 register([DISCOVER_TOOL], _run_discover)
@@ -811,4 +830,10 @@ def execute_tool(name: str, arguments: Any, memory: Memory, approve: Callable[[s
             return problem
     context = ToolContext(memory=memory, approve=approve, screen=screen, creative=creative, claude=claude, gmail=gmail,
                           brief=brief, said=said, **services)
-    return run(name, arguments, context)
+    try:
+        return run(name, arguments, context)
+    except NotHere as missing:
+        import cloud_tools
+        description = next((tool["function"]["description"] for tool in SKILL_TOOLS if tool["function"]["name"] == name), name)
+        return cloud_tools.fallback(name, description, arguments if isinstance(arguments, dict) else {}, str(missing),
+                                    context.cloud)

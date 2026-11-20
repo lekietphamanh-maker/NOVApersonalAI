@@ -589,6 +589,7 @@
         <option value="plan">My Claude plan, through Claude Code (no API credit)</option>
         <option value="key">An API key (billed per question, starts a little faster)</option>
       </select>
+      <label class="check" id="cloud-fallback-row"><input type="checkbox" id="cloud-fallback"> When a tool can't run on this PC (offline Wikipedia not downloaded, map servers down, code to run), let Claude do it in the cloud. Private turns and the strict privacy setting keep everything here.</label>
       <label class="check" id="claude-connectors-row"><input type="checkbox" id="claude-connectors"> Also let Claude use my claude.ai Gmail and Google Drive connectors (read and draft only)</label>
       <div class="row wrap" id="claude-buttons"><button class="box" id="claude-key-forget" hidden>Remove key</button></div>
       <div class="row"><input id="claude-key" class="field" type="password" maxlength="300" autocomplete="off"
@@ -747,6 +748,10 @@
       </div>
       <p class="small" id="live-model"></p>
       <p class="muted small" id="timing-last"></p>
+      <h4>Tuned for this PC</h4>
+      <p class="small" id="tune-info" aria-live="polite"></p>
+      <div class="row wrap"><button class="box" id="tune-now" title="Measure the models again and set up the strongest that runs smoothly">Tune now</button>
+        <button class="box" id="tune-auto">Tune after every update: on</button></div>
       <div class="row wrap"><button class="box" id="model-load">Load model</button>
         <button class="box" id="model-unload">Unload (free graphics memory)</button></div>
       <p class="muted small" id="gpu-tip"></p>

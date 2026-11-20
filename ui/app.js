@@ -250,6 +250,7 @@ function render() {
   renderConnections();
   renderGoogleMcp();
   renderKnowledge();
+  renderTuning();
   renderApproval();
   renderReadouts();
   renderTimers();
@@ -557,6 +558,8 @@ function renderClaude() {
   if (document.activeElement !== $("#claude-via")) $("#claude-via").value = claude.via || "plan";
   const onPlan = claude.via === "plan";
   $("#claude-connectors-row").hidden = !onPlan || claude.usb;
+  $("#cloud-fallback-row").hidden = Boolean(claude.usb);
+  $("#cloud-fallback").checked = Boolean(claude.cloud_fallback);
   $("#claude-connectors").checked = Boolean(claude.connectors);
   $("#need-claude-state").textContent = claude.on ? "on" : "";
   for (const id of ["#claude-key", "#claude-key-save"]) $(id).hidden = onPlan;
@@ -832,6 +835,21 @@ function renderConnections() {
     switches.drive ? "Google Drive (read-only): “find my budget in Drive”, “read file 1”." : switches.gmail ? "Click Add Google Drive and allow Drive too." : ""].join(" ");
   $("#need-google-state").textContent = switches.gmail ? (switches.calendar && switches.drive ? "connected" : "reconnect for more") : "";
   $("#need-google-connect").hidden = Boolean(switches.gmail) || switches.gmail === null || switches.gmail === undefined;
+}
+
+function renderTuning() {
+  const tuning = state.tuning;
+  if (!tuning) return;
+  const result = tuning.result;
+  const where = (share) => (share >= 0.97 ? "all on the graphics card" : share > 0 ? `${Math.round(share * 100)}% on the graphics card` : "on the processor");
+  $("#tune-info").textContent = tuning.running ? `Tuning… ${tuning.step || ""}`
+    : result ? `${result.model}, ${where(result.on_gpu)}, ${Math.round(result.tokens_per_second)} tokens a second, `
+      + `first words in ${result.first_token_seconds.toFixed(1)} s, ${Math.round(result.num_ctx / 1024)}K context. `
+      + `Tuned for ${result.version} on ${result.tuned_at.replace("T", " ")}.${result.notes?.length ? ` ${result.notes.join("; ")}.` : ""}`
+    : "Not tuned yet: Nova measures the models after it starts, or press Tune now.";
+  $("#tune-now").disabled = Boolean(tuning.running);
+  $("#tune-auto").textContent = `Tune after every update: ${tuning.auto ? "on" : "off"}`;
+  $("#tune-auto").classList.toggle("on", Boolean(tuning.auto));
 }
 
 function renderKnowledge() {
@@ -1551,6 +1569,8 @@ $("#pcs-wiki").onclick = () => act("wiki_here");
 $("#heart-toggle").onclick = () => act("heart", { on: !(state.heart || {}).on });
 $("#gesture-pose").onchange = renderGestures;
 $("#model-load").onclick = () => act("model_load");
+$("#tune-now").onclick = () => act("tune_now");
+$("#tune-auto").onclick = () => act("auto_tune", { on: !state.tuning?.auto });
 $("#version-create").onclick = async () => {
   const result = await act("version_create", { base: $("#version-base").value, name: $("#version-name").value, system: $("#version-system").value,
     temperature: $("#version-temp").value, num_ctx: $("#version-ctx").value });
@@ -1669,6 +1689,7 @@ $("#drive-connect").onclick = () => {
 };
 $("#need-google-connect").onclick = () => $("#gmail-toggle").click();
 $("#claude-connectors").onchange = (event) => act("claude_connectors", { on: event.target.checked });
+$("#cloud-fallback").onchange = (event) => act("cloud_fallback", { on: event.target.checked });
 $("#google-mcp-toggle").onclick = () => act("google_mcp", { on: !(state.google_mcp || {}).on });
 $("#google-mcp-new-key").onclick = async () => {
   if (await yesNo("Make a new key?", "Every Claude app set up with the old key stops reaching Nova until you paste the new setup into it.", "New key")) act("google_mcp", { new_key: true });

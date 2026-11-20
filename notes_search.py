@@ -63,7 +63,7 @@ class NotesIndex:
         """Brings the index up to date with the notes in `folder`: new and changed notes are read again, deleted ones
         dropped. Returns how many notes were read and removed."""
         folder = Path(folder)
-        notes = {str(path.relative_to(folder)): path for path in folder.rglob("*.md")
+        notes = {path.relative_to(folder).as_posix(): path for path in folder.rglob("*.md")  # wiki/Habits.md everywhere
                  if not SKIP_FOLDERS & set(path.relative_to(folder).parts) and path.stat().st_size <= MAX_FILE_BYTES}
         with self._lock, self._db() as db:
             known = dict(db.execute("SELECT file, MAX(changed) FROM passages GROUP BY file"))

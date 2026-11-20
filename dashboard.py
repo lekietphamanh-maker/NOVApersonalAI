@@ -88,6 +88,7 @@ import telegram_remote
 import cloud_relay
 import discover as discovery
 import reverse_engineering
+import auto_tune
 import shannon_runner
 from lab_jobs import JobLog
 from timers import Timers
@@ -304,6 +305,8 @@ class AlfredApp:
         self.discover_items: list[dict[str, Any]] = []
         self.discover_studies: dict[str, str] = {}  # Claude Code study title -> repo
         self.skill_offers: list[dict[str, str]] = []  # skill notes a study proposed, waiting for the owner's OK
+        self.tuning_now = False
+        self._apply_tuning(self.settings.get("tuning"))
         self.lab_jobs = JobLog(_data_dir() / "lab_jobs.json")
         self.reverse = reverse_engineering.ReverseEngineering(
             save=self.skills.save_output, library=self._filer(reverse_engineering.LIBRARY_TOPIC),
@@ -429,6 +432,8 @@ class AlfredApp:
             "second_brain": {"on": False, "running": False, "status": "off", "last": "", "notes_today": 0, "vault": "",
                              "videos": True, "videos_ready": False, "exclude": "", "gathered": 0},
             "pcs": {"on": False, "pc": "", "folder": "", "others": [], "wiki": "", "error": ""},
+            "tuning": {"auto": self.settings.get("auto_tune", True) is not False, "running": False, "step": "",
+                       "result": self.settings.get("tuning")},
             "claude": {"on": False, "key": False, "hint": "", "model": cloud_brain.DEFAULT_MODEL,
                        "effort": cloud_brain.DEFAULT_EFFORT, "models": cloud_brain.MODELS, "usb": USB},
             "free_cloud": {"on": False, "model": FREE_CLOUD_DEFAULT, "status": "", "usb": USB},
@@ -732,7 +737,7 @@ class AlfredApp:
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
                "obs_password", "rea_view", "rea_start", "rea_open", "rea_report",
-               "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report"}
+               "tune_now", "auto_tune", "cloud_fallback", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -1707,12 +1712,29 @@ class AlfredApp:
             self.agent.cloud = cloud_brain.CloudBrain(key, model, effort)
         if old is not None and old is not self.agent.cloud and hasattr(old, "close"):
             old.close()
-        self._update(claude={"on": on, "key": key is not None, "hint": claude_expert.key_hint(),
+        cloud_tools_on = (not USB and self.settings.get("cloud_fallback", True) is not False
+                          and (key is not None or claude_code.find() is not None))
+        self.agent.cloud_tools = self._cloud_tool if cloud_tools_on else None
+        self._update(claude={"on": on, "cloud_fallback": self.settings.get("cloud_fallback", True) is not False,
+                             "cloud_fallback_ready": cloud_tools_on, "key": key is not None, "hint": claude_expert.key_hint(),
                              "via": via, "claude_code": claude_code.find() is not None,
                              "connectors": bool(self.settings.get("claude_connectors")),
                              "model": self.settings.get("claude_model", cloud_brain.DEFAULT_MODEL),
                              "effort": self.settings.get("claude_effort", cloud_brain.DEFAULT_EFFORT),
                              "models": cloud_brain.MODELS, "usb": USB})
+
+    def _cloud_tool(self, tool: str, description: str, arguments: dict[str, Any], reason: str) -> str | None:
+        """A tool that can't run on this PC, done by Claude (cloud_tools): the API key when there is one, else the plan."""
+        import cloud_tools
+        claude = cloud_tools.Claude(key=claude_expert.key(), command=claude_code.find(),
+                                    model=self.settings.get("claude_model", cloud_brain.DEFAULT_MODEL),
+                                    effort=self.settings.get("claude_effort", cloud_brain.DEFAULT_EFFORT))
+        self.events.put(("toast", (f"{tool.replace('_', ' ').capitalize()} can't run on this PC: Claude is doing it.", "info")))
+        return cloud_tools.run_job(tool, description, arguments, reason, claude)
+
+    def _act_cloud_fallback(self, args: dict[str, Any]) -> None:
+        self._save_setting("cloud_fallback", bool(args.get("on")))
+        self._apply_claude()
 
     def _act_claude(self, args: dict[str, Any]) -> dict[str, Any] | None:
         return self._act_brain_choose({**args, "brain": "claude" if args.get("on") else "local"})
@@ -2294,9 +2316,13 @@ class AlfredApp:
     def _route_tool(self, start: str, end: str, stops: list[str], mode: str, best_order: bool) -> str:
         try:
             found = self.router.route(start, end, stops, mode, best_order)
-        except (ValueError, OSError) as exc:
+        except ValueError as exc:
             self.ui.emit({"type": "route_error", "text": f"No route: {exc}."})
             return f"Not done: {exc}."
+        except OSError as exc:  # the map servers are out of reach: Claude can still give directions from the web
+            self.ui.emit({"type": "route_error", "text": f"The map servers didn't answer ({exc})."})
+            from tool_registry import NotHere
+            raise NotHere(f"the map servers (OpenStreetMap) didn't answer: {exc}") from exc
         data = {key: getattr(found, key) for key in ("places", "mode", "seconds", "metres", "legs", "line", "searched",
                                                       "roads", "reordered")}
         self.ui.emit({"type": "route_view", "route": {**data, "google_maps": found.google_maps()}})
@@ -2309,7 +2335,12 @@ class AlfredApp:
             return {"ok": False, "error": "Say where from and where to."}
         stops = [stop.strip() for stop in str(args.get("stops") or "").split(",") if stop.strip()][:4]
         mode = str(args.get("mode") or "motorbike")
-        threading.Thread(target=self._route_tool, args=(start, end, stops, mode, True), name="NovaRoute", daemon=True).start()
+        def work() -> None:
+            try:
+                self._route_tool(start, end, stops, mode, True)
+            except Exception:
+                pass  # already shown on the Route screen
+        threading.Thread(target=work, name="NovaRoute", daemon=True).start()
         return {"ok": True}
 
     def _news_lookup(self, query: str, category: str, days: int, offset_days: int) -> str:
@@ -2616,6 +2647,9 @@ class AlfredApp:
                                                   "vision": vision.find_vision_model(installed)}))
             else:
                 choice = choose_model(self.settings.get("model", "auto"), installed, self.hardware)
+                tuned = self.settings.get("tuning") or {}
+                if self.settings.get("model", "auto") == "auto" and tuned.get("model") in installed:
+                    choice.model, choice.missing = tuned["model"], False  # measured here: the strongest that runs smoothly
                 offer = ({"name": choice.recommended, "size_gb": choice.size_gb, "reason": choice.reason,
                           "stronger": choice.stronger} if choice.missing else None)
                 self.events.put(("model_choice", {"name": choice.model, "recommended": choice.recommended,
@@ -2626,6 +2660,51 @@ class AlfredApp:
             self.root.after(15000, lambda: threading.Thread(target=self._resolve_model, daemon=True).start())
             return
         self._status_worker()
+        if (not USB and not MODEL and self.settings.get("auto_tune", True) and self.settings.get("model", "auto") == "auto"
+                and auto_tune.due(self.settings.get("tuning"), VERSION, self.hardware)):
+            self._tune()  # after an update or new hardware: find the best setup again
+
+    # ---------- auto-tune: the strongest model this PC runs smoothly, set up for it ----------
+
+    def _tune(self) -> None:
+        """Runs on a worker thread; reports through events ("tune_progress", then "tuned" or "tune_failed")."""
+        if self.tuning_now:
+            return
+        self.tuning_now = True
+        base = self.agent.base_url
+        try:
+            models = Path(os.environ.get("OLLAMA_MODELS") or Path.home() / ".ollama")
+            free_gb = shutil.disk_usage(models if models.exists() else Path.home()).free / 1024 ** 3
+            progress = lambda text: self.events.put(("tune_progress", text))  # noqa: E731
+            result = auto_tune.tune(
+                auto_tune.Ollama(base), self.hardware or detect_hardware(), VERSION,
+                pull=lambda name: pull_model(base, name, progress), disk_free_gb=free_gb,
+                restart=lambda settings: (auto_tune.apply_settings(settings), auto_tune.restart_ollama(base))[1],
+                progress=progress)
+            self.events.put(("tuned", result.as_dict()))
+        except Exception as exc:
+            self.events.put(("tune_failed", str(exc)))
+        finally:
+            self.tuning_now = False
+
+    def _apply_tuning(self, tuned: dict[str, Any] | None) -> None:
+        if not tuned or self.settings.get("model", "auto") != "auto" or USB or MODEL:
+            return
+        self.agent.num_ctx = int(tuned.get("num_ctx") or 8192)
+        self.agent.keep_alive = str(tuned.get("keep_alive") or "30m")
+
+    def _act_tune_now(self, _args: dict[str, Any]) -> dict[str, Any] | None:
+        if USB:
+            return {"ok": False, "error": "The USB Edition picks its model when it starts."}
+        if self.tuning_now:
+            return {"ok": False, "error": "Nova is tuning already."}
+        self._update(tuning={**self.state["tuning"], "running": True, "step": "Starting"})
+        threading.Thread(target=self._tune, name="NovaTune", daemon=True).start()
+        return None
+
+    def _act_auto_tune(self, args: dict[str, Any]) -> None:
+        self._save_setting("auto_tune", bool(args.get("on")))
+        self._update(tuning={**self.state["tuning"], "auto": bool(args.get("on"))})
 
     def _status_worker(self) -> None:
         try:
@@ -3731,6 +3810,19 @@ class AlfredApp:
             self._update(brief=payload, brief_loading=False)
             if payload["errors"]:
                 self._toast("Some brief sources didn't load: " + "; ".join(payload["errors"])[:300], "warn")
+        elif event_type == "tune_progress":
+            self._update(tuning={**self.state["tuning"], "running": True, "step": payload})
+        elif event_type == "tuned":
+            self._save_setting("tuning", payload)
+            self._apply_tuning(payload)
+            self.agent.model = payload["model"]
+            installed = sorted(set(self.state["model"]["installed"]) | {payload["model"]})
+            self._update(model={"name": payload["model"], "installed": installed, "offer": None},
+                         tuning={**self.state["tuning"], "running": False, "step": "", "result": payload})
+            self._toast(f"Tuned for this PC: {auto_tune.Tuning(**payload).summary()}.", "ok")
+        elif event_type == "tune_failed":
+            self._update(tuning={**self.state["tuning"], "running": False, "step": ""})
+            self._toast(f"Couldn't tune Nova this time: {payload}. It keeps its current setup.", "warn")
         elif event_type == "model_choice":
             self.agent.model = payload["name"]
             self._update(model={key: payload.get(key) for key in ("name", "recommended", "reason", "installed", "offer", "vision")

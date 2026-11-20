@@ -44,6 +44,12 @@ class ToolContext:
     wikipedia: Callable[[str], str] | None = None
     notes_search: Callable[[str], str] | None = None
     obs_password: str = ""
+    cloud: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # cloud_tools: Claude does it instead
+
+
+class NotHere(Exception):
+    """A tool can't run on this PC right now (what it needs is missing); the message says why. execute_tool then asks
+    Claude to do the job in the cloud when it may (cloud_tools)."""
 
 
 Run = Callable[[str, dict[str, Any], ToolContext], str]

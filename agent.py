@@ -144,6 +144,7 @@ CLAUDE_TOOL_NAMES = {"add_task", "calculate", "web_search", "media_control", "cr
 
 
 LOCAL_HISTORY_CHARS = 6000  # about 1,500 tokens of earlier conversation: the request still fits in the 8K context
+MAX_HISTORY_CHARS = 24000   # with a bigger tuned context, more of the conversation comes along (up to ~6,000 tokens)
 
 
 def describe_timing(stats: dict[str, Any]) -> str:
@@ -256,6 +257,9 @@ def _http_json(url: str, payload: dict[str, Any] | None = None, timeout: int = 1
 class Agent:
     def __init__(self, model: str = DEFAULT_MODEL, memory: Memory | None = None) -> None:
         self.model = model
+        self.num_ctx = 8192        # auto-tune raises it when the graphics card has room (auto_tune.py)
+        self.cloud_tools: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # see cloud_tools.py
+        self.keep_alive = "30m"
         self.memory = memory or Memory()
         self.base_url = local_base_url()
         self.creative = None  # creative_mode.CreativeServer when the dashboard offers it
@@ -342,14 +346,14 @@ class Agent:
             "messages": messages,
             "tools": tools,
             "stream": sink is not None,
-            "keep_alive": "30m",  # a reload after a pause costs seconds; warm_up() also loads it early
+            "keep_alive": self.keep_alive,  # a reload after a pause costs seconds; warm_up() also loads it early
             # Like Claude's adaptive thinking: the model reasons first on hard questions only. The reasoning comes back
             # apart from the answer and is never spoken.
             "think": think,
             # Tool lists, screens and search results are long; 4096 would silently drop the system prompt.
             # Qwen3 thinks reliably only with sampling (greedy decoding can loop), and thinking needs room.
-            "options": {"num_ctx": 8192, "num_predict": 2560, "temperature": 0.6, "top_p": 0.95, "top_k": 20} if think
-                       else {"num_ctx": 8192, "num_predict": 1024, "temperature": 0.25},
+            "options": {"num_ctx": self.num_ctx, "num_predict": 2560, "temperature": 0.6, "top_p": 0.95, "top_k": 20}
+                       if think else {"num_ctx": self.num_ctx, "num_predict": 1024, "temperature": 0.25},
         }
         try:
             if sink is None:
@@ -429,7 +433,8 @@ class Agent:
     def warm_up(self) -> None:
         """Load the model now (e.g. as soon as "Hey Nova" is heard), so the answer doesn't wait for it."""
         try:
-            _http_json(f"{self.base_url}/api/generate", {"model": self.model, "keep_alive": "30m"}, timeout=120)
+            _http_json(f"{self.base_url}/api/generate", {"model": self.model, "keep_alive": self.keep_alive,
+                                                         "options": {"num_ctx": self.num_ctx}}, timeout=120)
         except Exception:
             pass  # only an optimisation
 
@@ -684,7 +689,13 @@ class Agent:
                             skills=self.skills, deep_work=self.deep_work, web=self.web,
                             reminders=self.reminders, build=self.build, send_file=self.send_file, calendar=self.calendar,
                             reverse=self.reverse, discover=self.discover, drive=self.drive, world=self.world, route=self.route,
-                            wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password)
+                            wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password,
+                            cloud=self.cloud_tools if self._may_use_cloud(prompt) else None)
+
+    def _may_use_cloud(self, prompt: str) -> bool:
+        """A tool that can't run here may go to Claude, unless this turn or the privacy setting keeps things here."""
+        return (self.cloud_tools is not None and self.private_topics != "personal" and not PRIVATELY.search(prompt)
+                and not self.router.is_offline())
 
     def _sees_with_claude(self, prompt: str) -> bool:
         """A screen job goes to Claude (which sees screenshots) when that is on, Claude is set up and online, and the
@@ -881,7 +892,8 @@ class Agent:
             # Couldn't be reached before saying anything: the local model answers this turn.
         self._tell_brain(self.model, why if brain == "local" else self._fallback)
         history = fit([{key: value for key, value in message.items() if key not in ("private", "brain")}
-                       for message in self.memory.recent_messages(limit=24)], LOCAL_HISTORY_CHARS)
+                       for message in self.memory.recent_messages(limit=24)],
+                      min(MAX_HISTORY_CHARS, LOCAL_HISTORY_CHARS * max(1, self.num_ctx // 8192)))
         system_prompt = SYSTEM_PROMPT + (screen_prompt(self.autopilot) if screen is not None else SCREEN_OFF_PROMPT)
         if self.owner_name:
             system_prompt += f"\n\nYour owner's name is {self.owner_name}. Use it now and then, naturally, not in every reply."

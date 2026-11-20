@@ -240,7 +240,8 @@ def vscode(target: str, line: int = 0, run: Callable[..., Any] = subprocess.Pope
         path = projects / path
     if not path.exists():
         raise ValueError(f"there's no {path}")
-    if Path.home() not in path.resolve().parents and path.resolve() != Path.home():
+    home = Path.home().resolve()  # resolved like the path: short names (RUNNER~1) and junctions compare equal
+    if home not in path.resolve().parents and path.resolve() != home:
         raise ValueError("Nova opens only things in your own folders in VS Code")
     code = which("code") or which("code.cmd")
     if code is None:

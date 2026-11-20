@@ -333,7 +333,7 @@ class ClaudePlanChoiceTests(unittest.TestCase):
         app = types.SimpleNamespace(settings=settings, agent=types.SimpleNamespace(cloud=None, warm_plan=lambda: warmed.append(True)),
                                     tool_server=None, _update=lambda **changes: updates.append(changes))
         app.warmed = warmed
-        for method in ("_claude_via", "_claude_ready", "_brain_choice", "_apply_claude"):
+        for method in ("_claude_via", "_claude_ready", "_brain_choice", "_apply_claude", "_cloud_tool"):
             setattr(app, method, types.MethodType(getattr(dashboard.AlfredApp, method), app))
         app.updates = updates
         return app
@@ -342,6 +342,7 @@ class ClaudePlanChoiceTests(unittest.TestCase):
         app = self.app({"brain": "claude"}, "claude", None)
         app._apply_claude()
         self.assertTrue(getattr(app.agent.cloud, "plan", False))
+        self.assertIsNotNone(app.agent.cloud_tools)  # a tool that can't run here can go to Claude on the plan
         self.assertIsNotNone(app.tool_server)
         self.assertEqual((app.updates[-1]["claude"]["via"], app.updates[-1]["claude"]["on"]), ("plan", True))
         self.assertEqual(app.warmed, [True])  # Claude Code starts before the first question
