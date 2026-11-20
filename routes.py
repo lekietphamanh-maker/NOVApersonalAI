@@ -195,11 +195,29 @@ class Router:
         with self._open(request, timeout=timeout) as response:
             return response.read(200_000_000)
 
+    def _places_file(self) -> Path:
+        return self.cache / "places.json"
+
     def geocode(self, place: str) -> dict[str, Any]:
-        """A place the owner named, near their saved city first (Nominatim allows one request a second)."""
+        """A place the owner named, near their saved city first (Nominatim allows one request a second). Places found
+        once are kept, so they work offline afterwards."""
         name = " ".join(str(place).split())[:120]
         if not name:
             raise ValueError("say where from and where to")
+        try:
+            known = json.loads(self._places_file().read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            known = {}
+        key = f"{name.lower()}|{self.near().lower()}"
+        if key in known:
+            return {"name": name, **known[key]}
+        found = self._lookup(name)
+        known[key] = {"lat": found["lat"], "lon": found["lon"]}
+        self.cache.mkdir(parents=True, exist_ok=True)
+        self._places_file().write_text(json.dumps(known), encoding="utf-8")
+        return found
+
+    def _lookup(self, name: str) -> dict[str, Any]:
         for query in ([f"{name}, {self.near()}"] if self.near() else []) + [name]:
             wait = 1.0 - (self._clock() - self._last_geocode)
             if wait > 0:
@@ -211,22 +229,59 @@ class Router:
                 return {"name": name, "lat": float(found[0]["lat"]), "lon": float(found[0]["lon"])}
         raise ValueError(f"couldn't find “{name}” on the map")
 
+    def _kept_city(self, south: float, west: float, north: float, east: float) -> dict[str, Any] | None:
+        """A city kept for offline use that covers this whole area."""
+        for kept in sorted(self.cache.glob("city-*.json")):
+            try:
+                data = json.loads(kept.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            box = data.get("nova_box") or [90, 180, -90, -180]
+            if box[0] <= south and box[1] <= west and north <= box[2] and east <= box[3]:
+                return data
+        return None
+
+    def kept_cities(self) -> list[str]:
+        return [path.stem.removeprefix("city-").replace("_", " ") for path in sorted(self.cache.glob("city-*.json"))]
+
+    def keep_city(self, city: str) -> str:
+        """Downloads all of a city's roads once and keeps them (no expiry), so routes inside it work offline."""
+        name = " ".join(str(city).split())[:80]
+        found = json.loads(self._fetch(Request(NOMINATIM + "?" + urlencode({"q": name, "format": "json", "limit": 1}),
+                                               headers={"User-Agent": USER_AGENT}), 20))
+        if not found:
+            raise ValueError(f"couldn't find “{name}” on the map")
+        south, north, west, east = (float(value) for value in found[0]["boundingbox"])
+        if max(north - south, east - west) > MAX_SPAN_DEGREES:
+            raise ValueError(f"{name} is bigger than Nova can keep (about 65 km across)")
+        data = self._download_roads((round(south, 3), round(west, 3), round(north, 3), round(east, 3)))
+        data["nova_box"] = [south, west, north, east]
+        self.cache.mkdir(parents=True, exist_ok=True)
+        (self.cache / f"city-{name.replace(' ', '_').replace('/', '_')[:60]}.json").write_text(json.dumps(data), encoding="utf-8")
+        return name
+
+    def _download_roads(self, box: tuple[float, float, float, float]) -> dict[str, Any]:
+        kinds = "|".join(sorted({kind for speeds in SPEEDS.values() for kind in speeds}))
+        query = f'[out:json][timeout:180];way["highway"~"^({kinds})(_link)?$"]{box};out body;>;out skel qt;'
+        return json.loads(self._fetch(Request(OVERPASS, data=urlencode({"data": query}).encode(),
+                                              headers={"User-Agent": USER_AGENT}), 240))
+
     def roads(self, places: list[dict[str, Any]], mode: str) -> Roads:
         south, north = min(p["lat"] for p in places), max(p["lat"] for p in places)
         west, east = min(p["lon"] for p in places), max(p["lon"] for p in places)
+        kept = self._kept_city(south, west, north, east)
+        if kept is not None:
+            return Roads.from_overpass(kept, mode)
         if max(north - south, east - west) > MAX_SPAN_DEGREES:
             raise ValueError("those places are too far apart for the map on this PC (over about 65 km)")
         margin = max(0.015, 0.15 * max(north - south, east - west))
         box = tuple(round(value, 3) for value in (south - margin, west - margin, north + margin, east + margin))
-        kinds = "|".join(sorted({kind for speeds in SPEEDS.values() for kind in speeds}))
-        query = (f'[out:json][timeout:90];way["highway"~"^({kinds})(_link)?$"]{box};out body;>;out skel qt;')
-        key = hashlib.sha1(query.encode()).hexdigest()[:16]
+        key = hashlib.sha1(repr(box).encode()).hexdigest()[:16]
         saved = self.cache / f"roads-{key}.json"
         if saved.is_file() and self._clock() - saved.stat().st_mtime < CACHE_DAYS * 86400:
             data = json.loads(saved.read_text(encoding="utf-8"))
         else:
-            data = json.loads(self._fetch(Request(OVERPASS, data=urlencode({"data": query}).encode(),
-                                                  headers={"User-Agent": USER_AGENT}), 120))
+            data = self._download_roads(box)
             self.cache.mkdir(parents=True, exist_ok=True)
             saved.write_text(json.dumps(data), encoding="utf-8")
         return Roads.from_overpass(data, mode)

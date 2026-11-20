@@ -41,6 +41,8 @@ class ToolContext:
     drive: Any = None
     world: Callable[[str, str, int], str] | None = None
     route: Callable[[str, str, list[str], str, bool], str] | None = None
+    wikipedia: Callable[[str], str] | None = None
+    notes_search: Callable[[str], str] | None = None
 
 
 Run = Callable[[str, dict[str, Any], ToolContext], str]

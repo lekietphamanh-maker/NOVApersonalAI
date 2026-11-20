@@ -247,8 +247,14 @@ ROUTE_TOOL = _tool(
     "best_order: put the stops in the quickest order (default true).",
     {"start": _TEXT, "end": _TEXT, "stops": _TEXT, "mode": {"type": "string", "enum": ["motorbike", "car", "walk"]},
      "best_order": {"type": "boolean"}}, ["start", "end"])
+WIKIPEDIA_TOOL = _tool(
+    "wikipedia", "Look something up in Wikipedia, kept on this PC (works offline): people, places, history, science, "
+    "how things work. Answer from what it returns and say it's from Wikipedia.", {"query": _TEXT}, ["query"])
+NOTES_TOOL = _tool(
+    "search_my_notes", "Search the owner's own notes, Library and saved work by meaning, on this PC: what they wrote, "
+    "kept or learned about something, even in other words.", {"query": _TEXT}, ["query"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
-               ROUTE_TOOL]
+               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL]
 
 
 
@@ -729,6 +735,10 @@ register([BUILD_TOOL], _run_build)
 register([REVERSE_TOOL], _run_reverse)
 register([WORLD_TOOL], _run_world)
 register([ROUTE_TOOL], _run_route)
+register([WIKIPEDIA_TOOL], lambda _name, arguments, context: context.wikipedia(_words(arguments["query"], 200))
+         if context.wikipedia is not None else "Offline Wikipedia isn't downloaded yet: Settings → Offline knowledge.")
+register([NOTES_TOOL], lambda _name, arguments, context: context.notes_search(_words(arguments["query"], 300))
+         if context.notes_search is not None else "Your notes aren't indexed yet: Settings → Offline knowledge.")
 register([DISCOVER_TOOL], _run_discover)
 register([SEND_FILE_TOOL], _run_send_file)
 register([DEEP_WORK_TOOL], _run_deep_work)

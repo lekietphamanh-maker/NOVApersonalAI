@@ -381,3 +381,5 @@ body.mapping.drawer-open .map-note { display: none; }
 
 .versions { margin: 12px 0 4px; padding: 8px 10px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.18); }
 .versions > summary { cursor: pointer; font: 600 11px/1.4 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
+
+.knowledge-packs li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

@@ -40,6 +40,8 @@ import node_runtime
 import google_mcp
 import world_monitor
 import routes
+import offline_wikipedia
+import notes_search
 import hotkeys
 import media_keys
 import kokoro_voice
@@ -300,6 +302,7 @@ class AlfredApp:
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
         self.agent.route = self._route_tool
+        self._apply_knowledge()
         self.agent.web = self.web
         self.agent.claude = claude_expert.available()
         self.agent.on_brain = lambda label, why: self.events.put(("brain", (label, why)))
@@ -321,6 +324,10 @@ class AlfredApp:
         self.news_store: NewsStore | None = None  # the news desk's database, opened when first needed
         self.world_monitor = world_monitor.WorldMonitor(news=self._world_news)
         self.router = routes.Router(_data_dir() / "routes", near=self._route_city)
+        self.wikipedia = offline_wikipedia.Wikipedia(_data_dir() / "knowledge")
+        self.notes_index = notes_search.NotesIndex(_data_dir() / "notes_index.sqlite3",
+                                                   lambda texts: notes_search.ollama_embed(self.agent.base_url)(texts))
+        self.knowledge: dict[str, Any] = {"packs": {}, "downloading": None, "notes": {"status": ""}, "city": ""}
         self.news_running = False
         self.agent.news = self._news_lookup if self.settings.get("news_on") else None
         self.answers = deque(maxlen=12)  # who answered the latest requests (also in answers.jsonl in the data folder)
@@ -701,7 +708,8 @@ class AlfredApp:
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
-               "world", "claude_connectors", "google_mcp", "node_path", "route"}
+               "world", "claude_connectors", "google_mcp", "node_path", "route",
+               "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2143,6 +2151,122 @@ class AlfredApp:
             return f"The World view is open on {focus['name']}. Say so in a few words."
         return text
 
+    # ---------- offline knowledge: Wikipedia on this PC, searching the notes by meaning, kept city roads ----------
+
+    def _embedding_model_ready(self) -> bool:
+        return any(name.split(":")[0] == notes_search.MODEL for name in self.state.get("model", {}).get("installed") or [])
+
+    def _knowledge_state(self) -> dict[str, Any]:
+        installed = {path.name: path.stat().st_size for path in self.wikipedia.installed()}
+        packs = []
+        for pack in offline_wikipedia.PACKS:
+            files = [name for name in installed if name.startswith(f"{pack.name}_{pack.flavour}_")]
+            found = self.knowledge["packs"].get(pack.key) or {}
+            packs.append({"key": pack.key, "title": pack.title, "bytes": found.get("bytes", 0),
+                          "file": files[0] if files else "", "size": installed.get(files[0], 0) if files else 0})
+        return {"packs": packs, "downloading": self.knowledge["downloading"],
+                "notes": {**self.knowledge["notes"], "count": self.notes_index.count(), "model": self._embedding_model_ready(),
+                          "vault": str(self._vault_folder())},
+                "cities": self.router.kept_cities(), "city": self._route_city()}
+
+    def _apply_knowledge(self) -> None:
+        self.agent.wikipedia = self.wikipedia.search if self.wikipedia.installed() else None
+        self.agent.notes_search = self.notes_index.search if self.notes_index.count() and self._embedding_model_ready() else None
+        self._update(knowledge=self._knowledge_state())
+
+    def _act_knowledge_catalog(self, _args: dict[str, Any]) -> dict[str, Any]:
+        """The sizes of the Wikipedia files Kiwix has now (fetched on a thread)."""
+        def fetch() -> None:
+            for pack in offline_wikipedia.PACKS:
+                try:
+                    found = self.wikipedia.find(pack)
+                except (OSError, ValueError):
+                    found = None
+                if found:
+                    self.knowledge["packs"][pack.key] = found
+            self.events.put(("knowledge", None))
+        threading.Thread(target=fetch, name="NovaKnowledgeCatalog", daemon=True).start()
+        return {"ok": True}
+
+    def _act_knowledge_download(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        key = str(args.get("key") or "")
+        if key not in {pack.key for pack in offline_wikipedia.PACKS} or self.knowledge["downloading"]:
+            return {"ok": False, "error": "Nothing to download right now."}
+        pack = offline_wikipedia.pack(key)
+        size = int((self.knowledge["packs"].get(key) or {}).get("bytes") or 0)
+        if not args.get("consented"):
+            return {"need_consent": "knowledge", "detail": {"title": pack.title, "gb": round(size / 1e9, 1) if size else None}}
+        if size and not self.wikipedia.free_space_ok(size):
+            return {"ok": False, "error": f"Not enough free disk space for {pack.title} ({size / 1e9:.1f} GB plus room to spare)."}
+        self.knowledge["downloading"] = {"key": key, "done": 0, "total": size}
+        self._update(knowledge=self._knowledge_state())
+
+        def download() -> None:
+            last = [0.0]
+
+            def progress(done: int, total: int) -> None:
+                if time.monotonic() - last[0] > 1:
+                    last[0] = time.monotonic()
+                    self.knowledge["downloading"] = {"key": key, "done": done, "total": total}
+                    self.events.put(("knowledge", None))
+            try:
+                self.wikipedia.download(pack, progress)
+                self.events.put(("toast", (f"{pack.title} is on this PC: Nova can look things up offline now.", "ok")))
+            except Exception as exc:
+                self.events.put(("warning", f"{pack.title} didn't finish downloading: {exc}"))
+            finally:
+                self.knowledge["downloading"] = None
+                self.events.put(("knowledge", None))
+        threading.Thread(target=download, name="NovaWikipedia", daemon=True).start()
+        return None
+
+    def _act_knowledge_remove(self, args: dict[str, Any]) -> None:
+        name = Path(str(args.get("file") or "")).name
+        if name.endswith(".zim"):
+            self.wikipedia.remove(self.wikipedia.folder / name)
+        self._apply_knowledge()
+
+    def _act_notes_index(self, _args: dict[str, Any]) -> dict[str, Any] | None:
+        """Reads the notes again by meaning (downloading the small embedding model first if it isn't here)."""
+        if self.knowledge["notes"].get("busy"):
+            return {"ok": False, "error": "Already reading your notes."}
+        self.knowledge["notes"] = {"busy": True, "status": "Starting…"}
+        self._update(knowledge=self._knowledge_state())
+
+        def index() -> None:
+            try:
+                if not self._embedding_model_ready():
+                    pull_model(self.agent.base_url, notes_search.MODEL,
+                               lambda text: self._knowledge_status(f"Getting the meaning model: {text}"))
+                    self._status_worker()  # the model list now has the meaning model
+                done = self.notes_index.refresh(self._vault_folder(),
+                                                lambda count, total: self._knowledge_status(f"Reading notes {count}/{total}…"))
+                self.knowledge["notes"] = {"busy": False, "status": f"Up to date: {done['notes']} notes ({done['read']} read again)."}
+            except Exception as exc:
+                self.knowledge["notes"] = {"busy": False, "status": f"Couldn't read the notes: {exc}"}
+            self.events.put(("knowledge", None))
+        threading.Thread(target=index, name="NovaNotesIndex", daemon=True).start()
+        return None
+
+    def _knowledge_status(self, text: str) -> None:
+        self.knowledge["notes"] = {"busy": True, "status": text}
+        self.events.put(("knowledge", None))
+
+    def _act_keep_city(self, args: dict[str, Any]) -> dict[str, Any]:
+        city = " ".join(str(args.get("city") or self._route_city()).split())
+        if not city:
+            return {"ok": False, "error": "Save your city in Settings first (Location), or type one."}
+
+        def keep() -> None:
+            try:
+                name = self.router.keep_city(city)
+                self.events.put(("toast", (f"{name}'s roads are kept on this PC: routes there work offline.", "ok")))
+            except (ValueError, OSError) as exc:
+                self.events.put(("warning", f"Couldn't keep {city}'s roads: {exc}"))
+            self.events.put(("knowledge", None))
+        threading.Thread(target=keep, name="NovaKeepCity", daemon=True).start()
+        return {"ok": True}
+
     # ---------- fastest routes on OpenStreetMap roads (routes.py), shown on the Route screen ----------
 
     def _route_city(self) -> str:
@@ -3485,6 +3609,8 @@ class AlfredApp:
             self._update(weather_now=payload)
         elif event_type == "local_news":
             self._update(local_news=payload)
+        elif event_type == "knowledge":
+            self._apply_knowledge()
         elif event_type == "toast":
             self._toast(*payload)
         elif event_type == "brief":

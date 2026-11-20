@@ -228,6 +228,7 @@ function render() {
   renderBrief();
   renderConnections();
   renderGoogleMcp();
+  renderKnowledge();
   renderApproval();
   renderReadouts();
   renderTimers();
@@ -812,6 +813,37 @@ function renderConnections() {
   $("#need-google-connect").hidden = Boolean(switches.gmail) || switches.gmail === null || switches.gmail === undefined;
 }
 
+function renderKnowledge() {
+  const knowledge = state.knowledge;
+  if (!knowledge) return;
+  const gb = (bytes) => (bytes ? `${(bytes / 1e9).toFixed(bytes < 1e9 ? 2 : 1)} GB` : "");
+  const busy = knowledge.downloading;
+  $("#knowledge-packs").replaceChildren(...knowledge.packs.map((pack) => {
+    const row = document.createElement("li");
+    const label = document.createElement("span");
+    const downloading = busy && busy.key === pack.key;
+    label.textContent = `${pack.title}${pack.file ? ` · on this PC (${gb(pack.size)})` : pack.bytes ? ` · ${gb(pack.bytes)}` : ""}`
+      + (downloading ? ` · downloading ${busy.total ? Math.round((busy.done / busy.total) * 100) : 0}%` : "");
+    const button = document.createElement("button");
+    button.className = "box small";
+    button.textContent = pack.file ? "Remove" : "Download";
+    button.disabled = Boolean(busy) && !pack.file;
+    button.onclick = () => (pack.file ? act("knowledge_remove", { file: pack.file }) : act("knowledge_download", { key: pack.key }));
+    row.append(label, button);
+    return row;
+  }));
+  const notes = knowledge.notes || {};
+  $("#notes-info").textContent = notes.status || (notes.count
+    ? `${notes.count} notes from ${notes.vault} are searchable by meaning. Ask “what did I write about …?”.`
+    : `Index your vault (${notes.vault}) once: Nova downloads a small meaning model (about 270 MB) and reads your notes on this PC. Nothing leaves it.`);
+  $("#notes-index").disabled = Boolean(notes.busy);
+  $("#notes-index").textContent = notes.count ? "Update the index" : "Index my notes";
+  $("#cities-info").textContent = knowledge.cities.length
+    ? `Kept for offline routes: ${knowledge.cities.join(", ")}. Places you've routed to before work offline too.`
+    : "Routes need the internet the first time in each area. Keep your city's roads and they work offline (one download, a few minutes).";
+  if (document.activeElement !== $("#keep-city") && !$("#keep-city").value) $("#keep-city").value = knowledge.city || "";
+}
+
 function renderGoogleMcp() {
   const mcp = state.google_mcp || {};
   const ready = Boolean(mcp.on && mcp.running);
@@ -1142,6 +1174,7 @@ const CONSENT = {
   claude: () => ["Use Claude as Nova's brain", "While Claude is chosen and the PC is online, Nova sends your questions to Claude (Anthropic's AI, on your Claude plan through Claude Code, or with your own API key) and speaks Claude's answer.\n\n• Sent: your question, the recent conversation and what it needs: with the default setting that can be your name, what Nova remembers, your city (for the weather and news) and your notes or library when you ask about them. Web searches go to DuckDuckGo (only the search words); Claude reads the results.\n• Passwords, codes, bank details and mail: Nova asks you out loud first, every time; “no” keeps them on this PC.\n• Start with “privately” to keep any question here, or choose “Anything personal stays on this PC” in Settings. Offline, everything stays here.\n\nOn your Claude plan it counts toward the plan's usage limit (no extra bill); with an API key Anthropic bills per question (about half a cent with Sonnet at medium effort). Change it any time."],
   connectors: () => ["Claude with your claude.ai Gmail and Drive", "When Claude answers on your Claude plan, it may also use the Gmail and Google Drive connectors you connected on claude.ai, when you ask about your mail or files.\n\n• Your mail and files are read by Claude (Anthropic) through your own claude.ai account, under its privacy terms.\n• Nova lets it read, search and save drafts only: sending mail and sharing, changing or deleting files are blocked.\n• Connect them first on claude.ai → Settings → Connectors, with the account Claude Code is signed in with.\n\nTurn it off any time."],
   google_mcp: () => ["Nova's Gmail and Drive for your Claude apps", "Nova will serve its Gmail and Google Drive tools on this PC (127.0.0.1, port 47821) for Claude Code and Claude Desktop.\n\n• Only programs on this PC that have the private key can use it; you paste the key into your Claude apps. Don't share it.\n• Those apps can read your unread mail, save drafts (never send) and search and read your Drive files. What they read goes to Claude (Anthropic) under your Claude account.\n• Your Claude app asks you before each tool, so Nova doesn't ask again.\n• New key shuts out every app set up with the old one.\n\nTurn it off any time."],
+  knowledge: (detail) => [`Download ${detail.title}?`, `${detail.gb ? `About ${detail.gb} GB` : "Its size is shown once you click Show download sizes"}, from Kiwix's library (the same Wikipedia files offline libraries and Project NOMAD use), into Nova's data folder.\n\nAfter that Nova can look things up in it with the internet off. It downloads in the background; you can keep using Nova, and if it's cut off it carries on from where it stopped.`, "Download"],
   reverse: () => ["Reverse engineering with REA", "Nova will be able to hand “reverse engineer …” jobs to Claude Code (on your plan) with REA, an open-source reverse engineering toolkit (github.com/morluto/rea, pinned to rea-agents 6.9.0, run with npx).\n\n• Only use it on software, sites and files you're allowed to analyse; respect licenses and terms of service. Nova asks Claude not to patch, crack or bypass anything.\n• REA reads files and can run or drive the target with your Windows permissions.\n• What it finds goes to Claude (your plan), and the report to outputs/ and your Library.\n• It needs Claude Code and Node.js 22.23 or newer.\n\nTurn it off any time."],
   telegram_relay: () => ["Nova on Telegram with the PC off", "Nova will put a small relay on your own Cloudflare account (free). While your PC is off, Telegram sends your messages there instead.\n\n• Kept on your Cloudflare account: your bot token, your Telegram id, your name and what Nova remembers (so she still knows you), the reminders of the next three days (so they still come), the key of the online brain you chose, and the messages sent while the PC was off, until the PC is back and reads them.\n• While the PC is off, the brain you chose (Claude Haiku with your API key, or Ollama Cloud) answers; it can talk and plan, not use the PC. Voice notes and files wait for the PC.\n• When the PC starts, it takes Telegram back and the conversation continues there.\n\nRemove relay takes all of it off your Cloudflare account."],
   telegram: () => ["Nova on Telegram", "Nova will answer your own private Telegram bot from this PC, wherever you are.\n\n• Only you: the first account that sends the pairing code becomes the owner; everyone else is ignored without a reply.\n• Your messages and Nova's answers travel through Telegram's servers (bot chats are not end-to-end encrypted). Don't send passwords there.\n• Voice notes are turned into text on this PC and not kept.\n• Nova can send you your own files when you ask (from Desktop, Documents, Downloads, Pictures, Videos, Music).\n• With Screen assist on, she can also work the PC for you from the chat. When she needs a yes or no, she asks in the chat.\n\nNothing on this PC opens to the internet: Nova asks Telegram for new messages. Turn it off any time."],
@@ -1601,6 +1634,9 @@ $("#gmail-toggle").onclick = async () => {
       [{ label: "OK", value: null, primary: true, cancel: true }]);
   }
 };
+$("#knowledge-sizes").onclick = () => { toast("Asking Kiwix's library for the sizes…", "info"); act("knowledge_catalog"); };
+$("#notes-index").onclick = () => act("notes_index");
+$("#keep-city-save").onclick = () => { toast("Downloading the roads; it can take a few minutes for a big city.", "info"); act("keep_city", { city: $("#keep-city").value }); };
 $("#node-path-save").onclick = () => act("node_path", { path: $("#node-path").value });
 $("#drive-connect").onclick = () => {
   toast("Google opens in your browser: allow Drive too. If it says the Drive API is off, enable it in Google Cloud Console for your project first.", "info");

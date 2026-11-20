@@ -39,3 +39,5 @@ feedparser==6.0.14
 playwright==1.64.0
 # Telegram voice notes (Ogg Opus) are decoded on this PC for Whisper (telegram_remote.py); the wheel brings libsndfile.
 soundfile==0.13.1
+# Offline Wikipedia (offline_wikipedia.py): reads Kiwix's ZIM files and their full-text index.
+libzim==4.1.0

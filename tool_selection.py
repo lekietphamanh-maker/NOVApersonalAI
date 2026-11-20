@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 CORE = ("add_task", "calculate", "web_search", "remember", "forget", "set_timer", "cancel_timer", "reminder",
-        "media_control", "weather", "skills")
+        "media_control", "weather", "skills", "wikipedia")
 # (tool names, the words that call for them). Matched case-insensitively against the owner's request.
 GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("list_unread_mail", "read_mail", "draft_mail"), r"mail|e-?mails?|inbox|gmail|draft|repl(y|ies)|unread|thư"),
@@ -24,7 +24,7 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
                                                      r"hurricane|typhoon|cyclone|wildfires?|volcano|disaster|conflict|"
                                                      r"brief|tin tức"),
     (("set_location", "local_news"), r"weather|forecast|rain|temperature|city|location|live in|moved? to|thời tiết"),
-    (("second_brain", "library"), r"second brain|notes?|wiki|learn(ed|t)?|watched|read about|obsidian|vault|library|"
+    (("second_brain", "library", "search_my_notes"), r"second brain|notes?|wiki|learn(ed|t)?|watched|read about|obsidian|vault|library|i wrote|i saved|i kept|"
                                   r"projects?|ideas?|repos?"),
     (("mind_map", "add_to_map"), r"map|brainstorm|visuali[sz]e|ideas?"),
     (("creative_mode",), r"camera|creative|holograms?|photo|selfie|lens|kiss ?cam|webcam|3d|reactor"),
