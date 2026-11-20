@@ -8,6 +8,8 @@ An offline-first voice assistant for Windows. Say **"Hey Nova"** or hold **Ctrl+
 2. Download **Nova-Setup.exe** from the [latest release](../../releases/latest) and run it (no admin needed).
 3. Start Nova and click **Download** on the model she suggests for your PC.
 
+**On a Mac** (Apple silicon): most of Nova runs there too, from source for now; see [INSTALL.md part I](INSTALL.md#i-nova-on-a-mac-apple-silicon-15-min).
+
 Everything else is set up from inside Nova: **SETTINGS → Need to** has step-by-step folders for each feature. The full guide is in [INSTALL.md](INSTALL.md). Updates download in the background and install when you click **Restart to update**.
 
 ## What she does

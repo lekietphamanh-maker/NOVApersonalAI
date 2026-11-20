@@ -169,6 +169,15 @@ How it works: while the PC is on, Nova checks in with the relay every 5 minutes.
 
 ---
 
+## I. Nova on a Mac (Apple silicon, 15 min)
+
+Most of Nova runs on the Mac: voice and hold-to-talk, every brain (the AI on the Mac, Claude, Ollama Cloud), the World, Route, Library, Rea and Shannon screens, Gmail/Calendar/Drive, Telegram, music mode, offline knowledge and documents. Not yet: screen assist, the second brain's reading of your screen, the corner orb and the tray (closing Nova's window quits it). The model is chosen from the Mac's memory: Apple silicon's GPU shares the RAM, so 8 GB gets qwen3:4b, 16 GB qwen3:8b, 24 GB or more qwen3:14b. **SETTINGS → This PC** shows what Nova found.
+
+1. Install [Python 3.14](https://www.python.org/downloads/) (the macOS installer) and [Ollama](https://ollama.com/download) (drag it to Applications, open it once). Google Chrome is optional: it gives Nova its own window.
+2. Download this repository (**Code → Download ZIP**, or `git clone`), open Terminal in its folder and run `bash macos/setup.sh`.
+3. Double-click **macos/Start Nova.command**. The first time, macOS asks to allow **Input Monitoring** (needed to hold **Control+Option** to talk while another app is in front) and the **microphone**: allow both. If you missed it: System Settings → Privacy & Security → Input Monitoring → turn on Terminal.
+4. Claude Code, Node.js (for Rea) and Docker (for Shannon) work the same as on Windows; install them with their Mac installers or Homebrew, and Nova finds them.
+
 ## If something doesn't work
 
 1. **Check Nova.bat fails at the model:** open PowerShell and run `ollama pull qwen3:4b` (or the model Nova offered), then try again.
