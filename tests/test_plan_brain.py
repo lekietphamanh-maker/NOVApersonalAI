@@ -4,7 +4,9 @@ from __future__ import annotations
 import io
 import json
 import os
+import queue
 import tempfile
+import time
 import threading
 import unittest
 import urllib.error
@@ -87,6 +89,12 @@ def delta(text: str) -> dict:
 
 
 class KeptInput(io.StringIO):
+    """stdin: what Nova wrote, also after Claude Code's session would have read it."""
+    sent = ""
+
+    def flush(self) -> None:
+        self.sent = self.getvalue()
+
     def close(self) -> None:
         self.sent = self.getvalue()
         super().close()
@@ -153,13 +161,15 @@ class PlanBrainTests(unittest.TestCase):
             self.assertEqual(arguments[arguments.index(flag) + 1], value)
         self.assertIn("--strict-mcp-config", arguments)
         self.assertNotIn("Set a tea timer", " ".join(arguments))  # the request goes through stdin
-        self.assertEqual(seen["stdin"].sent, "Set a tea timer")
+        self.assertEqual(json.loads(seen["stdin"].sent), {"type": "user", "message": {"role": "user", "content": "Set a tea timer"}})
+        self.assertIn("--input-format", arguments)
         self.assertEqual(seen["system"], "You are Nova.")
         self.assertNotIn("ANTHROPIC_API_KEY", seen["options"]["env"])  # billed to the plan, never the API key
         server = seen["mcp"]["mcpServers"]["nova"]
         self.assertEqual((server["type"], server["url"]), ("http", brain.tools.url))
         self.assertTrue(server["headers"]["Authorization"].startswith("Bearer "))
-        self.assertFalse((brain.folder / "mcp.json").exists())  # the token's file is gone after the turn
+        brain.close()
+        self.assertFalse((brain.folder / "mcp.json").exists())  # the token's file is gone with the session
         self.assertIsNone(brain.tools.current(server["headers"]["Authorization"]))  # and the token no longer works
 
     def test_whole_messages_count_when_there_are_no_partial_pieces(self) -> None:
@@ -193,6 +203,83 @@ class PlanBrainTests(unittest.TestCase):
         self.assertTrue(process.killed)
 
 
+class SessionProcess:
+    """A Claude Code that stays open: each message written to it gets one answer, until it is stopped."""
+
+    def __init__(self) -> None:
+        self.received: list[str] = []
+        self.lines: queue.Queue = queue.Queue()
+        self.stdout = iter(self.lines.get, None)
+        self.stderr = io.StringIO("")
+        self.pid, self.killed, self.returncode = 4243, False, None
+        brain = self
+
+        class Input:
+            def write(self, text: str) -> None:
+                message = json.loads(text)["message"]["content"]
+                brain.received.append(message)
+                brain.lines.put(stream(delta(f"answer {len(brain.received)}"),
+                                       {"type": "result", "is_error": False, "result": "x"}).splitlines()[0] + "\n")
+                brain.lines.put(json.dumps({"type": "result", "is_error": False, "result": "x"}) + "\n")
+
+            def flush(self) -> None:
+                pass
+        self.stdin = Input()
+
+    def poll(self) -> int | None:
+        return 0 if self.killed else None
+
+    def kill(self) -> None:
+        self.killed = True
+        self.lines.put(None)
+
+    def wait(self, timeout: float | None = None) -> int:
+        return 0
+
+
+class SessionTests(unittest.TestCase):
+    def test_one_claude_code_answers_question_after_question(self) -> None:
+        started: list[SessionProcess] = []
+
+        def start(arguments, **options):
+            started.append(SessionProcess())
+            return started[-1]
+        server = nova_mcp.ToolServer()
+        self.addCleanup(server.shutdown)
+        brain = plan_brain.PlanBrain(tools=server, command=lambda: "claude", start=start)
+        self.addCleanup(brain.close)
+        brain.warm("You are Nova.", [TIMER])
+        for _ in range(50):
+            if started:
+                break
+            time.sleep(0.02)
+        self.assertEqual(len(started), 1)  # started before the first question
+        first = brain.turn("You are Nova.", "Full conversation. The owner says: hi", [TIMER], lambda *_: "", lambda _p: None,
+                           followup="The owner says: hi")
+        second = brain.turn("You are Nova.", "Full conversation. The owner says: and now?", [TIMER], lambda *_: "",
+                            lambda _p: None, followup="The owner says: and now?")
+        self.assertEqual((first, second), ("answer 1", "answer 2"))
+        self.assertEqual(len(started), 1)  # no new Claude Code for the second question
+        self.assertEqual(started[0].received, ["Full conversation. The owner says: hi", "The owner says: and now?"])
+        brain.turn("You are Nova. Remember: tea.", "Full. The owner says: x", [TIMER], lambda *_: "", lambda _p: None,
+                   followup="The owner says: x")
+        self.assertEqual(len(started), 2)  # new instructions: a new session, which gets the whole conversation
+        self.assertTrue(started[0].killed)
+        self.assertEqual(started[1].received, ["Full. The owner says: x"])
+
+    def test_a_session_that_stopped_by_itself_is_started_again(self) -> None:
+        started: list[SessionProcess] = []
+        server = nova_mcp.ToolServer()
+        self.addCleanup(server.shutdown)
+        brain = plan_brain.PlanBrain(tools=server, command=lambda: "claude",
+                                     start=lambda arguments, **options: started.append(SessionProcess()) or started[-1])
+        self.addCleanup(brain.close)
+        brain.turn("s", "one", [TIMER], lambda *_: "", lambda _p: None)
+        started[0].killed = True  # e.g. the PC slept and Claude Code quit
+        self.assertEqual(brain.turn("s", "two (full)", [TIMER], lambda *_: "", lambda _p: None, followup="two"), "answer 1")
+        self.assertEqual((len(started), started[1].received), (2, ["two (full)"]))
+
+
 class AgentPlanTurnTests(unittest.TestCase):
     def agent(self):
         from agent import Agent
@@ -208,8 +295,9 @@ class AgentPlanTurnTests(unittest.TestCase):
         class Plan:
             plan, sees_screen, name = True, False, "Claude Sonnet 5.5 (Claude plan)"
 
-            def turn(self, system, request, tools, run, on_text, cancel=None):
-                seen.update(system=system, request=request, tools={tool["function"]["name"] for tool in tools})
+            def turn(self, system, request, tools, run, on_text, cancel=None, followup=None):
+                seen.update(system=system, request=request, followup=followup,
+                            tools={tool["function"]["name"] for tool in tools})
                 seen["ran"] = run("calculate", {"expression": "6*7"})
                 on_text("It's 42.")
                 return "It's 42."
@@ -225,6 +313,15 @@ class AgentPlanTurnTests(unittest.TestCase):
         self.assertNotIn("click", seen["tools"])  # no screen control through the online brain
         self.assertIn("42", seen["ran"])
         self.assertEqual(agent.memory.recent_messages(limit=2)[-1]["brain"], "claude-plan")
+        self.assertIsNone(seen["followup"])  # no earlier answer on the plan: the whole conversation
+        agent.memory.save_message({"role": "user", "content": "privately, what's my pin", "private": True})
+        agent.memory.save_message({"role": "assistant", "content": "On this PC.", "private": True})
+        agent.memory.save_message({"role": "user", "content": "nice weather"})
+        agent.memory.save_message({"role": "assistant", "content": "Sunny, 24."})
+        agent.ask("and tomorrow?", lambda *_: True)
+        self.assertTrue(seen["followup"].endswith("Said since your last answer (answered on this PC):\n"
+                                                  "Owner: nice weather\nNova: Sunny, 24.\n\nThe owner says: and tomorrow?"))
+        self.assertNotIn("pin", seen["followup"])  # a private turn never goes
 
     def test_the_ai_on_this_pc_answers_when_the_plan_cant(self) -> None:
         agent = self.agent()

@@ -1673,6 +1673,8 @@ class AlfredApp:
                 self.tool_server = ToolServer()
             self.agent.cloud = plan_brain.PlanBrain(model, effort, self.tool_server,
                                                     connectors=bool(self.settings.get("claude_connectors")))
+            if on:
+                self.agent.warm_plan()  # Claude Code starts now, not on the first question
         else:
             self.agent.cloud = cloud_brain.CloudBrain(key, model, effort)
         if old is not None and old is not self.agent.cloud and hasattr(old, "close"):

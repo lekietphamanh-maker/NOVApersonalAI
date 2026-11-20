@@ -138,9 +138,11 @@ class ToolServer:
             self._turn = Turn(token, list(tools), run)
         return token
 
-    def close(self) -> None:
+    def close(self, token: str = "") -> None:
+        """Ends the turn (with a token: only if it is still that one's, so an older session can't end a newer one)."""
         with self._lock:
-            self._turn = None
+            if not token or (self._turn is not None and self._turn.token == token):
+                self._turn = None
 
     def shutdown(self) -> None:
         self.close()

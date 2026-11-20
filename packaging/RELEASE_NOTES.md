@@ -1,3 +1,7 @@
+## New in v2.7.0
+
+- **Claude on your plan answers much sooner**: Nova now keeps one Claude Code session open instead of starting Claude Code (and connecting Nova's tools) for every question. It starts as soon as Nova does, so even the first question doesn't wait. Each question sends only what's new, since the session remembers the conversation. In a test, follow-up questions started answering in about half a second. A fresh session starts by itself when Nova's instructions or tools change, after 30 questions, or if Claude Code stopped (after sleep, for example).
+
 ## New in v2.6.0
 
 - **Faster answers**:

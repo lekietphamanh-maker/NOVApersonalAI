@@ -583,12 +583,14 @@ class Agent:
         Nova's tools through nova_mcp. None when it couldn't answer before saying anything (the local model answers)."""
         from datetime import datetime
         approve = lambda name, details: name == "web_search" or approve_tool(name, details)  # noqa: E731
-        system = self._online_system(CLAUDE_SYSTEM) + PLAN_NOTE + (CONNECTORS_NOTE if getattr(self.cloud, "connectors", False) else "")
+        system = self._plan_system()
+        now = f"Now: {datetime.now():%A %d %B %Y, %H:%M} (the owner's local time).\n\n"
         conversation = "\n".join(f"{'Owner' if message['role'] == 'user' else 'Nova'}: {message['content']}"
                                   for message in self._claude_history()[:-1])
-        request = (f"Now: {datetime.now():%A %d %B %Y, %H:%M} (the owner's local time).\n\n"
-                   + (f"The conversation so far:\n{conversation}\n\n" if conversation else "")
-                   + f"The owner says: {prompt}")
+        request = now + (f"The conversation so far:\n{conversation}\n\n" if conversation else "") + f"The owner says: {prompt}"
+        since = self._since_last_plan_answer()
+        followup = None if since is None else now + (
+            f"Said since your last answer (answered on this PC):\n{since}\n\n" if since else "") + f"The owner says: {prompt}"
         said: list[str] = []
 
         def on_text(piece: str) -> None:
@@ -597,7 +599,8 @@ class Agent:
                 self.on_text(piece)
         try:
             answer = self.cloud.turn(system, request, self._online_tools(),
-                                     lambda name, arguments: self._online_run(name, arguments, approve, prompt), on_text, cancel)
+                                     lambda name, arguments: self._online_run(name, arguments, approve, prompt), on_text, cancel,
+                                     followup=followup)
         except Unavailable as exc:
             if exc.offline:
                 self.router.offline()
@@ -610,6 +613,29 @@ class Agent:
                                                          else "I didn't get an answer from Claude. Please try again.")
         self.memory.save_message({"role": "assistant", "content": answer, "brain": "claude-plan"})
         return answer
+
+    def _plan_system(self) -> str:
+        return self._online_system(CLAUDE_SYSTEM) + PLAN_NOTE + (CONNECTORS_NOTE if getattr(self.cloud, "connectors", False) else "")
+
+    def _since_last_plan_answer(self) -> str | None:
+        """What was said after Claude's last answer on the plan (other brains answered it), without this request; None
+        when that answer isn't among the recent messages (Claude then gets the whole conversation again)."""
+        recent = self.memory.recent_messages(limit=24)[:-1]
+        last = next((index for index in range(len(recent) - 1, -1, -1) if recent[index].get("brain") == "claude-plan"), None)
+        if last is None:
+            return None
+        lines = []
+        for message in recent[last + 1:]:
+            text = str(message.get("content") or "").split(SCREEN_MARKER)[0].strip()
+            if message.get("private") or message.get("role") not in ("user", "assistant") or not text:
+                continue
+            lines.append(f"{'Owner' if message['role'] == 'user' else 'Nova'}: {text}")
+        return "\n".join(lines)
+
+    def warm_plan(self) -> None:
+        """Starts Claude Code's session before the first question, when Claude on the plan is Nova's brain."""
+        if self.cloud is not None and getattr(self.cloud, "plan", False) and hasattr(self.cloud, "warm"):
+            self.cloud.warm(self._plan_system(), self._online_tools())
 
     def _run_tool(self, name: str, arguments: dict[str, Any], approve_tool: Callable[[str, dict[str, Any]], bool],
                   prompt: str, screen: Any) -> str:
