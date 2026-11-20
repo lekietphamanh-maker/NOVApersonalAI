@@ -4,17 +4,57 @@ from __future__ import annotations
 
 import base64
 import secrets
-from typing import Any
+from typing import Any, Callable
 
+import api_brains
+import vision
 import workplace
 from agent import SCREEN_MARKER
 
 
 class WorkplaceActions:
-    def _workplace_act(self, action: str, arguments: dict[str, Any]) -> str:
+    def _picture_looker(self) -> tuple[Callable[[bytes, str], str], str] | None:
+        """Who looks at a picture: the vision model on this PC first (nothing leaves it); without it, the owner's API
+        brain when it sees pictures and the privacy setting lets the owner's things go online."""
         vision_model = self.state["model"].get("vision")
-        look = (lambda image, question: workplace.ask_picture(self.agent.base_url, vision_model, image, question)) \
-            if vision_model else None
+        if vision_model:
+            return (lambda image, question: workplace.ask_picture(self.agent.base_url, vision_model, image, question),
+                    "the vision model on this PC")
+        if self._private_topics() == "personal":
+            return None
+        entry = next((item for item in [self._api_entry(), *self._api_entries()]
+                      if item is not None and item.provider in api_brains.SEES_PICTURES and self._api_key(item)), None)
+        if entry is None:
+            return None
+        key = self._api_key(entry)
+        return (lambda image, question: api_brains.look_at_picture(entry, key, image, question),
+                f"{entry.label} (online: the picture was sent to it)")
+
+    def _start_vision_download(self) -> str:
+        """No one can see pictures yet: Nova gets the vision model herself, in the background."""
+        model = self.state["model"]
+        if model.get("vision_downloading"):
+            return "The vision model is already downloading; Nova can look at pictures once it's in."
+        if model.get("ollama") in ("offline", "checking", None):
+            return ("Nova can't see pictures yet: the vision model needs Ollama running (SETTINGS → Downloads → Set up "
+                    "everything), or add an API brain that sees pictures (Claude, OpenAI or Gemini).")
+        answer = self._act_pull_vision({"consented": True}) or {}
+        if answer.get("ok") is False:
+            return f"Nova can't see pictures yet: {answer.get('error', 'the vision model download did not start')}."
+        return (f"Nova is downloading the vision model now (about {vision.VISION_GB} GB, it runs on this PC). Tell the "
+                "owner she can look at pictures and sketches once it's in, and meanwhile describe only what the board's "
+                "text says about them.")
+
+    def _workplace_act(self, action: str, arguments: dict[str, Any]) -> str:
+        looker = self._picture_looker() if action == "look" else None
+        if action == "look" and looker is None:
+            item = self.workplace_board.find(str(arguments.get("item") or ""))
+            if item is not None and item["kind"] in ("picture", "sketch") and item["image"]:
+                return self._start_vision_download()
+        look = None
+        if looker is not None:
+            see, who = looker
+            look = lambda image, question: f"{see(image, question)} (seen by {who})"  # noqa: E731
         return self.workplace_board.act(action, arguments, look)
 
     def _with_workplace(self, prompt: str) -> str:

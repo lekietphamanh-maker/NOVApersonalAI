@@ -8,7 +8,10 @@
     - She puts her own note beside the item, linked by a dashed line.
     - She points at what she means.
     - She looks at pictures and sketches with the vision model on your PC.
-  - **Saving**: closing asks **Save / Don't save / Cancel**. **Open ▾** brings back a saved board, and Ctrl+S saves.
+  - **Saving**: closing asks **Save / Don't save / Cancel**. **Open ▾** brings back a saved board with Nova's highlights and notes, and Ctrl+S saves.
+  - **Pictures**: Nova looks with the vision model on your PC.
+    - **No vision model yet:** she uses your API brain instead, if it can see pictures (Claude, OpenAI, Gemini, OpenRouter or xAI). She says the picture went online. With the strict privacy setting, pictures never go online.
+    - **No API brain that sees pictures either:** she starts downloading the vision model herself and tells you when she'll be able to look.
   - **Its own window**: open it from Advance → Separate apps.
   - **Privacy**: the board goes along with your questions only while it's open, and isn't kept in the conversation history. It goes to whichever brain answers, just like anything you type.
 - **Top bar** fits on one row again, down to 1280-pixel-wide screens.

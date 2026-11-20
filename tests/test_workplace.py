@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import io
 import tempfile
 import unittest
@@ -105,3 +106,90 @@ class VoiceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HighlightSavingTests(unittest.TestCase):
+    def test_highlights_survive_save_and_open_and_nova_sees_them(self) -> None:
+        board, _sent = board_with_items()
+        items = [dict(item) for item in board.items]
+        items[0]["marks"] = [{"text": "  mass times   acceleration ", "note": "the law in words"}, {"text": ""}, "junk"]
+        board.sync(True, "Physics", items, [])
+        self.assertIn("[already highlighted: “mass times acceleration”]", board.context())
+        loaded = board.load(board.save("Physics", items))
+        self.assertEqual(loaded["items"][0]["marks"], [{"text": "mass times acceleration", "note": "the law in words"}])
+        self.assertEqual(loaded["items"][1]["marks"], [])
+
+
+class PictureTests(unittest.TestCase):
+    def test_a_failing_looker_is_said_not_raised(self) -> None:
+        board, _sent = board_with_items()
+
+        def broken(image, question):
+            raise RuntimeError("no credit left")
+        self.assertIn("Not done: couldn't look at [p2] (no credit left)", board.act("look", {"item": "p2"}, broken))
+
+    def looker_app(self, vision_model=None, entries=(), privacy="secrets", ollama="online · v0.13"):
+        import workplace_actions
+        pulled: list = []
+
+        class App(workplace_actions.WorkplaceActions):
+            pass
+        app = App()
+        app.state = {"model": {"vision": vision_model, "ollama": ollama}}
+        app.agent = type("Agent", (), {"base_url": "http://127.0.0.1:11434"})()
+        app.workplace_board, _sent = board_with_items()
+        app._private_topics = lambda: privacy
+        app._api_entries = lambda: list(entries)
+        app._api_entry = lambda: entries[0] if entries else None
+        app._api_key = lambda entry: "sk-test"
+        app._act_pull_vision = lambda args: pulled.append(args)
+        return app, pulled
+
+    def test_who_looks_this_pc_first_then_an_api_brain_then_nova_downloads_the_model(self) -> None:
+        import api_brains
+        app, _pulled = self.looker_app(vision_model="qwen2.5vl:7b")
+        self.assertEqual(app._picture_looker()[1], "the vision model on this PC")
+        claude = api_brains.Entry("c1", "anthropic", "claude-sonnet-5-5", "", "Claude")
+        groq = api_brains.Entry("g1", "groq", "llama", "https://api.groq.com/openai/v1", "Groq")
+        app, _pulled = self.looker_app(entries=[groq, claude])
+        self.assertIn("Claude (online", app._picture_looker()[1])  # Groq's models don't see pictures
+        app, _pulled = self.looker_app(entries=[claude], privacy="personal")
+        self.assertIsNone(app._picture_looker())  # the strict privacy rule: the owner's pictures stay here
+        app, pulled = self.looker_app()
+        said = app._workplace_act("look", {"item": "p2"})
+        self.assertEqual(pulled, [{"consented": True}])
+        self.assertIn("downloading the vision model now", said)
+        app, pulled = self.looker_app(ollama="offline")
+        self.assertIn("needs Ollama running", app._workplace_act("look", {"item": "p2"}))
+        self.assertEqual(pulled, [])
+
+    def test_the_api_brain_gets_the_picture_and_the_question(self) -> None:
+        import api_brains
+        sent: list = []
+
+        class Answer(io.BytesIO):
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_):
+                return False
+
+        def opener(request, timeout):
+            sent.append(json.loads(request.data))
+            return Answer(json.dumps({"choices": [{"message": {"content": "A yellow sun over a field."}}]}).encode())
+        entry = api_brains.Entry("o1", "openai", "gpt-5", "https://api.openai.com/v1", "OpenAI")
+        said = api_brains.look_at_picture(entry, "sk", b"\x89PNG\r\n\x1a\nrest", "What is it?", opener=opener)
+        self.assertEqual(said, "A yellow sun over a field.")
+        content = sent[0]["messages"][0]["content"]
+        self.assertEqual(content[0], {"type": "text", "text": "What is it?"})
+        self.assertTrue(content[1]["image_url"]["url"].startswith("data:image/png;base64,"))
+
+        class Claude:
+            class messages:
+                @staticmethod
+                def create(**params):
+                    sent.append(params)
+                    return type("Reply", (), {"content": [type("Block", (), {"text": "A leaf diagram."})()]})()
+        entry = api_brains.Entry("c1", "anthropic", "claude-sonnet-5-5", "", "Claude")
+        self.assertEqual(api_brains.look_at_picture(entry, "sk", b"\xff\xd8jpeg", "What?", anthropic_client=Claude), "A leaf diagram.")
+        self.assertEqual(sent[-1]["messages"][0]["content"][0]["source"]["media_type"], "image/jpeg")

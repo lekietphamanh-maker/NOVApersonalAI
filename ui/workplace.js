@@ -48,7 +48,7 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
   function changed() { dirty = true; clearTimeout(syncTimer); syncTimer = setTimeout(sync, SYNC_MS); }
   function sync() {
     act("workplace_sync", { open: view$.isOpen(), name: nameBox.value, selected: [...selected],
-      items: items.map(({ marks, ...item }) => item) });
+      items: items });
   }
 
   // ---------- items ----------
@@ -277,6 +277,7 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
     else if (event.command === "highlight" && item) {
       item.marks = [...(item.marks || []).filter((mark) => mark.text !== event.text), { text: event.text, note: event.note }];
       paintMarks();
+      changed();  // highlights are part of the board: saved with it, and asked about next time
       if (event.note) add("nova", { text: `“${event.text}”: ${event.note}` }, item);
       point(item, "");
     } else if (event.command === "point" && item) point(item, event.note);
@@ -325,7 +326,7 @@ export function createWorkplace(root, { act, toast, onOpenChange }) {
 
   // ---------- saving, opening, closing ----------
   async function save() {
-    const answer = await act("workplace_save", { name: nameBox.value, items: items.map(({ marks, ...item }) => item) });
+    const answer = await act("workplace_save", { name: nameBox.value, items: items });
     if (!answer.ok) return false;
     nameBox.value = answer.name;
     dirty = false;

@@ -246,3 +246,39 @@ def make_image(base_url: str, key: str, prompt: str, folder: Any, model: str = "
     path = target / f"Image {datetime.now():%Y-%m-%d %H%M%S}.png"
     path.write_bytes(picture)
     return path
+
+
+# Providers whose usual models see pictures (an API brain on one of these can look at the owner's pictures).
+SEES_PICTURES = {"anthropic", "openai", "gemini", "openrouter", "xai"}
+
+
+def _media_type(image: bytes) -> str:
+    return "image/png" if image[:8] == b"\x89PNG\r\n\x1a\n" else "image/webp" if image[8:12] == b"WEBP" else "image/jpeg"
+
+
+def look_at_picture(entry: Entry, key: str, image: bytes, question: str, opener: Callable[..., Any] = urlopen,
+                    anthropic_client: Any = None) -> str:
+    """One question about one picture on an API brain: Claude through its SDK, the others in the OpenAI chat format."""
+    import base64
+    data = base64.b64encode(image).decode()
+    question = " ".join(str(question).split())[:1000] or "Describe this picture in detail."
+    if entry.provider == "anthropic":
+        try:
+            import anthropic
+            client = anthropic_client or anthropic.Anthropic(api_key=key, max_retries=1, timeout=anthropic.Timeout(90.0, connect=5.0))
+            reply = client.messages.create(model=entry.model, max_tokens=700, messages=[{"role": "user", "content": [
+                {"type": "image", "source": {"type": "base64", "media_type": _media_type(image), "data": data}},
+                {"type": "text", "text": question}]}])
+        except Exception as exc:  # the SDK's own errors: rejected key, no credit, offline
+            raise Unavailable(f"Claude couldn't look at it ({type(exc).__name__})") from exc
+        return " ".join("".join(getattr(block, "text", "") for block in reply.content).split()) or "It couldn't make it out."
+    body = {"model": entry.model, "max_tokens": 700, "messages": [{"role": "user", "content": [
+        {"type": "text", "text": question},
+        {"type": "image_url", "image_url": {"url": f"data:{_media_type(image)};base64,{data}"}}]}]}
+    try:
+        with opener(_request(f"{entry.base_url.rstrip('/')}/chat/completions", key, body), timeout=120) as response:
+            answer = json.loads(response.read())
+    except (HTTPError, URLError, OSError, ValueError) as exc:
+        raise _problem(exc, entry.label) from exc
+    text = ((answer.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+    return " ".join(str(text).split()) or "It couldn't make it out."
