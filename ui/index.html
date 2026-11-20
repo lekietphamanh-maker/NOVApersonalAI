@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="hud.css">
 <link rel="stylesheet" href="library.css">
 <link rel="stylesheet" href="world.css">
+<link rel="stylesheet" href="lab.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -31,6 +32,8 @@
     <button class="box" data-act="library" title="Your projects, repos and ideas by topic">Library</button>
     <button class="box" data-act="world" title="What's happening on Earth: quakes, storms, fires, news">World</button>
     <button class="box" data-act="route" title="The fastest way from A to B, with stops">Route</button>
+    <button class="box" data-act="rea" title="Rea: how an app is built, as a blueprint">Rea</button>
+    <button class="box" data-act="shannon" title="Shannon: break into your own app before someone else does">Shannon</button>
     <span class="toolbar-gap" aria-hidden="true"></span>
     <button class="box" data-pane="settings">Settings</button>
   </nav>
@@ -164,6 +167,44 @@
     <aside class="world-side route-side" id="route-info" aria-live="polite"><span class="muted small">Say “fastest way from District 12 to District 7 via Ben Thanh”, or type it above.</span></aside>
   </div>
   <p class="lib-hint">roads from OpenStreetMap, worked out on this PC &nbsp;·&nbsp; normal speeds, no live traffic &nbsp;·&nbsp; Esc</p>
+</section>
+
+<section id="rea" class="world lab lab-rea" hidden aria-label="Rea">
+  <header class="lib-head">
+    <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>REA</b><span class="lib-crumb">blueprint</span></div>
+    <form id="rea-form" class="route-form" autocomplete="off">
+      <input class="field" name="target" placeholder="App, file, folder or site to analyse" maxlength="300" required aria-label="What to analyse">
+      <input class="field" name="goal" placeholder="What to find out (optional)" maxlength="300" aria-label="What to find out">
+      <button class="box small on" type="submit">Analyse</button>
+    </form>
+    <button class="box small" id="rea-close" type="button" title="Esc">Close</button>
+  </header>
+  <div class="world-body">
+    <div class="world-stage lab-stage" id="rea-stage"></div>
+    <aside class="world-side lab-side" id="rea-side" aria-live="polite"></aside>
+  </div>
+  <div class="lab-bottom"><p class="lab-problem" id="rea-problem" role="status" hidden></p><nav class="lab-strip" id="rea-strip" aria-label="Past reports"></nav></div>
+  <p class="lib-hint">Claude Code on your plan with REA &nbsp;·&nbsp; only software you're allowed to analyse &nbsp;·&nbsp; reports in your Library &nbsp;·&nbsp; Esc</p>
+</section>
+
+<section id="shannon" class="world lab lab-shannon" hidden aria-label="Shannon">
+  <header class="lib-head">
+    <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>SHANNON</b><span class="lib-crumb">mission board</span></div>
+    <form id="shannon-form" class="route-form" autocomplete="off">
+      <input class="field" name="project" list="shannon-projects" placeholder="Project folder" maxlength="300" required aria-label="Project folder">
+      <datalist id="shannon-projects"></datalist>
+      <input class="field" name="url" placeholder="Where it runs (localhost:3000)" maxlength="300" required aria-label="Where the app runs">
+      <button class="box small on" type="submit">Run</button>
+    </form>
+    <button class="box small danger" id="shannon-stop" type="button" hidden>Stop</button>
+    <button class="box small" id="shannon-close" type="button" title="Esc">Close</button>
+  </header>
+  <div class="world-body">
+    <div class="world-stage lab-stage shannon-board" id="shannon-board"></div>
+    <aside class="world-side lab-side" id="shannon-side" aria-live="polite"></aside>
+  </div>
+  <div class="lab-bottom"><p class="lab-problem" id="shannon-problem" role="status" hidden></p><nav class="lab-strip" id="shannon-strip" aria-label="Past checks"></nav></div>
+  <p class="lib-hint">your own apps on this PC or home network only &nbsp;·&nbsp; WSL + Docker, Claude API key (costs credit) &nbsp;·&nbsp; reports in your Library &nbsp;·&nbsp; Esc</p>
 </section>
 
 <section id="world" class="world" hidden aria-label="World">

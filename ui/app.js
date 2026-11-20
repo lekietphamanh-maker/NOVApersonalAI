@@ -4,6 +4,8 @@ import { createMindMap, ICONS, PALETTE } from "./mindmap.js";
 import { createLibrary } from "./library.js";
 import { createWorld } from "./world.js";
 import { createRoute } from "./route.js";
+import { createRea } from "./rea.js";
+import { createShannon } from "./shannon.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -23,18 +25,31 @@ const library = createLibrary($("#library"), { act: (...args) => act(...args), t
     $("[data-act=library]").classList.toggle("on", open);
     if (open && mapOpen) openMap(false);
     if (open && world.isOpen()) world.close();
+    if (open) closeLabs();
     act("library_view", { open });
   } });
 const world = createWorld($("#world"), { act: (...args) => act(...args), onOpenChange: (open) => {
   $("[data-act=world]").classList.toggle("on", open);
   if (open && library.isOpen()) library.close();
   if (open && mapOpen) openMap(false);
+  if (open) closeLabs();
 } });
 const routeView = createRoute($("#route"), { act: (...args) => act(...args), onOpenChange: (open) => {
   $("[data-act=route]").classList.toggle("on", open);
   if (open && world.isOpen()) world.close();
   if (open && library.isOpen()) library.close();
+  if (open) closeLabs();
 } });
+// Full-screen views: opening one closes the others.
+function labOpened(name, open) {
+  $(`[data-act=${name}]`).classList.toggle("on", open);
+  if (!open) return;
+  for (const other of [world, routeView, library, rea, shannon]) if (other && other !== labs[name] && other.isOpen()) other.close();
+}
+const labs = {};
+function closeLabs() { for (const lab of Object.values(labs)) if (lab.isOpen()) lab.close(); }
+const rea = labs.rea = createRea($("#rea"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("rea", open) });
+const shannon = labs.shannon = createShannon($("#shannon"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("shannon", open) });
 let online = false;
 let offlineTimer = 0;
 let openPane = null;
@@ -121,6 +136,12 @@ function handle(event) {
     case "world_data": if (world.isOpen()) world.setData(event); break;
     case "route_view": routeView.show(event.route); break;
     case "route_error": routeView.open(); routeView.error(event.text); break;
+    case "rea_job": rea.job(event.job); break;
+    case "rea_step": rea.step(event); break;
+    case "rea_ready": rea.ready(event); break;
+    case "shannon_job": shannon.job(event.job); break;
+    case "shannon_line": shannon.line(event); break;
+    case "shannon_ready": shannon.ready(event); break;
   }
 }
 
@@ -1176,6 +1197,7 @@ const CONSENT = {
   google_mcp: () => ["Nova's Gmail and Drive for your Claude apps", "Nova will serve its Gmail and Google Drive tools on this PC (127.0.0.1, port 47821) for Claude Code and Claude Desktop.\n\n• Only programs on this PC that have the private key can use it; you paste the key into your Claude apps. Don't share it.\n• Those apps can read your unread mail, save drafts (never send) and search and read your Drive files. What they read goes to Claude (Anthropic) under your Claude account.\n• Your Claude app asks you before each tool, so Nova doesn't ask again.\n• New key shuts out every app set up with the old one.\n\nTurn it off any time."],
   knowledge: (detail) => [`Download ${detail.title}?`, `${detail.gb ? `About ${detail.gb} GB` : "Its size is shown once you click Show download sizes"}, from Kiwix's library (the same Wikipedia files offline libraries and Project NOMAD use), into Nova's data folder.\n\nAfter that Nova can look things up in it with the internet off. It downloads in the background; you can keep using Nova, and if it's cut off it carries on from where it stopped.`, "Download"],
   reverse: () => ["Reverse engineering with REA", "Nova will be able to hand “reverse engineer …” jobs to Claude Code (on your plan) with REA, an open-source reverse engineering toolkit (github.com/morluto/rea, pinned to rea-agents 6.9.0, run with npx).\n\n• Only use it on software, sites and files you're allowed to analyse; respect licenses and terms of service. Nova asks Claude not to patch, crack or bypass anything.\n• REA reads files and can run or drive the target with your Windows permissions.\n• What it finds goes to Claude (your plan), and the report to outputs/ and your Library.\n• It needs Claude Code and Node.js 22.23 or newer.\n\nTurn it off any time."],
+  shannon: () => ["Shannon attacks your app for real", "Shannon (github.com/KeygraphHQ/shannon, pinned to 3.5.0) is an AI pentester: it reads your project's code, then really tries to break into the running app (injection, XSS, logins, access control, SSRF) and reports only what it could prove, with the fix.\n\n• Only your own apps, running on this PC or your home network. Nova refuses other addresses. Use a test copy: it can change or delete data in the app it attacks.\n• It runs in Docker inside WSL2 and talks to Claude with your Claude API key: your code and the app's answers go to Anthropic, and a full run costs API credit (it can be tens of dollars) and takes an hour or two.\n• The report goes to the project's Security checks folder and your Library.\n\nYou are asked this once.", "I understand, run it"],
   telegram_relay: () => ["Nova on Telegram with the PC off", "Nova will put a small relay on your own Cloudflare account (free). While your PC is off, Telegram sends your messages there instead.\n\n• Kept on your Cloudflare account: your bot token, your Telegram id, your name and what Nova remembers (so she still knows you), the reminders of the next three days (so they still come), the key of the online brain you chose, and the messages sent while the PC was off, until the PC is back and reads them.\n• While the PC is off, the brain you chose (Claude Haiku with your API key, or Ollama Cloud) answers; it can talk and plan, not use the PC. Voice notes and files wait for the PC.\n• When the PC starts, it takes Telegram back and the conversation continues there.\n\nRemove relay takes all of it off your Cloudflare account."],
   telegram: () => ["Nova on Telegram", "Nova will answer your own private Telegram bot from this PC, wherever you are.\n\n• Only you: the first account that sends the pairing code becomes the owner; everyone else is ignored without a reply.\n• Your messages and Nova's answers travel through Telegram's servers (bot chats are not end-to-end encrypted). Don't send passwords there.\n• Voice notes are turned into text on this PC and not kept.\n• Nova can send you your own files when you ask (from Desktop, Documents, Downloads, Pictures, Videos, Music).\n• With Screen assist on, she can also work the PC for you from the chat. When she needs a yes or no, she asks in the chat.\n\nNothing on this PC opens to the internet: Nova asks Telegram for new messages. Turn it off any time."],
   mic: () => ["Turn the microphone on", "While the mic is on, Nova listens for its name. Say “Hey Nova, …” with your request, or “Hey Nova”, wait for the beep, then speak. After that Nova keeps listening for a minute: no need to say its name again. “Thanks” ends it early.\n\nAudio is analyzed on this PC in memory and never saved. It can sometimes miss its name or wake by mistake. The mic stays on until you switch it off, also after restarting Nova."],
@@ -1378,6 +1400,8 @@ $("[data-act=map]").onclick = () => openMap(!mapOpen);
 $("[data-act=library]").onclick = () => (library.isOpen() ? library.close() : library.open());
 $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.open());
 $("[data-act=route]").onclick = () => (routeView.isOpen() ? routeView.close() : routeView.open());
+$("[data-act=rea]").onclick = () => (rea.isOpen() ? rea.close() : rea.open());
+$("[data-act=shannon]").onclick = () => (shannon.isOpen() ? shannon.close() : shannon.open());
 $("#map-add").onclick = () => mindmap.addIdea();
 $("#map-outline-toggle").onclick = () => setPane("notes");
 $("#map-tidy").onclick = () => mindmap.tidy();
@@ -1696,6 +1720,8 @@ document.addEventListener("keydown", (event) => {
     else if (openPane) setPane(openPane);
     else if (world.isOpen()) world.close();
     else if (routeView.isOpen()) routeView.close();
+    else if (rea.isOpen()) rea.close();
+    else if (shannon.isOpen()) shannon.close();
     else if (mapOpen) openMap(false);
     else act("stop");
     return;

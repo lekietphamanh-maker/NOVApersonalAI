@@ -13,6 +13,53 @@ import reverse_engineering as rea
 from tools import execute_tool
 
 
+BLUEPRINT = {"parts": [{"id": "ui", "name": "Window", "kind": "ui", "summary": "Electron renderer", "findings": ["React 19"]},
+                       {"id": "core", "name": "Sync engine", "kind": "logic", "summary": "Rust", "findings": []},
+                       {"id": "bad"}],
+             "links": [{"from": "ui", "to": "core", "label": "IPC"}, {"from": "ui", "to": "nowhere"}]}
+
+
+class BlueprintTests(unittest.TestCase):
+    def test_the_blueprint_is_split_from_the_report_and_checked(self) -> None:
+        report, plan = rea.blueprint("# App\nText.\n\n```json\n" + json.dumps(BLUEPRINT) + "\n```\n")
+        self.assertEqual(report, "# App\nText.")
+        self.assertEqual([part["id"] for part in plan["parts"]], ["ui", "core"])  # a part without a name can't be drawn
+        self.assertEqual(plan["links"], [{"from": "ui", "to": "core", "label": "IPC"}])  # the link to nowhere went
+        self.assertEqual(rea.blueprint("No block here."), ("No block here.", {"parts": [], "links": []}))
+
+    def test_progress_lines_come_from_tool_calls(self) -> None:
+        event = {"type": "assistant", "message": {"content": [{"type": "text", "text": "Looking"},
+                 {"type": "tool_use", "name": "mcp__rea__strings", "input": {"path": "C:/Apps/Thing.exe", "min": 4}}]}}
+        self.assertEqual(rea.progress_line(event), "strings: C:/Apps/Thing.exe")
+        self.assertEqual(rea.progress_line({"type": "result", "result": "x"}), "")
+
+    def test_the_stream_gives_the_report_and_the_steps(self) -> None:
+        stream = "\n".join(json.dumps(event) for event in (
+            {"type": "system", "subtype": "init"},
+            {"type": "assistant", "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "a.js"}}]}},
+            {"type": "result", "result": "The report."}))
+        steps: list = []
+        report = rea.run("x", "", Path(tempfile.mkdtemp()), "claude",
+                         lambda arguments, **options: subprocess.CompletedProcess(arguments, 0, stream, ""), steps.append)
+        self.assertEqual((report, steps), ("The report.", ["Read: a.js"]))
+
+
+class LiveTests(unittest.TestCase):
+    def test_steps_arrive_while_it_runs_and_a_hang_is_stopped(self) -> None:
+        import sys
+        script = ("import json, sys; sys.stdin.read(); "
+                  "print(json.dumps({'type': 'assistant', 'message': {'content': [{'type': 'tool_use', 'name': 'Grep', "
+                  "'input': {'pattern': 'token'}}]}}), flush=True); print(json.dumps({'type': 'result', 'result': 'ok'}))")
+        steps: list = []
+        result = rea._live([sys.executable, "-c", script], input="task", progress=steps.append, timeout=20,
+                           capture_output=True, text=True)
+        self.assertEqual((result.returncode, steps), (0, ["Grep: token"]))
+        self.assertIn('"result": "ok"', result.stdout)
+        with self.assertRaises(subprocess.TimeoutExpired):
+            rea._live([sys.executable, "-c", "import time; time.sleep(30)"], input="", progress=steps.append, timeout=1,
+                      text=True)
+
+
 class SetupTests(unittest.TestCase):
     def test_rea_is_pinned_and_started_the_windows_way(self) -> None:
         self.assertEqual(rea.mcp_config("win32"), {"mcpServers": {"rea": {"command": "cmd",
@@ -51,12 +98,19 @@ class RunTests(unittest.TestCase):
     def test_a_finished_job_files_its_report(self) -> None:
         saved, filed, told = [], [], []
         done = threading.Event()
+        events: list = []
         job = rea.ReverseEngineering(save=lambda title, text: saved.append((title, text)) or Path("outputs/2026 RE.md"),
                                      library=lambda title, note: filed.append((title, note)),
-                                     done=lambda title, result, ok: told.append((title, result, ok)) or done.set(),
-                                     workspace=Path(tempfile.mkdtemp()), command=lambda: "claude", node=lambda: (24, 22, 1))
+                                     done=lambda title, result, ok: told.append((title, result, ok)),
+                                     workspace=Path(tempfile.mkdtemp()), command=lambda: "claude", node=lambda: (24, 22, 1),
+                                     notify=lambda event, data: events.append((event, data)) or (
+                                         event == "rea_job" and data["job"]["status"] != "running" and done.set()))
         original = rea.run
-        rea.run = lambda target, goal, folder, command: "Summary line.\nMore."
+
+        def fake_run(target, goal, folder, command, progress):
+            progress("disassemble: Thing.exe")
+            return "Summary line.\nMore.\n```json\n" + json.dumps(BLUEPRINT) + "\n```"
+        rea.run = fake_run
         try:
             answer = job.start("C:/Apps/Thing", "how it updates")
             done.wait(5)
@@ -67,6 +121,12 @@ class RunTests(unittest.TestCase):
         self.assertEqual(filed[0][0], "RE Thing")
         self.assertIn("Full report: outputs/2026 RE.md", filed[0][1])
         self.assertEqual(job.running, [])
+        self.assertNotIn("```json", saved[0][1])  # the blueprint is for the screen, not the written report
+        self.assertEqual([event for event, _ in events], ["rea_job", "rea_step", "rea_job"])
+        finished = events[-1][1]["job"]
+        self.assertEqual((finished["status"], finished["counts"]), ("done", {"parts": 2}))
+        self.assertEqual(job.jobs.get(finished["id"])["blueprint"]["links"][0]["label"], "IPC")
+        self.assertEqual(job.jobs.recent("rea")[0]["title"], "Thing")
 
     def test_missing_pieces_are_said_before_anything_starts(self) -> None:
         job = rea.ReverseEngineering(save=None, library=None, done=None, workspace=Path("."), command=lambda: "claude",

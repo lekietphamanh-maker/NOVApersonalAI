@@ -85,6 +85,8 @@ import telegram_remote
 import cloud_relay
 import discover as discovery
 import reverse_engineering
+import shannon_runner
+from lab_jobs import JobLog
 from timers import Timers
 from portable_ollama import start_if_configured, stop as stop_portable_ollama
 from ui_server import UiServer
@@ -294,11 +296,15 @@ class AlfredApp:
         self.discover_items: list[dict[str, Any]] = []
         self.discover_studies: dict[str, str] = {}  # Claude Code study title -> repo
         self.skill_offers: list[dict[str, str]] = []  # skill notes a study proposed, waiting for the owner's OK
+        self.lab_jobs = JobLog(_data_dir() / "lab_jobs.json")
         self.reverse = reverse_engineering.ReverseEngineering(
-            save=self.skills.save_output, library=self._file_reverse_engineering,
+            save=self.skills.save_output, library=self._filer(reverse_engineering.LIBRARY_TOPIC),
             done=lambda title, result, ok: self.events.put(("deep_work_done", (title, result, ok))),
             workspace=Path.home() / "Documents" / "Nova Projects" / "Reverse engineering",
-            node=lambda: reverse_engineering.node_version(choice=str(self.settings.get("node_path") or "")))
+            node=lambda: reverse_engineering.node_version(choice=str(self.settings.get("node_path") or "")),
+            jobs=self.lab_jobs, notify=self._lab_event)
+        self.shannon = shannon_runner.Shannon(self.lab_jobs, library=self._filer(shannon_runner.LIBRARY_TOPIC),
+                                              notify=self._lab_event, key=claude_expert.key)
         self.agent.reverse = self.reverse.start if self.settings.get("reverse_on") else None
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
@@ -712,7 +718,8 @@ class AlfredApp:
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
-               "obs_password"}
+               "obs_password", "rea_view", "rea_start", "rea_open", "rea_report",
+               "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2857,12 +2864,100 @@ class AlfredApp:
 
     # ---------- reverse engineering with REA (through Claude Code) ----------
 
-    def _file_reverse_engineering(self, title: str, note: str) -> None:
-        try:
-            self._library().save(title, topic=reverse_engineering.LIBRARY_TOPIC, note=note, status="idea")
-            self.ui.emit({"type": "library_changed"})
-        except Exception:  # no vault right now: the report is still in outputs/
-            pass
+    def _filer(self, topic: str) -> Callable[[str, str], None]:
+        """Files a finished Rea or Shannon job in the Library under its topic."""
+        def file(title: str, note: str) -> None:
+            try:
+                self._library().save(title, topic=topic, note=note, status="idea")
+                self.ui.emit({"type": "library_changed"})
+            except Exception:  # no vault right now: the report is still on disk
+                pass
+        return file
+
+    # ---------- Rea (Blueprint) and Shannon (Mission board) screens ----------
+
+    def _lab_event(self, event: str, data: dict[str, Any]) -> None:
+        """From the Rea / Shannon job threads to their screens (and the owner, when a security check ends)."""
+        self.ui.emit({"type": event, **data})
+        job = data.get("job") or {}
+        if event == "shannon_job" and job.get("status") in ("done", "failed"):
+            self.events.put(("lab_done", job))
+
+    def _lab_job(self, args: dict[str, Any], kind: str) -> dict[str, Any]:
+        job = self.lab_jobs.get(str(args.get("id") or ""))
+        if job is None or job.get("kind") != kind:
+            raise ValueError("That report isn't there any more.")
+        return job
+
+    def _open_file(self, path: str) -> None:
+        if not path or not Path(path).exists():
+            raise ValueError("The report file isn't there any more.")
+        if sys.platform == "win32":
+            os.startfile(path)  # noqa: S606 - a report Nova wrote
+
+    def _act_rea_view(self, _args: dict[str, Any]) -> dict[str, Any]:
+        def check() -> None:
+            problem = self.reverse.problem() if self.settings.get("reverse_on") else ""
+            self.ui.emit({"type": "rea_ready", "problem": problem})
+        threading.Thread(target=check, name="NovaReaCheck", daemon=True).start()
+        return {"ok": True, "jobs": self.lab_jobs.recent("rea"), "running": list(self.reverse.running)}
+
+    def _act_rea_start(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        target = " ".join(str(args.get("target") or "").split())[:300]
+        if not target:
+            return {"ok": False, "error": "Say what to analyse: an app, a file, a folder or a site."}
+        if not self.settings.get("reverse_on"):
+            answer = self._act_reverse_toggle({"on": True, "consented": args.get("consented")})
+            if answer:
+                return answer
+        problem = self.reverse.problem()
+        if problem:
+            return {"ok": False, "error": f"Can't run Rea here: {problem}."}
+        self.reverse.start(target, " ".join(str(args.get("goal") or "").split())[:300])
+        return None
+
+    def _act_rea_open(self, args: dict[str, Any]) -> dict[str, Any]:
+        return {"ok": True, "job": self._lab_job(args, "rea")}
+
+    def _act_rea_report(self, args: dict[str, Any]) -> None:
+        self._open_file(str(self._lab_job(args, "rea").get("report") or ""))
+
+    def _act_shannon_view(self, _args: dict[str, Any]) -> dict[str, Any]:
+        def check() -> None:
+            self.ui.emit({"type": "shannon_ready", "problem": self.shannon.problem()})
+        threading.Thread(target=check, name="NovaShannonCheck", daemon=True).start()
+        return {"ok": True, "jobs": self.lab_jobs.recent("shannon"), "projects": self.shannon.projects(),
+                "running": self.shannon.job_id if self.shannon.process is not None else ""}
+
+    def _act_shannon_start(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        url, project = str(args.get("url") or ""), str(args.get("project") or "")
+        shannon_runner.docker_target(url)  # a wrong address or folder is said at once, before the slow checks
+        self.shannon._repo(project)
+        if not self.settings.get("shannon_consented"):
+            if not args.get("consented"):
+                return {"need_consent": "shannon"}
+            self._save_setting("shannon_consented", True)
+
+        def begin() -> None:
+            problem = self.shannon.problem()
+            if problem:
+                self.ui.emit({"type": "shannon_ready", "problem": problem})
+                return
+            try:
+                self.shannon.start(url, project)
+            except (OSError, ValueError) as exc:
+                self.ui.emit({"type": "shannon_ready", "problem": str(exc)})
+        threading.Thread(target=begin, name="NovaShannonStart", daemon=True).start()
+        return None
+
+    def _act_shannon_stop(self, _args: dict[str, Any]) -> None:
+        threading.Thread(target=self.shannon.stop, name="NovaShannonStop", daemon=True).start()
+
+    def _act_shannon_open(self, args: dict[str, Any]) -> dict[str, Any]:
+        return {"ok": True, "job": self._lab_job(args, "shannon")}
+
+    def _act_shannon_report(self, args: dict[str, Any]) -> None:
+        self._open_file(str(self._lab_job(args, "shannon").get("report") or ""))
 
     def _act_node_path(self, args: dict[str, Any]) -> dict[str, Any] | None:
         """The owner points Nova at node.exe (or its folder), for a Node.js that isn't installed the usual way."""
@@ -3528,6 +3623,15 @@ class AlfredApp:
             else:
                 self._append_chat("ERROR", f"Claude Code couldn't build “{name}”: {said}", "system")
             self._update(skills=self._skills_state())
+        elif event_type == "lab_done":
+            if payload.get("status") == "done":
+                found = payload.get("counts") or {}
+                worst = ", ".join(f"{number} {severity}" for severity, number in found.items() if number) or "no proven holes"
+                self._append_chat("NOVA", f"Shannon finished checking {payload.get('title')}: {worst}. "
+                                          f"Report: {payload.get('report')}", "assistant")
+                self.voice.say(f"Shannon finished checking {payload.get('title')}: {worst}.")
+            else:
+                self._append_chat("ERROR", f"Shannon stopped on {payload.get('title')}: {payload.get('error')}", "system")
         elif event_type == "deep_work_done":
             title, result, ok = payload
             if ok:

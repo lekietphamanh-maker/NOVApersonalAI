@@ -38,7 +38,8 @@ Do **A** first. Everything after it is optional, in any order (D needs PHONE fro
 - [ ] A Telegram bot from **@BotFather** (free): Nova from anywhere, by text or voice note.
 - [ ] Or a free [Ollama](https://ollama.com) account: Ollama Cloud as Nova's brain, free with limits.
 - [ ] Google (Gmail, Calendar, Drive): the one-time Google setup in SETTINGS → Need to → Google.
-- [ ] Node.js LTS (nodejs.org), only for reverse engineering or Nova's Gmail and Drive in Claude Desktop.
+- [ ] Node.js LTS (nodejs.org), only for Rea (reverse engineering) or Nova's Gmail and Drive in Claude Desktop.
+- [ ] For Shannon only: WSL2, [Docker Desktop](https://www.docker.com/products/docker-desktop/) and an Anthropic API key (see H).
 
 **Nothing to download for:** the iPhone and iPad (Nova's certificate comes from your PC's setup page; the apps are web pages you add to the Home Screen), the TV (its own browser), a heart-rate band (Bluetooth), the webcam and mic.
 
@@ -153,6 +154,14 @@ How it works: while the PC is on, Nova checks in with the relay every 5 minutes.
 - **Claude with your claude.ai connectors**: connect Gmail and Google Drive on **claude.ai → Settings → Connectors**, then tick **Also let Claude use my claude.ai Gmail and Google Drive connectors** under SETTINGS → Nova's brain (Claude on your plan only).
 - **Nova's Gmail and Drive in Claude Code / Claude Desktop**: **SETTINGS → Need to → Your Claude apps → Turn on**. Claude Code: copy the command, run it in a terminal, check `claude mcp list`. Claude Desktop (needs Node.js): **Settings → Developer → Edit Config**, add the copied `nova-google` entry under `"mcpServers"`, save, restart it. Nova must be running (keep it in the tray).
 - **Nova's brain** (SETTINGS → Model → *Who answers your questions*): **Claude** (the best answers; with Claude Code installed and signed in it runs on your Claude plan with no API credit, **Pay with → My Claude plan**; or paste an API key from [console.anthropic.com](https://console.anthropic.com) and choose **An API key**; default Sonnet 5.5 at medium effort) or **Ollama Cloud** (free with an Ollama account: click **Sign in to Ollama** once). Offline, the AI on this PC answers. Passwords and mail: Nova asks you out loud whether to send them (*yes* sends, *no* keeps them here). On the laptop, choose it there too.
+- **Rea (reverse engineering)**: needs Claude Code and Node.js 22.23+. **REA** in the top bar → type the app, file, folder or site and what you want to know → **Analyse** (the first time Nova asks you to agree to the rules). Steps show live; the result is a blueprint of its parts. Only software you're allowed to analyse.
+- **Shannon (break into your own app)**, one time, about 20 minutes:
+  1. Admin PowerShell: `wsl --install`, restart, open **Ubuntu** once and pick a user name.
+  2. Install **Docker Desktop** → Settings → Resources → **WSL integration** → turn on Ubuntu. Keep Docker running.
+  3. In Ubuntu: `curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash`, reopen it, `nvm install --lts`.
+  4. An Anthropic API key in **SETTINGS → Model → Claude → API key** (Shannon 3.5 doesn't work on a Claude plan; a full run costs API credit and takes an hour or two).
+  5. Start your app (a test copy: Shannon really attacks it). **SHANNON** in the top bar → your project folder (from Documents\Nova Projects, or a full path) → where it runs, like `localhost:3000` → **Run**.
+  The report lands in Documents\Nova Projects\Security checks and your Library.
 - **Library**: **LIBRARY** in the top bar, or "Hey Nova, open my library". Add your repos and ideas with **+ New**; move it by voice or gestures.
 - **Your own gestures**: SETTINGS → Gestures → name it, pick what it does, then hold the pose for 3 seconds while Nova records it.
 - **Heart rate:** wear a Bluetooth heart-rate band or watch with broadcast on, then **SETTINGS → Fitness → Connect heart rate**.

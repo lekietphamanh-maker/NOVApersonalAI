@@ -19,8 +19,12 @@ Everything else is set up from inside Nova: **SETTINGS → Need to** has step-by
 | **Brains** | The model on your PC, or Claude (your Claude plan via Claude Code, or an API key), or Ollama Cloud. Auto mode sends only hard questions online. |
 | **Google** | Gmail (read and draft, never send), Calendar, Drive (read-only). Also served to Claude Code and Claude Desktop over MCP. |
 | **World** | A live globe: earthquakes, disaster alerts, storms, fires, volcanoes and news by country. "What's happening in Japan?" |
-| **Knowledge** | Second brain in Obsidian, a Library of your projects and ideas, a daily news desk with sources, a daily brief. |
-| **Work** | Reminders, timers, skills (tasks run by phrase or schedule), long jobs and builds handed to Claude Code, Discover (GitHub picks studied read-only), reverse engineering with REA. |
+| **Knowledge** | Second brain in Obsidian, a Library of your projects and ideas, a daily news desk with sources, a daily brief. Offline: Wikipedia on your PC (Kiwix ZIM files) and search of your own notes by meaning. |
+| **Routes** | The fastest way from A to B with stops, worked out on your PC from OpenStreetMap roads, the search animated on the map. Keep a city's roads for offline use. |
+| **Apps** | Instant commands with no AI (timers, volume, media, open apps). Real Word, Excel and PowerPoint files; OBS (record, stream, scenes); VS Code. Clicking on the screen is the fallback. |
+| **Work** | Reminders, timers, skills (tasks run by phrase or schedule), long jobs and builds handed to Claude Code, Discover (GitHub picks studied read-only). |
+| **Rea** | Reverse engineering with REA through Claude Code: the app drawn as a blueprint of its parts; click a part for what was found. Reports in the Library. |
+| **Shannon** | An AI pentester on your own app: it attacks it for real and reports only proven holes, with proof and fix, on a mission board. Your apps on this PC or home network only. |
 | **Creative mode** | Webcam mirror with hand-controlled 3D holograms, camera lenses, photo booth. |
 | **Other screens** | Telegram from anywhere (even with the PC off, via your own Cloudflare relay), an old iPhone as a companion, the TV as a dashboard, the iPad as a keyboard and widget deck, a second laptop sharing memory. |
 
@@ -45,4 +49,4 @@ Releases are built by the `build` workflow (Actions → build → Run workflow w
 
 ## Credits
 
-Speech-while-writing, the remember/forget guard and walkthroughs are adapted from [plip](https://github.com/hussainn7/plip-oss) (MIT). Camera lenses and the photo booth follow ideas from [Curious Machines](https://github.com/tigrisli/curious-machines). Map outlines: Natural Earth (public domain) via world-atlas. 3D: three.js; hands and faces: MediaPipe.
+Speech-while-writing, the remember/forget guard and walkthroughs are adapted from [plip](https://github.com/hussainn7/plip-oss) (MIT). Camera lenses and the photo booth follow ideas from [Curious Machines](https://github.com/tigrisli/curious-machines). Reverse engineering: [REA](https://github.com/morluto/rea); pentesting: [Shannon](https://github.com/KeygraphHQ/shannon) (both run as their own pinned packages). Map outlines: Natural Earth (public domain) via world-atlas. 3D: three.js; hands and faces: MediaPipe.
