@@ -1,7 +1,10 @@
 """Nova's hotkeys, all changeable in SETTINGS → Hotkeys: hold-to-talk (Ctrl+Alt), stop (Esc), keep what you
 highlighted (F9), and yes (F8) / no (F10) to answer a question Nova asks. Keys are Windows virtual-key
-codes, read by polling (no keyboard hook), so they are never swallowed from the app you are using."""
+codes, read by polling (no keyboard hook), so they are never swallowed from the app you are using. On the Mac the
+same codes are read through Quartz (mac.py), and Ctrl, Alt and Win are Control, Option and Command."""
 from __future__ import annotations
+
+import sys
 
 DEFAULTS = {"talk": [0x11, 0x12], "stop": [0x1B], "clip": [0x78], "yes": [0x77], "no": [0x79]}
 MODIFIERS = {0x10: "Shift", 0x11: "Ctrl", 0x12: "Alt", 0x5B: "Win", 0x5C: "Win"}
@@ -14,7 +17,21 @@ _TYPING = set(range(0x30, 0x3A)) | set(range(0x41, 0x5B)) | {0x08, 0x09, 0x0D, 0
                                                               0xC0, 0xDB, 0xDC, 0xDD, 0xDE}
 
 
-def key_name(code: int) -> str:
+MAC_NAMES = {0x11: "Control", 0x12: "Option", 0x5B: "Command", 0x5C: "Command", 0x08: "Delete", 0x0D: "Return"}
+
+
+def held(code: int, platform: str = sys.platform) -> bool:
+    """Whether the key is down right now, whichever app is in front."""
+    if platform == "darwin":
+        import mac
+        return mac.key_held(code)
+    import ctypes
+    return bool(ctypes.windll.user32.GetAsyncKeyState(code) & 0x8000)
+
+
+def key_name(code: int, platform: str = sys.platform) -> str:
+    if platform == "darwin" and code in MAC_NAMES:
+        return MAC_NAMES[code]
     if code in MODIFIERS:
         return MODIFIERS[code]
     if code in _NAMED:

@@ -20,7 +20,11 @@ NODE = "node.exe" if sys.platform == "win32" else "node"
 
 
 def registry_path() -> list[str]:
-    """PATH as Windows has it now (the machine's, then this user's), with %VARIABLES% filled in."""
+    """PATH as Windows has it now (the machine's, then this user's), with %VARIABLES% filled in. On the Mac: the
+    folders Homebrew, nvm and Claude Code's installer use."""
+    if sys.platform == "darwin":
+        import mac
+        return mac.tool_folders()
     if sys.platform != "win32":
         return []
     import winreg

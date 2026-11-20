@@ -12,6 +12,7 @@ import base64
 import hashlib
 import json
 import os
+import sys
 import secrets
 import threading
 import webbrowser
@@ -76,11 +77,17 @@ def _client() -> dict[str, str]:
 
 
 def _protect(data: bytes) -> bytes:
+    if sys.platform == "darwin":  # sealed with a key kept in the login Keychain
+        import mac
+        return mac.protect(data)
     import win32crypt
     return win32crypt.CryptProtectData(data, "Alfred Gmail", None, None, None, 0)
 
 
 def _unprotect(data: bytes) -> bytes:
+    if sys.platform == "darwin":
+        import mac
+        return mac.unprotect(data)
     import win32crypt
     return win32crypt.CryptUnprotectData(data, None, None, None, 0)[1]
 

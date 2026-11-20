@@ -10,12 +10,14 @@ import math
 import os
 import queue
 import re
+import subprocess
+import sys
 import threading
 import time
 from array import array
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Any, Callable, Iterator
 
 import echo_filter
 import piper_voice
@@ -98,6 +100,8 @@ def enumerate_input_devices() -> list[dict[str, object]]:
 
 def enumerate_speech_outputs() -> list[dict[str, str]]:
     """Enumerate Windows SAPI output devices without launching PowerShell."""
+    if sys.platform == "darwin":  # `say` plays on the output chosen in System Settings → Sound
+        return [{"key": "", "label": "The Mac's sound output (System Settings → Sound)"}]
     try:
         import pythoncom
         import win32com.client
@@ -907,6 +911,8 @@ class VoiceController:
 
     @staticmethod
     def _make_sapi_voice(output_key: str | None):
+        if sys.platform == "darwin":
+            return _SayVoice(), None, None
         import pythoncom
         import win32com.client
         pythoncom.CoInitialize()
@@ -1096,3 +1102,43 @@ class VoiceController:
                 if pythoncom is not None:
                     pythoncom.CoUninitialize()
         threading.Thread(target=run, name="AlfredSpeakerTest", daemon=True).start()
+
+
+class _SayVoice:
+    """macOS's own voice (`say`) behind the few SAPI calls Nova makes, so speaking and cutting off work the same."""
+    _voice: str | None = None
+
+    def __init__(self) -> None:
+        self.Rate, self.Volume = 0, 100
+        self.process: Any = None
+
+    @classmethod
+    def _pick(cls) -> str:
+        if cls._voice is None:  # a female English voice, as on Windows; else the Mac's default voice
+            import mac
+            try:
+                installed = mac.voices()
+            except OSError:
+                installed = []
+            cls._voice = next((name for name in ("Samantha", "Ava", "Allison", "Susan") if name in installed), "")
+        return cls._voice
+
+    def Speak(self, text: str, flags: int = 0) -> None:  # noqa: N802 - SAPI's name
+        import mac
+        if self.process is not None and self.process.poll() is None:
+            self.process.terminate()
+        if not text:
+            return
+        loudness = "" if self.Volume >= 100 else f"[[volm {max(0, self.Volume) / 100:.2f}]] "
+        self.process = mac.say(loudness + text, voice=self._pick())
+        if not flags & SVSF_ASYNC:
+            self.process.wait()
+
+    def WaitUntilDone(self, milliseconds: int) -> bool:  # noqa: N802 - SAPI's name
+        if self.process is None:
+            return True
+        try:
+            self.process.wait(timeout=milliseconds / 1000)
+            return True
+        except subprocess.TimeoutExpired:
+            return False

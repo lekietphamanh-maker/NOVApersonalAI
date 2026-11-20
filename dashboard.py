@@ -29,6 +29,9 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
+if sys.platform == "darwin":  # every data folder below LOCALAPPDATA lands in the Mac's own place for app data
+    os.environ.setdefault("LOCALAPPDATA", str(Path.home() / "Library" / "Application Support"))
+
 import app_window
 import claude_expert
 import cloud_brain
@@ -199,6 +202,11 @@ def _system_snapshot(profile) -> dict[str, str]:
         status.dwLength = ctypes.sizeof(status)
         if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
             total, free = status.ullTotalPhys / 1024 ** 3, status.ullAvailPhys / 1024 ** 3
+            ram = f"{total - free:.1f} / {total:.1f} GB in use"
+    elif sys.platform == "darwin":
+        import mac
+        total, free = mac.memory_gib()
+        if total and free is not None:
             ram = f"{total - free:.1f} / {total:.1f} GB in use"
     gpus = ", ".join(f"{gpu['name']}" + (f" ({gpu['reported_vram_gib']:g} GB)" if gpu.get("reported_vram_gib") else "")
                      for gpu in profile.gpus) if profile else ""
@@ -464,11 +472,16 @@ class AlfredApp:
                 self._start_mini_orb()
         self.root.after(100, self._poll_events)
         self.root.after(1000, self._watch_window)
+        if sys.platform == "darwin":
+            import mac
+            if not mac.quartz().may_listen(ask=False):
+                mac.quartz().may_listen(ask=True)  # macOS asks once: Input Monitoring, for the hold-to-talk keys
+            self.root.after(1500, self._poll_keys)
         threading.Thread(target=self._resolve_model, name="AlfredModelChoice", daemon=True).start()
         if self.settings.get("mic_on") and self.voice.available:
             self.root.after(900, self._start_mic)
         self.root.after(2500, self._refresh_weather)
-        if sys.platform == "win32":
+        if sys.platform in ("win32", "darwin"):
             self.music.start()  # what's playing: a cheap look once a second; the bars only while music plays
             self.root.after(1000, self._stream_music_bars)
         if self.settings.get("second_brain") and sys.platform == "win32":
@@ -511,7 +524,7 @@ class AlfredApp:
 
     def _open_window(self, extra: str = "") -> None:
         """Show the HUD: un-minimize it if it is open, else open it again (closing it only hides Nova)."""
-        if self.ui.clients and app_window.is_window(self.window_hwnd):
+        if self.ui.clients and (app_window.is_window(self.window_hwnd) or not IS_WINDOWS):
             app_window.restore(self.window_hwnd)
             if extra == "open=creative":
                 self.creative.open_window()
@@ -839,8 +852,7 @@ class AlfredApp:
 
     def _act_open_outputs(self, _args: dict[str, Any]) -> None:
         self.skills.outputs.mkdir(parents=True, exist_ok=True)
-        if IS_WINDOWS:
-            os.startfile(self.skills.outputs)  # noqa: S606 - the owner's own vault folder
+        app_window.open_path(self.skills.outputs)
 
     def _act_stop(self, _args: dict[str, Any]) -> None:
         self.turn_cancel.set()
@@ -953,7 +965,7 @@ class AlfredApp:
 
     def _act_assist(self, args: dict[str, Any]) -> dict[str, Any] | None:
         if not IS_WINDOWS:
-            return {"ok": False, "error": "Screen assist needs Windows."}
+            return {"ok": False, "error": "Screen assist on the Mac comes in the next version of Nova; everything else works here."}
         if not args.get("on"):
             self._stop_walkthrough()
             if self.assist is not None:
@@ -1456,7 +1468,7 @@ class AlfredApp:
             send_keys(send_keys_spec(what), pause=0.02)
             return ""
         if kind == "app":
-            os.startfile(what)  # noqa: S606 - a fixed list: Notepad, Calculator, Explorer, the browser, Spotify
+            app_window.open_path(what)  # a fixed list: Notepad, Calculator, Explorer, the browser, Spotify
             return ""
         if kind == "nova":
             if what == "stop":
@@ -1652,18 +1664,13 @@ class AlfredApp:
         from urllib.parse import quote
         folder = self._vault_folder()
         folder.mkdir(parents=True, exist_ok=True)
-        if sys.platform != "win32":
-            return
-        import winreg
-        try:
-            winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "obsidian").Close()
-        except OSError:
-            os.startfile(folder)  # noqa: S606 - Nova's own notes folder
+        if not app_window.obsidian_installed():
+            app_window.open_path(folder)
             self._toast("Obsidian isn't installed yet: get it free from obsidian.md, then choose “Open folder as vault” "
                         f"and pick {folder}.", "info")
             return
         note = self.brain.vault.daily_path(datetime.now())
-        os.startfile(f"obsidian://open?path={quote(str(note if note.exists() else folder))}")  # noqa: S606
+        app_window.open_path(f"obsidian://open?path={quote(str(note if note.exists() else folder))}")
 
     # ---------- Claude: the online brain (personal turns and offline stay on the local model) ----------
 
@@ -1967,8 +1974,7 @@ class AlfredApp:
             return None
         if not Path(project.repo).is_dir():
             return {"ok": False, "error": f"{project.repo} isn't a folder on this PC."}
-        if sys.platform == "win32":
-            os.startfile(project.repo)  # noqa: S606 - a folder the owner saved
+        app_window.open_path(project.repo)
         return None
 
     def _act_library_view(self, args: dict[str, Any]) -> None:
@@ -1976,14 +1982,9 @@ class AlfredApp:
 
     def _open_in_obsidian(self, path: Path) -> dict[str, Any] | None:
         from urllib.parse import quote
-        if sys.platform != "win32":
-            return {"ok": False, "error": f"Open {path} in Obsidian."}
-        import winreg
-        try:
-            winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "obsidian").Close()
-        except OSError:
+        if not app_window.obsidian_installed():
             return {"ok": False, "error": "Obsidian isn't installed yet: get it free from obsidian.md (SETTINGS → Downloads)."}
-        os.startfile(f"obsidian://open?path={quote(str(path))}")  # noqa: S606
+        app_window.open_path(f"obsidian://open?path={quote(str(path))}")
         return None
 
     # ---------- who answered, and this PC's live load (Settings → Model and This PC) ----------
@@ -2443,6 +2444,10 @@ class AlfredApp:
 
     def _act_free_cloud_signin(self, _args: dict[str, Any]) -> dict[str, Any] | None:
         """Ollama signs in from its own command: it opens ollama.com to connect this PC to the owner's account."""
+        if sys.platform == "darwin":
+            import mac
+            mac.osascript('tell application "Terminal" to do script "ollama signin"')
+            return None
         if sys.platform != "win32":
             return {"ok": False, "error": "Run `ollama signin` in a terminal."}
         try:
@@ -2506,8 +2511,7 @@ class AlfredApp:
     def _act_open_photos(self, _args: dict[str, Any]) -> None:
         folder = self.creative.photo_folder
         folder.mkdir(parents=True, exist_ok=True)
-        if sys.platform == "win32":
-            os.startfile(folder)  # noqa: S606 - opens Explorer on Nova's own photo folder
+        app_window.open_path(folder)
 
     def _act_location_forget(self, _args: dict[str, Any]) -> None:
         self.location.forget()
@@ -2892,8 +2896,7 @@ class AlfredApp:
     def _open_file(self, path: str) -> None:
         if not path or not Path(path).exists():
             raise ValueError("The report file isn't there any more.")
-        if sys.platform == "win32":
-            os.startfile(path)  # noqa: S606 - a report Nova wrote
+        app_window.open_path(path)
 
     def _act_rea_view(self, _args: dict[str, Any]) -> dict[str, Any]:
         def check() -> None:
@@ -3354,16 +3357,17 @@ class AlfredApp:
 
     def _poll_keys(self) -> None:
         """Track the user's app and read hold-to-talk / Esc by polling: no keyboard hook, keys are never swallowed."""
-        if self.closing or self.assist is None:
-            return
-        user32 = ctypes.windll.user32
-        foreground = user32.GetForegroundWindow()
-        if foreground and foreground != self.window_hwnd:
-            owner = ctypes.c_ulong()
-            user32.GetWindowThreadProcessId(foreground, ctypes.byref(owner))
-            if owner.value != os.getpid():
-                self.target_hwnd = foreground
-        held = lambda key: bool(user32.GetAsyncKeyState(key) & 0x8000)
+        if self.closing or (self.assist is None and IS_WINDOWS):
+            return  # on the Mac (no screen assist yet) the hotkeys run on their own
+        if IS_WINDOWS:
+            user32 = ctypes.windll.user32
+            foreground = user32.GetForegroundWindow()
+            if foreground and foreground != self.window_hwnd:
+                owner = ctypes.c_ulong()
+                user32.GetWindowThreadProcessId(foreground, ctypes.byref(owner))
+                if owner.value != os.getpid():
+                    self.target_hwnd = foreground
+        held = hotkeys.held
         talking = all(held(key) for key in self._hotkey("talk"))
         waiting = self.pending_approval is not None  # Nova asked something: hold to answer it out loud
         if talking and self.hold_release is None and (not self.state["busy"] or waiting) and not self.state["switches"]["mic"]:
@@ -3413,7 +3417,7 @@ class AlfredApp:
 
     @staticmethod
     def _wait_for_keys_up(keys: list[int], seconds: float = 2.0) -> None:
-        held = lambda: any(ctypes.windll.user32.GetAsyncKeyState(key) & 0x8000 for key in keys)  # noqa: E731
+        held = lambda: any(hotkeys.held(key) for key in keys)  # noqa: E731
         deadline = time.monotonic() + seconds
         while held() and time.monotonic() < deadline:
             time.sleep(0.05)
@@ -3618,8 +3622,7 @@ class AlfredApp:
                 start = Path(folder) / "index.html"
                 self._append_chat("NOVA", f"“{name}” is built in {folder}.\n\n{said[-600:]}", "assistant")
                 self.voice.say(f"{name.replace('-', ' ')} is ready. I'm opening it.")
-                if IS_WINDOWS:
-                    os.startfile(start if start.exists() else folder)  # noqa: S606 - the owner's own project
+                app_window.open_path(start if start.exists() else folder)
             else:
                 self._append_chat("ERROR", f"Claude Code couldn't build “{name}”: {said}", "system")
             self._update(skills=self._skills_state())
@@ -3999,7 +4002,7 @@ def main() -> int:
             def check_connected() -> None:
                 if app.ui.ever_connected.is_set():
                     # Approvals rely on finding the window by its title; check that too when Edge drew it.
-                    window = app_window.find_window() if app_window.find_edge() else True
+                    window = app_window.find_window() if app_window.find_edge() and IS_WINDOWS else True
                     if window or time.monotonic() - started > 90:
                         on_top = True
                         if window and window is not True:  # an approval must be able to lift the window above other apps

@@ -1,9 +1,15 @@
-"""Nova's window: the HUD page in an Edge app window (own profile, no browser bars), plus Win32 helpers."""
+"""Nova's window: the HUD page in a browser app window (own profile, no browser bars), plus Win32 helpers.
+
+Windows uses Edge, which is always there. On the Mac it's Chrome, Edge, Brave or Chromium if one is installed (else
+the default browser); the Win32 window helpers do nothing there.
+"""
 from __future__ import annotations
 
 import ctypes
 import os
+import shutil
 import subprocess
+import sys
 import webbrowser
 from ctypes import wintypes
 from pathlib import Path
@@ -15,6 +21,10 @@ SW_MINIMIZE, SW_SHOWNOACTIVATE, SW_RESTORE = 6, 4, 9
 
 
 def find_edge() -> Path | None:
+    """The browser for Nova's own window: Edge on Windows, a Chromium browser on the Mac."""
+    if sys.platform == "darwin":
+        import mac
+        return mac.find_browser()
     paths = [Path(os.environ.get(variable, "")) / "Microsoft" / "Edge" / "Application" / "msedge.exe"
              for variable in ("ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA")]
     return next((path for path in paths if path.is_file()), None)
@@ -118,3 +128,26 @@ def restore(hwnd: int | None) -> None:
 def is_topmost(hwnd: int | None) -> bool:
     WS_EX_TOPMOST, GWL_EXSTYLE = 0x8, -20
     return is_window(hwnd) and bool(_user32().GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST)
+
+
+def open_path(target: str | Path) -> None:
+    """Open a file, folder or link (obsidian://…) the way double-clicking it would."""
+    if sys.platform == "win32":
+        os.startfile(str(target))  # noqa: S606 - Nova's own files, the owner's folders and fixed apps
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", str(target)])  # noqa: S603,S607
+    else:
+        subprocess.Popen(["xdg-open", str(target)])  # noqa: S603,S607
+
+
+def obsidian_installed() -> bool:
+    if sys.platform == "win32":
+        import winreg
+        try:
+            winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, "obsidian").Close()
+            return True
+        except OSError:
+            return False
+    if sys.platform == "darwin":
+        return any((base / "Obsidian.app").exists() for base in (Path("/Applications"), Path.home() / "Applications"))
+    return shutil.which("obsidian") is not None

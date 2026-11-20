@@ -31,6 +31,10 @@ def ram() -> tuple[float, float]:
         if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status)):
             return (status.total - status.free) / GIB, status.total / GIB
         return 0.0, 0.0
+    if sys.platform == "darwin":
+        import mac
+        total, free = mac.memory_gib()
+        return ((total - free) if total and free is not None else 0.0), (total or 0.0)
     info = {}
     try:
         for line in open("/proc/meminfo", encoding="ascii"):
@@ -55,6 +59,9 @@ class CpuMeter:
             ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kernel), ctypes.byref(user))
             total = kernel.value + user.value  # kernel time includes idle time
             return total - idle.value, total
+        if sys.platform == "darwin":
+            import mac
+            return mac.cpu_ticks()
         try:
             fields = [int(value) for value in open("/proc/stat", encoding="ascii").readline().split()[1:]]
         except OSError:

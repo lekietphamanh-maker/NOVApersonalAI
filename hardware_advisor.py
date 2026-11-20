@@ -12,6 +12,7 @@ import os
 import platform
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, asdict
 from typing import Any, Callable
 from urllib.request import Request, urlopen
@@ -46,6 +47,10 @@ class HardwareProfile:
 
 
 def _ram() -> tuple[float | None, float | None]:
+    if sys.platform == "darwin":
+        import mac
+        return mac.memory_gib()
+
     class MEMORYSTATUSEX(ctypes.Structure):
         _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
                     ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
@@ -63,6 +68,9 @@ def _ram() -> tuple[float | None, float | None]:
 
 
 def _cpu_name() -> str:
+    if sys.platform == "darwin":
+        import mac
+        return mac.chip()
     try:
         if winreg is None:
             raise OSError
@@ -112,8 +120,21 @@ def _registry_gpus() -> list[dict[str, Any]]:
     return adapters
 
 
+def _mac_gpus() -> list[dict[str, Any]]:
+    """Apple silicon's GPU shares the RAM: what macOS lets it use counts as its graphics memory (Ollama runs on it
+    with Metal). An Intel Mac reports none, so the model is chosen for its RAM."""
+    import mac
+    total, _ = mac.memory_gib()
+    if not total or platform.machine() != "arm64":
+        return []
+    return [{"name": f"{mac.chip()} GPU (shares the RAM)", "reported_vram_gib": mac.gpu_share(total),
+             "driver_version": "Metal", "unified": True}]
+
+
 def _gpus() -> list[dict[str, Any]]:
     """Display adapters from the registry (fast, real VRAM), else from WMI (AdapterRAM can be capped)."""
+    if sys.platform == "darwin":
+        return _mac_gpus()
     adapters = _registry_gpus()
     if adapters:
         return adapters
@@ -164,7 +185,9 @@ def detect_hardware(ollama_ps: dict[str, Any] | None = None) -> HardwareProfile:
         if placements:
             acceleration = "; ".join(placements)
     notes = []
-    if gpus:
+    if any(gpu.get("unified") for gpu in gpus):
+        notes.append("Apple silicon: the GPU uses part of the RAM; Ollama runs models on it with Metal.")
+    elif gpus:
         notes.append("WMI VRAM can be incomplete; GPU acceleration is not guaranteed by detection.")
     else:
         notes.append("No display adapter details returned; CPU inference may still work.")
@@ -269,6 +292,8 @@ def recommend_model(profile: HardwareProfile) -> tuple[str, float, str]:
     vram = graphics_memory_gib(profile)
     for name, size_gb, gpu_gib, cpu_ram_gib in DESKTOP_MODELS:
         if gpu_gib and vram >= gpu_gib and ram >= 8:
+            if any(gpu.get("unified") for gpu in profile.gpus):
+                return name, size_gb, f"{ram:g} GB unified memory, {vram:g} GB of it for the GPU"
             return name, size_gb, f"{vram:g} GB graphics card, {ram:g} GB RAM"
         if cpu_ram_gib is not None and ram >= cpu_ram_gib:
             return name, size_gb, f"{ram:g} GB RAM" + (f", {vram:g} GB graphics" if vram else ", no graphics card")

@@ -25,6 +25,15 @@ APPS = {"notepad": "notepad", "calculator": "calc", "calc": "calc", "paint": "ms
         "file explorer": "explorer", "explorer": "explorer", "files": "explorer", "settings": "ms-settings:",
         "task manager": "taskmgr", "vs code": "code", "vscode": "code", "visual studio code": "code",
         "discord": "discord:", "obs": "obs64", "steam": "steam:", "teams": "msteams:", "zalo": "zalo"}
+# The same names on the Mac: what `open -a` calls each app ("notepad" and "paint" open their Mac counterparts).
+MAC_APPS = {"notepad": "TextEdit", "calculator": "Calculator", "calc": "Calculator", "paint": "Preview",
+            "spotify": "Spotify", "chrome": "Google Chrome", "google chrome": "Google Chrome", "edge": "Microsoft Edge",
+            "microsoft edge": "Microsoft Edge", "firefox": "Firefox", "word": "Microsoft Word",
+            "microsoft word": "Microsoft Word", "excel": "Microsoft Excel", "powerpoint": "Microsoft PowerPoint",
+            "outlook": "Microsoft Outlook", "file explorer": "Finder", "explorer": "Finder", "files": "Finder",
+            "settings": "System Settings", "task manager": "Activity Monitor", "vs code": "Visual Studio Code",
+            "vscode": "Visual Studio Code", "visual studio code": "Visual Studio Code", "discord": "Discord",
+            "obs": "OBS", "steam": "Steam", "teams": "Microsoft Teams", "zalo": "Zalo"}
 _NUMBER = r"\d+(?:\.\d+)?|" + "|".join(sorted((re.escape(word) for word in NUMBERS), key=len, reverse=True))
 _UNIT = r"sec(?:ond)?s?|min(?:ute)?s?|h(?:ou)?rs?"
 _LEAD = re.compile(r"^(?:(?:hey |ok |okay )?nova[,!.]?\s+)?(?:can you |could you |please )?", re.IGNORECASE)
@@ -108,11 +117,14 @@ def match(prompt: str) -> Instant | None:
 
 
 def open_app(name: str, run: Callable[..., Any] = subprocess.Popen) -> str:
-    """Starts one of the known programs the way Start > Run does (Windows' own App Paths and protocols)."""
-    target = APPS[name]
-    if sys.platform != "win32":
-        raise OSError("opening programs this way works on Windows")
-    run(["cmd", "/c", "start", "", target], creationflags=subprocess.CREATE_NO_WINDOW)
+    """Starts one of the known programs the way Start > Run does (Windows' own App Paths and protocols), or with
+    `open -a` on the Mac."""
+    if sys.platform == "darwin":
+        run(["open", "-a", MAC_APPS[name]])
+    elif sys.platform == "win32":
+        run(["cmd", "/c", "start", "", APPS[name]], creationflags=subprocess.CREATE_NO_WINDOW)
+    else:
+        raise OSError("opening programs this way works on Windows and the Mac")
     return f"Opening {name.title() if len(name) > 3 else name.upper()}."
 
 

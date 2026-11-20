@@ -71,6 +71,36 @@ def windows_now_playing() -> Track | None:
     return asyncio.run(read())
 
 
+_mac_art: dict[str, bytes] = {}
+
+
+def mac_now_playing() -> Track | None:
+    """Spotify or Apple Music on the Mac (asked through AppleScript; only while one of them is open)."""
+    import mac
+    found = mac.now_playing()
+    if not found:
+        return None
+    key = f"{found['title']}␟{found['artist']}"
+    art = _mac_art.get(key)
+    if art is None and found["player"] == "Spotify":
+        _mac_art.clear()  # one cover kept: the current song's
+        try:
+            from urllib.request import urlopen
+            link = mac.osascript('tell application "Spotify" to artwork url of current track')
+            if link.startswith("https://"):
+                with urlopen(link, timeout=5) as response:  # Spotify's own picture server
+                    art = response.read(2_000_000)
+        except OSError:
+            art = None
+        _mac_art[key] = art or b""
+    return Track(found["title"], found["artist"], playing=True, app=found["player"], art=art or None)
+
+
+def now_playing_here() -> Track | None:
+    import sys
+    return mac_now_playing() if sys.platform == "darwin" else windows_now_playing()
+
+
 def bands_from(samples, previous: list[float] | None = None) -> list[float]:
     """BANDS levels 0..1 from a block of float samples, spaced like hearing (60 Hz to 8 kHz), smoothed so the bars
     rise quickly and fall slowly."""
@@ -95,7 +125,7 @@ def bands_from(samples, previous: list[float] | None = None) -> list[float]:
 class Music:
     """Watches what's playing (every second) and, while music plays, how its sound moves (~20 times a second)."""
 
-    def __init__(self, now_playing: Callable[[], Track | None] = windows_now_playing,
+    def __init__(self, now_playing: Callable[[], Track | None] = now_playing_here,
                  on_change: Callable[[Track | None], None] = lambda _track: None) -> None:
         self.now_playing = now_playing
         self.on_change = on_change
