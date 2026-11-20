@@ -1634,6 +1634,7 @@ $("#gmail-toggle").onclick = async () => {
       [{ label: "OK", value: null, primary: true, cancel: true }]);
   }
 };
+$("#obs-password-save").onclick = () => { act("obs_password", { password: $("#obs-password").value }); $("#obs-password").value = ""; toast("Saved on this PC.", "ok"); };
 $("#knowledge-sizes").onclick = () => { toast("Asking Kiwix's library for the sizes…", "info"); act("knowledge_catalog"); };
 $("#notes-index").onclick = () => act("notes_index");
 $("#keep-city-save").onclick = () => { toast("Downloading the roads; it can take a few minutes for a big city.", "info"); act("keep_city", { city: $("#keep-city").value }); };

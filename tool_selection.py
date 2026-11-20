@@ -37,6 +37,10 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("fitness_status",), r"heart|pulse|bpm|hrv|fitness|workout|exercise"),
     (("ask_claude",), r"claude"),
     (("send_file",), r"send (me )?(the|my|a|that)|telegram"),
+    (("make_document",), r"word|document|docx?|excel|spreadsheet|sheet|table|chart|graph|powerpoint|slides?|presentation|"
+                         r"deck|report|essay|letter|cv|resume|invoice"),
+    (("obs",), r"obs|record(ing)?|stream(ing)?|go live|scene"),
+    (("vscode",), r"vs ?code|visual studio|code editor|open (the |my )?(project|code|repo)"),
     (("route",), r"route|directions?|way (to|from)|get (to|from)|fastest|quickest|drive to|ride to|walk to|"
                  r"how far|from .+ to|đường|chỉ đường"),
 )

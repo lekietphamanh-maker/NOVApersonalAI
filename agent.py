@@ -294,6 +294,7 @@ class Agent:
         self.route = None     # route(start, end, stops, mode, best_order) -> text: fastest routes (routes.py)
         self.wikipedia = None     # wikipedia(query) -> text, when a Wikipedia file is downloaded (offline_wikipedia.py)
         self.notes_search = None  # notes_search(query) -> text, when the notes are indexed (notes_search.py)
+        self.obs_password = ""    # OBS's WebSocket password, if the owner set one (Settings)
         self.reverse = None  # (target, goal) -> str: REA through Claude Code, when the owner turned it on
         self.discover = None  # (action, number) -> str: Discover's suggestions
         self._mail_online = False  # the owner said to send this mail question online: the online brain gets the mail tools
@@ -508,7 +509,8 @@ class Agent:
                             reverse=self.reverse, discover=self.discover,
                             drive=self.drive if self.private_topics != "personal" else None, world=self.world, route=self.route,
                             wikipedia=self.wikipedia,
-                            notes_search=self.notes_search if self.private_topics != "personal" else None)
+                            notes_search=self.notes_search if self.private_topics != "personal" else None,
+                            obs_password=self.obs_password)
 
     def _claude_history(self) -> list[dict[str, Any]]:
         """The recent conversation as Claude may see it: what was said, never a personal turn, a tool result or a screen."""
@@ -682,7 +684,7 @@ class Agent:
                             skills=self.skills, deep_work=self.deep_work, web=self.web,
                             reminders=self.reminders, build=self.build, send_file=self.send_file, calendar=self.calendar,
                             reverse=self.reverse, discover=self.discover, drive=self.drive, world=self.world, route=self.route,
-                            wikipedia=self.wikipedia, notes_search=self.notes_search)
+                            wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password)
 
     def _sees_with_claude(self, prompt: str) -> bool:
         """A screen job goes to Claude (which sees screenshots) when that is on, Claude is set up and online, and the

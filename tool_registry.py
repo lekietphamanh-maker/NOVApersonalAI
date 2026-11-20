@@ -43,6 +43,7 @@ class ToolContext:
     route: Callable[[str, str, list[str], str, bool], str] | None = None
     wikipedia: Callable[[str], str] | None = None
     notes_search: Callable[[str], str] | None = None
+    obs_password: str = ""
 
 
 Run = Callable[[str, dict[str, Any], ToolContext], str]

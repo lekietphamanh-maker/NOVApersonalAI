@@ -15,6 +15,9 @@ sf_ret = collect_all('_soundfile_data')  # libsndfile for Telegram voice notes
 datas += sf_ret[0]; binaries += sf_ret[1]
 hiddenimports += ['soundfile', '_soundfile']
 # Claude, the online brain: the SDK loads parts of itself lazily (beta streaming, types), so bundle all of it.
+for package in ('docx', 'pptx'):  # Word and PowerPoint's own template files
+    office_ret = collect_all(package)
+    datas += office_ret[0]; binaries += office_ret[1]; hiddenimports += office_ret[2]
 zim_ret = collect_all('libzim')  # offline Wikipedia
 datas += zim_ret[0]; binaries += zim_ret[1]; hiddenimports += zim_ret[2]
 anthropic_ret = collect_all('anthropic')

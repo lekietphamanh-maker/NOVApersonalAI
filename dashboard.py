@@ -107,6 +107,7 @@ LIBRARY_GESTURES = {"next": "next", "previous": "previous", "play_pause": "open"
 # Autopilot: the owner said "just do what I ask", so these never ask. Still asked, because they send the owner's
 # words off this PC: send_online and ask_claude.
 NEVER_ASK = SCREEN_STEP_TOOLS | {"web_search", "add_task", "library", "set_location", "draft_mail", "skills", "deep_work",
+                                "make_document",
                                  "web", "send_file", "add_event", "reverse_engineer"}
 ASK_REMIND_SECONDS, ASK_GIVE_UP_SECONDS = 25, 90  # a question nobody answers is asked again, then counts as no
 MODIFIER_KEYS = (0x10, 0x11, 0x12)  # Shift, Ctrl, Alt
@@ -302,6 +303,7 @@ class AlfredApp:
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
         self.agent.route = self._route_tool
+        self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self._apply_knowledge()
         self.agent.web = self.web
         self.agent.claude = claude_expert.available()
@@ -709,7 +711,8 @@ class AlfredApp:
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
                "world", "claude_connectors", "google_mcp", "node_path", "route",
-               "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city"}
+               "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
+               "obs_password"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2251,6 +2254,10 @@ class AlfredApp:
     def _knowledge_status(self, text: str) -> None:
         self.knowledge["notes"] = {"busy": True, "status": text}
         self.events.put(("knowledge", None))
+
+    def _act_obs_password(self, args: dict[str, Any]) -> None:
+        self._save_setting("obs_password", str(args.get("password") or "")[:120])
+        self.agent.obs_password = str(self.settings.get("obs_password") or "")
 
     def _act_keep_city(self, args: dict[str, Any]) -> dict[str, Any]:
         city = " ".join(str(args.get("city") or self._route_city()).split())

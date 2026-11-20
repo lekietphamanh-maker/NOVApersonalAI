@@ -253,8 +253,23 @@ WIKIPEDIA_TOOL = _tool(
 NOTES_TOOL = _tool(
     "search_my_notes", "Search the owner's own notes, Library and saved work by meaning, on this PC: what they wrote, "
     "kept or learned about something, even in other words.", {"query": _TEXT}, ["query"])
+DOCUMENT_TOOL = _tool(
+    "make_document", "Make a real Word, Excel or PowerPoint file and open it (faster and surer than clicking in Office). "
+    "kind: word (content: the text, '# ' and '## ' for headings, '- ' for bullets, '1. ' numbered, **bold**), excel "
+    "(content: the table as CSV or a Markdown table with a header row; chart: none, bar, line or pie), powerpoint "
+    "(content: an outline, '# Slide title' then '- point' lines). Saved in Documents/Nova Documents.",
+    {"kind": {"type": "string", "enum": ["word", "excel", "powerpoint"]}, "title": _TEXT, "content": _TEXT,
+     "chart": {"type": "string", "enum": ["none", "bar", "line", "pie"]}}, ["kind", "title", "content"])
+OBS_TOOL = _tool(
+    "obs", "Control OBS Studio on this PC: status, start_recording, stop_recording, start_streaming, stop_streaming, "
+    "list_scenes, switch_scene (scene: its name).",
+    {"action": {"type": "string", "enum": ["status", "start_recording", "stop_recording", "start_streaming",
+                                           "stop_streaming", "list_scenes", "switch_scene"]}, "scene": _TEXT}, ["action"])
+VSCODE_TOOL = _tool(
+    "vscode", "Open a project folder or a file in VS Code, at a line if given. target: a path, or a project's name in "
+    "Documents/Nova Projects.", {"target": _TEXT, "line": {"type": "integer"}}, ["target"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
-               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL]
+               ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL]
 
 
 
@@ -735,6 +750,39 @@ register([BUILD_TOOL], _run_build)
 register([REVERSE_TOOL], _run_reverse)
 register([WORLD_TOOL], _run_world)
 register([ROUTE_TOOL], _run_route)
+def _run_document(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
+    import app_control
+    kind, title = str(arguments["kind"]), _words(arguments["title"], 80)
+    if not context.approve("make_document", {"summary": f"Make the {kind.title()} file “{title}” in Documents/Nova Documents"}):
+        return "The owner declined; nothing was made."
+    try:
+        return app_control.make_document(kind, title, str(arguments["content"]), str(arguments.get("chart") or "none"))
+    except (ValueError, OSError) as exc:
+        return f"Not done: {exc}"
+
+
+def _run_obs(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
+    import app_control
+    action = str(arguments["action"])
+    if action == "start_streaming" and not context.approve("obs_stream", {"summary": "Go live: start streaming in OBS"}):
+        return "The owner declined; nothing was streamed."
+    try:
+        return app_control.obs(action, str(arguments.get("scene") or ""), context.obs_password)
+    except (ValueError, OSError) as exc:
+        return f"Not done: {exc}"
+
+
+def _run_vscode(_name: str, arguments: dict[str, Any], _context: ToolContext) -> str:
+    import app_control
+    try:
+        return app_control.vscode(str(arguments["target"]), int(arguments.get("line") or 0))
+    except (ValueError, OSError) as exc:
+        return f"Not done: {exc}"
+
+
+register([DOCUMENT_TOOL], _run_document)
+register([OBS_TOOL], _run_obs)
+register([VSCODE_TOOL], _run_vscode)
 register([WIKIPEDIA_TOOL], lambda _name, arguments, context: context.wikipedia(_words(arguments["query"], 200))
          if context.wikipedia is not None else "Offline Wikipedia isn't downloaded yet: Settings → Offline knowledge.")
 register([NOTES_TOOL], lambda _name, arguments, context: context.notes_search(_words(arguments["query"], 300))

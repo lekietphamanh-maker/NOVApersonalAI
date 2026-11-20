@@ -466,6 +466,17 @@
             placeholder="Where node.exe is (only if Nova can't find it)">
           <button class="box" id="node-path-save">Save</button></div>
       </details>
+      <details class="sub" id="need-apps">
+        <summary><span class="folder" aria-hidden="true"></span>Direct app control · Office, OBS, VS Code</summary>
+        <ol class="need-steps">
+          <li><b>Word, Excel, PowerPoint:</b> nothing to set up. Say “make a Word document from my notes on …”, “put these numbers in Excel with a bar chart”, “turn this into slides”. Nova makes the real file in Documents\Nova Documents and opens it.</li>
+          <li><b>OBS:</b> in OBS, <b>Tools → WebSocket Server Settings → Enable WebSocket server</b>. If you keep <b>Enable Authentication</b> on, click <b>Show Connect Info</b>, copy the password and paste it below. Then: “start recording”, “switch to the Gaming scene”, “stop recording”. Going live asks you first.</li>
+          <li><b>VS Code:</b> install it, then in VS Code press Ctrl+Shift+P → <b>Shell Command: Install 'code' command in PATH</b> (the installer usually does this). Then: “open my portfolio project in VS Code”.</li>
+          <li>Anything else still works the old way: Nova clicks on the screen with Screen assist.</li>
+        </ol>
+        <div class="row"><input id="obs-password" class="field" type="password" maxlength="120" autocomplete="off" placeholder="OBS WebSocket password (only if authentication is on)">
+          <button class="box" id="obs-password-save">Save</button></div>
+      </details>
       <details class="sub" id="need-ollama-cloud">
         <summary><span class="folder" aria-hidden="true"></span>Ollama Cloud · free online brain</summary>
         <ol class="need-steps">
