@@ -261,3 +261,9 @@ def cpu_ticks() -> tuple[float, float]:
         return 0.0, 0.0
     user, kernel, idle, nice = ticks
     return float(user + kernel + nice), float(user + kernel + nice + idle)
+
+
+def type_text(text: str, run: Runner = subprocess.run) -> None:
+    """Types into the app in front (System Events; needs Accessibility for Nova in Privacy & Security)."""
+    escaped = text.replace("\\", "\\\\").replace('"', '\\"')
+    osascript(f'tell application "System Events" to keystroke "{escaped}"', run)

@@ -260,6 +260,8 @@ class Agent:
         self.num_ctx = 8192        # auto-tune raises it when the graphics card has room (auto_tune.py)
         self.cloud_tools: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # see cloud_tools.py
         self.optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer.py, set by the dashboard
+        self.recorder: Any = None                                      # screen_record.Recorder
+        self.make_image: Callable[[str], str] | None = None            # api_brains.make_image on an OpenAI API brain
         self.keep_alive = "30m"
         self.memory = memory or Memory()
         self.base_url = local_base_url()
@@ -694,7 +696,8 @@ class Agent:
                             reminders=self.reminders, build=self.build, send_file=self.send_file, calendar=self.calendar,
                             reverse=self.reverse, discover=self.discover, drive=self.drive, world=self.world, route=self.route,
                             wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password,
-                            cloud=self.cloud_tools if self._may_use_cloud(prompt) else None, optimize=self.optimize)
+                            cloud=self.cloud_tools if self._may_use_cloud(prompt) else None, optimize=self.optimize,
+                            recorder=self.recorder, make_image=self.make_image)
 
     def _may_use_cloud(self, prompt: str) -> bool:
         """A tool that can't run here may go to Claude, unless this turn or the privacy setting keeps things here."""

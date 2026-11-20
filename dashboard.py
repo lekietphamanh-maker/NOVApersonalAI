@@ -328,6 +328,10 @@ class AlfredApp:
         self.agent.world = self._world_tool
         self.agent.route = self._route_tool
         self.agent.optimize = self._optimize_prompt
+        import screen_record
+        self.recorder = screen_record.Recorder(_data_dir())
+        self.agent.recorder = self.recorder
+        self.agent.make_image = self._make_image
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self.agent.web = self.web
         self.agent.claude = claude_expert.available()
@@ -362,6 +366,7 @@ class AlfredApp:
         self.cpu_meter = pc_monitor.CpuMeter()
         self.library_open = False  # the Library is on screen: short commands and gestures move it
         self.library_gesture = ("", 0.0)  # the last gesture that moved it, so a held one acts once
+        self.dictate_release: threading.Event | None = None  # dictation (OpenWhispr's idea): held key → typed text
         self.gesture_screen = ""  # a full screen that takes the webcam gestures while it's open ("rea")
         self.heart = HeartRateMonitor(on_reading=lambda reading: self.events.put(("heart", reading)),
                                       on_status=lambda text: self.events.put(("heart_status", text)))
@@ -2898,6 +2903,19 @@ class AlfredApp:
                                                             "temperature": 0.3}}, timeout=300)
         return str((reply.get("message") or {}).get("content") or "")
 
+    def _make_image(self, prompt: str) -> str:
+        """A picture on the owner's OpenAI API brain (the first one they added), saved in Pictures/Nova Images and opened."""
+        entry = next((item for item in self._api_entries() if item.provider == "openai" and self._api_key(item)), None)
+        if entry is None:
+            return "Making pictures needs an OpenAI API brain: SETTINGS → Model → API brain → Add (OpenAI)."
+        try:
+            path = api_brains.make_image(entry.base_url, self._api_key(entry), prompt, Path.home() / "Pictures" / "Nova Images",
+                                         str(self.settings.get("image_model") or "gpt-image-1"))
+        except cloud_brain.Unavailable as exc:
+            return f"Not done: {exc.why}."
+        app_window.open_path(path)
+        return f"Made the picture and opened it: {path}"
+
     def _optimize_prompt(self, prompt: str, kind: str, test: bool) -> str:
         import prompt_optimizer
         result = prompt_optimizer.optimize(prompt, self._prompt_ask, kind, test)
@@ -3702,6 +3720,18 @@ class AlfredApp:
         elif not talking and self.hold_release is not None:
             self.hold_release.set()
             self.hold_release = None
+        dictating = all(held(key) for key in self._hotkey("dictate"))
+        if dictating and self.dictate_release is None and not talking and not self.state["switches"]["mic"]:
+            self.dictate_release = threading.Event()
+            self.voice.stop_speaking()
+            self.voice.push_to_talk(
+                on_start=lambda: self.events.put(("voice_state", ("DICTATING · RELEASE TO TYPE IT", "record"))),
+                on_result=lambda text: self.events.put(("dictated", text)),
+                on_error=lambda error: self.events.put(("voice_error", error)),
+                hold=self.dictate_release)
+        elif not dictating and self.dictate_release is not None:
+            self.dictate_release.set()
+            self.dictate_release = None
         escape = all(held(key) for key in self._hotkey("stop"))
         if escape and not self.escape_down and not self.escape_is_novas:
             self._act_stop({})  # also while Nova moves the mouse or types: the banner promises Esc stops it
@@ -3718,6 +3748,27 @@ class AlfredApp:
         if newly_pressed("no") and self.pending_approval is not None:
             self._answer(False)
         self.root.after(40, self._poll_keys)
+
+    def _type_dictation(self, text: str) -> None:
+        """What was said while the dictate key was held, typed into the app in front (after the keys are let go)."""
+        text = " ".join(text.split())
+        self._set_voice_state("READY", "idle")
+        if not text:
+            self._toast("Nothing heard to type.", "warn")
+            return
+
+        def work() -> None:
+            self._wait_for_keys_up([*self._hotkey("dictate"), *MODIFIER_KEYS])
+            try:
+                if sys.platform == "darwin":
+                    import mac
+                    mac.type_text(text + " ")
+                else:
+                    import deck_keyboard
+                    deck_keyboard.type_text(text + " ")
+            except Exception as exc:
+                self.events.put(("toast", (f"Couldn't type it: {exc}", "warn")))
+        threading.Thread(target=work, name="NovaDictate", daemon=True).start()
 
     def _keep_highlight(self) -> None:
         """The keep hotkey: copy what is highlighted in the app in front and keep it in the second brain."""
@@ -4044,6 +4095,8 @@ class AlfredApp:
             self._update(local_news=payload)
         elif event_type == "knowledge":
             self._apply_knowledge()
+        elif event_type == "dictated":
+            self._type_dictation(str(payload or ""))
         elif event_type == "claude_refresh":
             self._apply_claude()
         elif event_type == "toast":

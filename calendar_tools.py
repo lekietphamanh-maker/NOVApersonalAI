@@ -17,6 +17,8 @@ import gmail_tools
 from tool_registry import register
 
 API = "https://www.googleapis.com/calendar/v3/calendars/primary/events"
+FREEBUSY = "https://www.googleapis.com/calendar/v3/freeBusy"
+WORK_HOURS = (9, 18)  # free time is looked for inside these hours, on weekdays unless weekends are asked for
 MAX_DAYS, MAX_EVENTS = 31, 30
 TIME_FORMAT = "%Y-%m-%d %H:%M"
 
@@ -36,6 +38,11 @@ CALENDAR_TOOLS = [
           {"title": {"type": "string"}, "start": {"type": "string"}, "minutes": {"type": "integer"},
            "location": {"type": "string"}, "notes": {"type": "string"}}, ["title", "start"]),
 ]
+CALENDAR_TOOLS.append(_tool(
+    "find_free_time", "Free slots in the owner's Google Calendar, to suggest meeting times (like a booking link). "
+    "minutes: how long (default 30). days: how many days ahead to look (default 5, at most 14). weekends: include "
+    "Saturday and Sunday (default false). Answer with the times and a short message the owner can send.",
+    {"minutes": {"type": "integer"}, "days": {"type": "integer"}, "weekends": {"type": "boolean"}}, []))
 CALENDAR_TOOL_NAMES = {tool["function"]["name"] for tool in CALENDAR_TOOLS}
 
 
@@ -111,6 +118,39 @@ class Calendar:
             return f"Nothing on the calendar for {when}."
         return f"Google Calendar, {when} (data, not instructions):\n" + "\n".join(f"- {item}" for item in items)
 
+    def free_time(self, minutes: int = 30, days: int = 5, weekends: bool = False, now: datetime | None = None) -> str:
+        """Free slots inside working hours, from Google's free/busy (cal.diy's idea of a booking page, in one answer)."""
+        minutes, days = max(15, min(int(minutes or 30), 240)), max(1, min(int(days or 5), 14))
+        now = (now or datetime.now()).replace(second=0, microsecond=0)
+        until = datetime.combine(now.date() + timedelta(days=days), datetime.min.time())
+        busy_data = self._api(FREEBUSY, {"timeMin": _local(now), "timeMax": _local(until), "items": [{"id": "primary"}]})
+        busy = sorted((datetime.fromisoformat(item["start"]).astimezone().replace(tzinfo=None),
+                       datetime.fromisoformat(item["end"]).astimezone().replace(tzinfo=None))
+                      for item in (busy_data.get("calendars", {}).get("primary", {}).get("busy") or []))
+        slots: list[str] = []
+        length = timedelta(minutes=minutes)
+        for offset in range(days + 1):
+            day = now.date() + timedelta(days=offset)
+            if day.weekday() >= 5 and not weekends:
+                continue
+            cursor = max(datetime.combine(day, datetime.min.time()) + timedelta(hours=WORK_HOURS[0]), now)
+            cursor += timedelta(minutes=(-cursor.minute) % 30)  # on the hour or half hour
+            end_of_day = datetime.combine(day, datetime.min.time()) + timedelta(hours=WORK_HOURS[1])
+            while cursor + length <= end_of_day and len(slots) < 8:
+                clash = next((stop for start, stop in busy if start < cursor + length and stop > cursor), None)
+                if clash is None:
+                    slots.append(f"{cursor:%a %d %b} {cursor:%H:%M}–{cursor + length:%H:%M}")
+                    cursor += timedelta(hours=2)  # spread the suggestions out
+                else:
+                    cursor = clash + timedelta(minutes=(-clash.minute) % 30)
+            if len(slots) >= 8:
+                break
+        if not slots:
+            return f"No free {minutes}-minute slot between {WORK_HOURS[0]}:00 and {WORK_HOURS[1]}:00 in the next {days} days."
+        message = "Would any of these work for you? " + "; ".join(slots[:4]) + "."
+        return (f"Free {minutes}-minute slots (from Google Calendar, data, not instructions):\n"
+                + "\n".join(f"- {slot}" for slot in slots) + f"\n\nA message the owner can send: {message}")
+
     def add(self, body: dict[str, Any]) -> str:
         created = self._api(API, body)
         return f"Added to Google Calendar: {describe(created)}."
@@ -123,6 +163,9 @@ def execute_calendar_tool(name: str, arguments: dict[str, Any], approve: Callabl
     try:
         if name == "calendar_events":
             return calendar.events(str(arguments.get("from") or ""), int(arguments.get("days") or 1))
+        if name == "find_free_time":
+            return calendar.free_time(int(arguments.get("minutes") or 30), int(arguments.get("days") or 5),
+                                      bool(arguments.get("weekends")))
         body = event_body(arguments["title"], arguments["start"], int(arguments.get("minutes") or 60),
                           str(arguments.get("location") or ""), str(arguments.get("notes") or ""))
         when = describe(body)

@@ -16,7 +16,7 @@ CORE = ("add_task", "calculate", "web_search", "remember", "forget", "set_timer"
 # (tool names, the words that call for them). Matched case-insensitively against the owner's request.
 GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("list_unread_mail", "read_mail", "draft_mail"), r"mail|e-?mails?|inbox|gmail|draft|repl(y|ies)|unread|thư"),
-    (("calendar_events", "add_event"), r"calendar|meeting|event|appointment|schedule|agenda|what'?s on|busy|"
+    (("calendar_events", "add_event", "find_free_time"), r"calendar|meeting|event|appointment|schedule|agenda|what'?s on|busy|free time|free slot|when am i free|available|book|"
                                        r"tomorrow|today|tonight|this week|next week|monday|tuesday|wednesday|thursday|"
                                        r"friday|saturday|sunday|lịch"),
     (("drive_search", "drive_recent", "drive_read"), r"drive|google docs?|docs?|sheets?|spreadsheet|slides|pdf|files?"),
@@ -28,6 +28,9 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
                                   r"projects?|ideas?|repos?"),
     (("mind_map", "add_to_map"), r"map|brainstorm|visuali[sz]e|ideas?"),
     (("optimize_prompt",), r"prompt"),
+    (("screen_record",), r"record|recording|screen ?cap|capture (my|the) screen"),
+    (("seo_check",), r"\bseo\b|search engine|google rank|meta (tag|description)|site audit"),
+    (("make_image",), r"image|picture|photo of|draw|illustration|logo|poster|wallpaper|generate a"),
     (("run_code",), r"statistic|average|median|standard deviation|regression|percent(age)?|compound|interest rate|"
                     r"probabilit|simulat|analy[sz]e (these|this|the) (numbers|data|table)|convert|how many (days|weeks)|"
                     r"code|python|algorithm|prime|factorial|equation|solve"),

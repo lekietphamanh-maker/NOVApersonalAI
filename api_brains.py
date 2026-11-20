@@ -218,3 +218,31 @@ class OpenAIBrain:
             blocks.append(SimpleNamespace(type="tool_use", id=slot["id"] or f"call_{index}", name=slot["name"], input=arguments))
         stop = "tool_use" if calls else STOPS.get(finish, "end_turn")
         return SimpleNamespace(content=blocks, stop_reason=stop)
+
+
+def make_image(base_url: str, key: str, prompt: str, folder: Any, model: str = "gpt-image-1",
+               opener: Callable[..., Any] = urlopen) -> Any:
+    """An image from the prompt through an OpenAI-format images endpoint, saved as a PNG (Open-Generative-AI's idea,
+    on the owner's own API brain). Returns the file's path."""
+    import base64
+    from datetime import datetime
+    from pathlib import Path
+    body = {"model": model, "prompt": " ".join(str(prompt).split())[:4000], "size": "1024x1024", "n": 1}
+    try:
+        with opener(_request(f"{base_url.rstrip('/')}/images/generations", key, body), timeout=240) as response:
+            data = json.loads(response.read())
+    except (HTTPError, URLError, OSError, ValueError) as exc:
+        raise _problem(exc, "The image service") from exc
+    item = (data.get("data") or [{}])[0]
+    if item.get("b64_json"):
+        picture = base64.b64decode(item["b64_json"])
+    elif item.get("url"):
+        with opener(Request(item["url"], headers={"User-Agent": "Nova"}), timeout=120) as response:
+            picture = response.read()
+    else:
+        raise Unavailable("the image service sent no picture")
+    target = Path(folder)
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / f"Image {datetime.now():%Y-%m-%d %H%M%S}.png"
+    path.write_bytes(picture)
+    return path

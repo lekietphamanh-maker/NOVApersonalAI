@@ -46,6 +46,8 @@ class ToolContext:
     obs_password: str = ""
     cloud: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # cloud_tools: Claude does it instead
     optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer, on the brain the owner uses
+    recorder: Any = None  # screen_record.Recorder
+    make_image: Callable[[str], str] | None = None  # api_brains.make_image on the owner's OpenAI API brain
 
 
 class NotHere(Exception):

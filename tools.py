@@ -270,6 +270,15 @@ OPTIMIZE_PROMPT_TOOL = _tool(
     "won. prompt: the prompt itself, word for word. kind: user (a request, default) or system (instructions that set up "
     "an assistant). test: compare the answers (default true; false is quicker).",
     {"prompt": _TEXT, "kind": {"type": "string", "enum": ["user", "system"]}, "test": {"type": "boolean"}}, ["prompt"])
+SCREEN_RECORD_TOOL = _tool(
+    "screen_record", "Record the whole screen to a video (an MP4 in Videos/Nova Recordings). action: start, stop or "
+    "status.", {"action": {"type": "string", "enum": ["start", "stop", "status"]}}, ["action"])
+SEO_TOOL = _tool(
+    "seo_check", "A quick SEO check of a web page: title, description, headings, previews, speed, robots.txt and "
+    "sitemap, and what to fix first. url: the page.", {"url": _TEXT}, ["url"])
+IMAGE_TOOL = _tool(
+    "make_image", "Make a picture from a description (on the owner's OpenAI API brain) and open it. prompt: what the "
+    "picture shows, in detail: subject, style, colours, light.", {"prompt": _TEXT}, ["prompt"])
 RUN_CODE_TOOL = _tool(
     "run_code", "Work something out with real code instead of guessing: exact maths, statistics, unit and date "
     "calculations, analysing numbers or a table someone gave, a quick simulation. task: what to work out, with all "
@@ -280,7 +289,7 @@ VSCODE_TOOL = _tool(
     "Documents/Nova Projects.", {"target": _TEXT, "line": {"type": "integer"}}, ["target"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
                ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
-               OPTIMIZE_PROMPT_TOOL]
+               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL]
 
 
 
@@ -810,6 +819,35 @@ def _run_code(_name: str, _arguments: dict[str, Any], _context: ToolContext) -> 
 
 register([WIKIPEDIA_TOOL], _run_wikipedia)
 register([RUN_CODE_TOOL], _run_code)
+
+
+def _run_screen_record(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
+    if context.recorder is None:
+        return "Screen recording isn't available here."
+    action = str(arguments.get("action") or "status")
+    try:
+        return {"start": context.recorder.start, "stop": context.recorder.stop}.get(action, context.recorder.status)()
+    except RuntimeError as exc:
+        return f"Not done: {exc}."
+
+
+def _run_seo(_name: str, arguments: dict[str, Any], _context: ToolContext) -> str:
+    import seo_check
+    try:
+        return seo_check.check(_words(arguments["url"], 300))
+    except ValueError as exc:
+        return f"Not done: {exc}."
+
+
+def _run_image(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
+    if context.make_image is None:
+        return "Making pictures needs an OpenAI API brain: SETTINGS → Model → API brain → Add (OpenAI)."
+    return context.make_image(str(arguments["prompt"])[:4000])
+
+
+register([SCREEN_RECORD_TOOL], _run_screen_record)
+register([SEO_TOOL], _run_seo)
+register([IMAGE_TOOL], _run_image)
 register([OPTIMIZE_PROMPT_TOOL], lambda _name, arguments, context: context.optimize(
     str(arguments["prompt"])[:8000], str(arguments.get("kind") or "user"), arguments.get("test") is not False)
     if context.optimize is not None else "The prompt optimizer isn't available here.")

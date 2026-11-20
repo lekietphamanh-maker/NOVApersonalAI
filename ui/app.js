@@ -336,6 +336,7 @@ function renderReadouts() {
     $("#hotkey-clip").textContent = keys.clip || "F9";
     $("#hotkey-yes").textContent = keys.yes || "F8";
     $("#hotkey-no").textContent = keys.no || "F10";
+    $("#hotkey-dictate").textContent = keys.dictate || "Ctrl+Win";
   }
   const secondBrain = state.second_brain || {};
   $("#ro-brain-row").hidden = !secondBrain.on;
@@ -1564,7 +1565,7 @@ addEventListener("keyup", (event) => {
 }, true);
 $("#skills-suggest").onclick = () => act("skills_suggest");
 $("#outputs-open").onclick = () => act("open_outputs");
-for (const which of ["talk", "stop", "clip", "yes", "no"]) {
+for (const which of ["talk", "stop", "clip", "yes", "no", "dictate"]) {
   $(`#hotkey-${which}-change`).onclick = () => {
     if (hotkeyCapture) { hotkeyCapture = null; render(); return; }
     startHotkeyCapture(which);
