@@ -100,6 +100,12 @@ CATALOG: tuple[Entry, ...] = (
           ("check the SEO of my portfolio site",), ("seo_check",)),
     Entry("Talk", "Dictation", "Hold Ctrl+Win (Control+Command on a Mac), speak, let go: your words are typed where the "
           "cursor is, in any app (OpenWhispr's idea).", needs="mic", where="SETTINGS → Hotkeys"),
+    Entry("Make", "Workplace", "A board for notes, sketch notes you draw on, pictures and files (text, code, PDF, Word). "
+          "Select something and Nova explains it: she highlights the key words, adds her note beside it, points at "
+          "things and looks at pictures. Closing asks whether to save.", ("workplace mode", "explain this",
+                                                                          "highlight what matters in these notes",
+                                                                          "what's in this picture?"),
+          ("workplace",), where="WORKPLACE in the top bar"),
     Entry("Apps", "Advance mode", "A red HUD: the orb on the left; your Library, what Nova can do, your widgets (add, "
           "remove, reorder) and separate apps on the right. Rea and Shannon open in their own windows; OpenProject runs "
           "in Docker; AppFlowy, Cap, VoiceStudio and your own apps open from there.", ("advance mode on", "exit advance mode"),

@@ -54,6 +54,13 @@ class AppStartsTests(unittest.TestCase):
                     self.assertIn(wanted, steps)
                 self.assertNotIn("ollama", [step.id for step in app._setup_steps(usb=True)])
                 self.assertEqual(app.state["setup"]["steps"], [])
+                app._run_action("workplace_sync", {"open": True, "name": "Test", "selected": ["n1"],
+                                                   "items": [{"id": "n1", "kind": "note", "text": "E = m c squared"}]})
+                self.assertIn("[n1] note (SELECTED): E = m c squared", app._with_workplace("explain this"))
+                self.assertIn("workplace", [tool["function"]["name"] for tool in app.agent._offered(__import__("tools").SKILL_TOOLS)])
+                app._run_action("workplace_sync", {"open": False})
+                self.assertEqual(app._with_workplace("hi"), "hi")
+                self.assertIsNone(app.agent.workplace)
                 app._run_action("lab_view", {"view": "shannon", "open": True})
                 sent: list = []
                 with mock.patch.object(app.ui, "emit", sent.append), \
@@ -76,7 +83,7 @@ class AppStartsTests(unittest.TestCase):
         self.assertTrue(app.state["settings"]["advance"])
         board = app._run_action("advance_board", {})
         self.assertEqual({"library", "skills", "counts", "widgets", "apps"} <= board.keys(), True)
-        self.assertEqual([item["id"] for item in board["apps"][:3]], ["rea", "shannon", "openproject"])
+        self.assertEqual([item["id"] for item in board["apps"][:3]], ["rea", "shannon", "workplace"])
         app._run_action("advance_widgets", {"widgets": ["pc", "clock", "nonsense", "pc"]})
         self.assertEqual(app.state["settings"]["advance_widgets"], ["pc", "clock"])
         added = app._run_action("app_add", {"name": "My site", "target": "https://klee.dev"})

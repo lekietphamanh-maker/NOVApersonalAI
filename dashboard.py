@@ -97,6 +97,8 @@ import setup_everything
 from advance_mode import AdvanceMode
 import setup_actions
 from setup_actions import SetupActions
+from workplace_actions import WorkplaceActions
+import workplace
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -255,7 +257,7 @@ def _qr_data_url(url: str) -> str:
     return "data:image/svg+xml;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-class AlfredApp(AdvanceMode, SetupActions):
+class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
     def __init__(self, root: tk.Tk, startup: dict[str, Any] | None = None) -> None:
         startup = startup or {}
         self.root = root
@@ -339,6 +341,8 @@ class AlfredApp(AdvanceMode, SetupActions):
         self.agent.make_image = self._make_image
         self.docker_apps = separate_apps.Docker()
         self.setup = setup_everything.Setup(self._setup_report)
+        self.workplace_board = workplace.WorkplaceBoard(_data_dir() / "workplaces", lambda event: self.ui.emit(event))
+        self.agent.open_workplace = self._open_workplace
         self.agent.advance = self._set_advance
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self.agent.web = self.web
@@ -759,7 +763,8 @@ class AlfredApp(AdvanceMode, SetupActions):
                "creative", "notes_save", "notes_load", "notes_new", "notes_delete", "map_expand", "read_screen", "audio_devices", "audio_save", "test_mic", "test_speaker",
                "test_voice", "install_whisper", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
                "open_url", "status_refresh", "cancel_timer", "forget_fact",
-               "setup_everything", "setup_stop", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
+               "setup_everything", "setup_stop", "workplace_sync", "workplace_save", "workplace_list", "workplace_load",
+               "workplace_delete", "workplace_file", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
                "walkthrough_next", "walkthrough_stop", "heart", "library", "library_topic", "library_save",
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
@@ -3010,8 +3015,8 @@ class AlfredApp(AdvanceMode, SetupActions):
             self.ui.emit({"type": "reply_delta", "text": self.live_reply})
         try:
             with self.agent_lock:
-                reply = self.agent.ask(prompt, approve_tool=self._confirm_action, screen=screen, cancel=self.turn_cancel,
-                                       on_text=on_text)
+                reply = self.agent.ask(self._with_workplace(prompt), approve_tool=self._confirm_action, screen=screen,
+                                       cancel=self.turn_cancel, on_text=on_text)
             splitter.flush()
             latency = round(((first_words or time.monotonic()) - started) * 1000)
             self.events.put(("chat_done", (reply, bool(streamed), latency)))

@@ -287,9 +287,18 @@ RUN_CODE_TOOL = _tool(
 VSCODE_TOOL = _tool(
     "vscode", "Open a project folder or a file in VS Code, at a line if given. target: a path, or a project's name in "
     "Documents/Nova Projects.", {"target": _TEXT, "line": {"type": "integer"}}, ["target"])
+WORKPLACE_TOOL = _tool(
+    "workplace", "Work on the owner's Workplace board (notes, sketches, pictures, files) while it's open. The board's "
+    "items come with the question, each with an id like [n3]; the selected ones are what the owner means by this or "
+    "these. action: read (the board again), highlight (mark the exact words `text` in note or file `item`, with a short "
+    "`note` explaining them), add_note (put your own note `text` on the board, next to `item` if given), point (draw "
+    "the owner's eye to `item`), look (see picture or sketch `item` and answer `question` about it). When explaining "
+    "something on the board, highlight the key words and add a note, then say the gist out loud.",
+    {"action": {"type": "string", "enum": ["read", "highlight", "add_note", "point", "look"]}, "item": _TEXT,
+     "text": _TEXT, "note": _TEXT, "question": _TEXT}, ["action"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
                ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
-               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL]
+               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL]
 
 
 
@@ -847,6 +856,8 @@ def _run_image(_name: str, arguments: dict[str, Any], context: ToolContext) -> s
 
 register([SCREEN_RECORD_TOOL], _run_screen_record)
 register([SEO_TOOL], _run_seo)
+register([WORKPLACE_TOOL], lambda _name, arguments, context: context.workplace(str(arguments.get("action") or "read"), arguments)
+         if context.workplace is not None else "The Workplace isn't open.")
 register([IMAGE_TOOL], _run_image)
 register([OPTIMIZE_PROMPT_TOOL], lambda _name, arguments, context: context.optimize(
     str(arguments["prompt"])[:8000], str(arguments.get("kind") or "user"), arguments.get("test") is not False)

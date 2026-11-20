@@ -48,6 +48,7 @@ class ToolContext:
     optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer, on the brain the owner uses
     recorder: Any = None  # screen_record.Recorder
     make_image: Callable[[str], str] | None = None  # api_brains.make_image on the owner's OpenAI API brain
+    workplace: Callable[[str, dict[str, Any]], str] | None = None  # the open Workplace board (workplace.WorkplaceBoard.act)
 
 
 class NotHere(Exception):

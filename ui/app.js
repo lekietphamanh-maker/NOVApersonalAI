@@ -9,6 +9,7 @@ import { createShannon } from "./shannon.js";
 import { createSkills } from "./skills.js";
 import { h } from "./lab.js";
 import { createAdvance } from "./advance.js";
+import { createWorkplace } from "./workplace.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -78,12 +79,14 @@ function labOpened(name, open) {
   $(`[data-act=${name}]`).classList.toggle("on", open);
   if (!open && solo === name) window.close();
   if (!open) return;
-  for (const other of [world, routeView, library, rea, shannon, skills]) if (other && other !== labs[name] && other.isOpen()) other.close();
+  for (const other of [world, routeView, library, rea, shannon, skills, workplace]) if (other && other !== labs[name] && other.isOpen()) other.close();
 }
 const labs = {};
 function closeLabs() { for (const lab of Object.values(labs)) if (lab.isOpen()) lab.close(); }
 const rea = labs.rea = createRea($("#rea"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("rea", open) });
 const shannon = labs.shannon = createShannon($("#shannon"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("shannon", open) });
+const workplace = labs.workplace = createWorkplace($("#workplace"), { act: (...args) => act(...args), toast: (...args) => toast(...args),
+  onOpenChange: (open) => labOpened("workplace", open) });
 const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
   ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
 // A Nova screen opened as its own app window from Advance mode (…#token=…&app=rea): only that screen, and closing it
@@ -164,6 +167,10 @@ function handle(event) {
         act("creative");
       }
       if (solo && !labs[solo].isOpen()) labs[solo].open();
+      if (new URLSearchParams(location.hash.slice(1)).get("open") === "workplace") {
+        history.replaceState(null, "", `#token=${encodeURIComponent(token)}`);
+        workplace.open();
+      }
       if (new URLSearchParams(location.hash.slice(1)).get("open") === "library") {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`);
         library.open();
@@ -185,7 +192,8 @@ function handle(event) {
     case "creative": openCreative(event.url); break;
     case "close_creative": if (!$("#creative-layer").hidden) closeCreative(); break;
     case "audio_status": audioStatus(event.text, event.tone); break;
-    case "reply_delta": $("#reply").textContent = event.text; break;
+    case "reply_delta": $("#reply").textContent = event.text; if (workplace.isOpen()) workplace.showReply(event.text); break;
+    case "workplace_command": workplace.command(event); break;
     case "bands": musicBands = event.bands; break;
     case "library_command": library.command(event); break;
     case "library_changed": library.reload(); break;
@@ -1529,6 +1537,7 @@ $("#drawer-close").onclick = () => setPane(openPane);
 $("[data-act=camera]").onclick = () => act("creative");
 $("[data-act=screen]").onclick = screenMenu;
 $("[data-act=map]").onclick = () => openMap(!mapOpen);
+$("[data-act=workplace]").onclick = () => (workplace.isOpen() ? workplace.close() : workplace.open());
 $("[data-act=advance]").onclick = () => act("advance", { on: !(state.settings || {}).advance });
 $("[data-act=library]").onclick = () => (library.isOpen() ? library.close() : library.open());
 $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.open());
@@ -1857,6 +1866,7 @@ document.addEventListener("keydown", (event) => {
     if (button && !typing) { event.preventDefault(); button.click(); }
     return;
   }
+  if (workplace.isOpen() && openPane === null && workplace.handleKey(event)) { event.preventDefault(); return; }
   if (library.isOpen() && openPane === null && library.handleKey(event)) { event.preventDefault(); return; }
   if (rea.isOpen() && openPane === null && !typing && rea.handleKey(event)) { event.preventDefault(); return; }
   if (shannon.isOpen() && openPane === null && !typing && shannon.handleKey(event)) { event.preventDefault(); return; }

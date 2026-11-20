@@ -115,6 +115,10 @@ def match(prompt: str) -> Instant | None:
     if advance:
         word = advance["a"] or advance["b"] or advance["c"] or "on"
         return Instant("advance", {"on": word in ("on", "open", "start", "enter")})
+    board = re.fullmatch(r"(?:(?P<a>open|start|enter|show)(?: me)? )?(?:the |my )?(?:workplace|work ?space|workspace)(?: mode)?"
+                         r"|(?P<c>close|exit|leave|stop|end) (?:the |my )?(?:workplace|work ?space)(?: mode)?", text)
+    if board:
+        return Instant("workplace", {"on": not board["c"]})
     opened = re.fullmatch(r"(?:open|launch|start|run)(?: up)? (?:the |my )?(?P<app>[a-z][a-z .]{1,30}?)(?: app)?", text)
     if opened and opened["app"].strip() in APPS:
         return Instant("open", {"app": opened["app"].strip()})

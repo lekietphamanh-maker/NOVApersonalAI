@@ -48,6 +48,8 @@ CATALOG: tuple[App, ...] = (
         runs_on="Claude Code (your Claude plan)", licence="Nova's own screen"),
     App("shannon", "Shannon", "Break into your own app before someone else does: weak spots on a shield.", "window",
         runs_on="Claude (Anthropic API key), in Docker", licence="Nova's own screen"),
+    App("workplace", "Workplace", "Notes, sketches, pictures and files on one board, with Nova explaining.", "window",
+        runs_on="whichever brain answers you", licence="Nova's own screen"),
     App("openproject", "OpenProject", "Projects, boards, Gantt charts and time tracking, on this PC.", "docker",
         "https://www.openproject.org/docs/installation-and-operations/installation/docker/",
         image="openproject/openproject:15", port=8080, inner_port=80,

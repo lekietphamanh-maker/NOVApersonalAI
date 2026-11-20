@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="world.css">
 <link rel="stylesheet" href="lab.css">
 <link rel="stylesheet" href="advance.css">
+<link rel="stylesheet" href="workplace.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -37,6 +38,7 @@
     <button class="box" data-act="rea" title="Rea: how an app is built, as a blueprint">Rea</button>
     <button class="box" data-act="shannon" title="Shannon: break into your own app before someone else does">Shannon</button>
     <span class="toolbar-gap" aria-hidden="true"></span>
+    <button class="box" data-act="workplace" title="Workplace: notes, sketches, pictures and files, with Nova beside you">Workplace</button>
     <button class="box advance-toggle" data-act="advance" title="Advance mode: the red board with your Library, skills, widgets and apps">Advance</button>
     <button class="box" data-pane="settings">Settings</button>
   </nav>
@@ -130,6 +132,35 @@
     </section>
   </section>
 </main>
+
+<section id="workplace" class="workplace" hidden aria-label="Workplace">
+  <header class="wp-bar">
+    <div class="wp-title"><span class="wp-mark" aria-hidden="true"></span><b>WORKPLACE</b>
+      <input id="wp-name" class="field" maxlength="60" placeholder="Untitled board" aria-label="Board name" autocomplete="off"></div>
+    <div class="wp-tools">
+      <button class="box small" data-add="note" type="button" title="A note to type in">+ Note</button>
+      <button class="box small" data-add="sketch" type="button" title="A note to draw on (mouse, pen or finger)">+ Sketch</button>
+      <button class="box small" data-add="picture" type="button" title="Or drop / paste a picture">+ Picture</button>
+      <button class="box small" data-add="file" type="button" title="Or drop a file: text, code, PDF, Word">+ File</button>
+      <button class="box small" id="wp-clear-marks" type="button" title="Remove Nova's highlights and notes">Clear Nova's marks</button>
+      <details class="wp-open" id="wp-open"><summary class="box small">Open ▾</summary><ul id="wp-saved" class="wp-saved"></ul></details>
+      <button class="box small on" id="wp-save" type="button" title="Ctrl+S">Save</button>
+      <button class="box small" id="wp-close" type="button" title="Esc">Close</button>
+    </div>
+    <input type="file" id="wp-picker" multiple hidden>
+  </header>
+  <div class="wp-board" id="wp-board">
+    <div class="wp-layer" id="wp-layer"><svg class="wp-links" id="wp-links" aria-hidden="true"></svg></div>
+    <p class="wp-empty" id="wp-empty">Add a note, a sketch, a picture or a file, or drop them here.<br>
+      Select something and ask Nova: “explain this”, “highlight what matters”, “what's in this picture?”</p>
+  </div>
+  <form class="wp-ask" id="wp-ask" autocomplete="off">
+    <input id="wp-question" class="field" maxlength="2000" placeholder="Ask Nova about the board (select items to ask about them; or just talk)">
+    <button class="box small on" type="submit">Ask Nova</button>
+  </form>
+  <aside class="wp-reply" id="wp-reply" hidden aria-live="polite"></aside>
+  <div class="wp-dialog" id="wp-dialog" hidden role="dialog" aria-modal="true"><div><p></p><div class="wp-choices"></div></div></div>
+</section>
 
 <section id="library" class="library" hidden aria-label="Library">
   <header class="lib-head">

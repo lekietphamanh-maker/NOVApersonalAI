@@ -12,7 +12,7 @@ import re
 from typing import Any
 
 CORE = ("add_task", "calculate", "web_search", "remember", "forget", "set_timer", "cancel_timer", "reminder",
-        "media_control", "weather", "skills", "wikipedia")
+        "media_control", "weather", "skills", "wikipedia", "workplace")  # workplace: only offered while the board is open
 # (tool names, the words that call for them). Matched case-insensitively against the owner's request.
 GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("list_unread_mail", "read_mail", "draft_mail"), r"mail|e-?mails?|inbox|gmail|draft|repl(y|ies)|unread|thư"),

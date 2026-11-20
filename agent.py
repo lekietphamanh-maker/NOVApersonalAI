@@ -261,7 +261,9 @@ class Agent:
         self.cloud_tools: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # see cloud_tools.py
         self.optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer.py, set by the dashboard
         self.recorder: Any = None                                      # screen_record.Recorder
+        self.open_workplace: Callable[[bool], str] | None = None       # the Workplace board on/off
         self.advance: Callable[[bool], str] | None = None              # Advance mode on/off (the HUD's red board)
+        self.workplace: Callable[[str, dict[str, Any]], str] | None = None  # the open Workplace board
         self.make_image: Callable[[str], str] | None = None            # api_brains.make_image on an OpenAI API brain
         self.keep_alive = "30m"
         self.memory = memory or Memory()
@@ -477,7 +479,8 @@ class Agent:
                     "calendar_events": self.calendar, "add_event": self.calendar,
                     "drive_search": self.drive, "drive_recent": self.drive, "drive_read": self.drive,
                     "reverse_engineer": self.reverse, "discover": self.discover, "world": self.world,
-                    "route": self.route, "wikipedia": self.wikipedia, "search_my_notes": self.notes_search}
+                    "route": self.route, "wikipedia": self.wikipedia, "search_my_notes": self.notes_search,
+                    "workplace": self.workplace}
         offered = [tool for tool in tools if optional.get(tool["function"]["name"], True)]
         if self.only_tools is not None:  # a skill that names its tools gets only those
             offered = [tool for tool in offered if tool["function"]["name"] in self.only_tools]
@@ -519,7 +522,8 @@ class Agent:
                             drive=self.drive if self.private_topics != "personal" else None, world=self.world, route=self.route,
                             wikipedia=self.wikipedia,
                             notes_search=self.notes_search if self.private_topics != "personal" else None,
-                            obs_password=self.obs_password)
+                            obs_password=self.obs_password, recorder=self.recorder, make_image=self.make_image,
+                            workplace=self.workplace)
 
     def _claude_history(self) -> list[dict[str, Any]]:
         """The recent conversation as Claude may see it: what was said, never a personal turn, a tool result or a screen."""
@@ -650,10 +654,11 @@ class Agent:
                 answer = instant_commands.open_app(quick.arguments["app"])
             except OSError:
                 return None
-        elif quick.tool == "advance":
-            if self.advance is None:
+        elif quick.tool in ("advance", "workplace"):
+            switch = self.advance if quick.tool == "advance" else self.open_workplace
+            if switch is None:
                 return None
-            answer = self.advance(bool(quick.arguments["on"]))
+            answer = switch(bool(quick.arguments["on"]))
         elif quick.tool in ("set_timer", "cancel_timer") and self.timers is None:
             return None
         else:
@@ -702,7 +707,7 @@ class Agent:
                             reverse=self.reverse, discover=self.discover, drive=self.drive, world=self.world, route=self.route,
                             wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password,
                             cloud=self.cloud_tools if self._may_use_cloud(prompt) else None, optimize=self.optimize,
-                            recorder=self.recorder, make_image=self.make_image)
+                            recorder=self.recorder, make_image=self.make_image, workplace=self.workplace)
 
     def _may_use_cloud(self, prompt: str) -> bool:
         """A tool that can't run here may go to Claude, unless this turn or the privacy setting keeps things here."""
@@ -854,7 +859,7 @@ class Agent:
             return "Type a message and I can help."
 
         self.turn_stats = {}
-        quick = None if self.only_tools is not None else instant_commands.match(prompt)
+        quick = None if self.only_tools is not None else instant_commands.match(prompt.split(SCREEN_MARKER)[0])
         if quick is not None:
             answer = self._run_instant(quick, prompt, approve_tool)
             if answer is not None:
