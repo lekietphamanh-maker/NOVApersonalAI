@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova · TV</title>
+<style>
+  @font-face { font-family: "Rajdhani"; src: url("/fonts/rajdhani-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  :root { --accent-rgb: 255, 176, 64; --accent: rgb(var(--accent-rgb)); --text: #eef2f6; --dim: #9aa6b2; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05070b; color: var(--text);
+    font-family: "Segoe UI", Roboto, system-ui, sans-serif; }
+  body { background-image: linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px); background-size: 4vw 4vw; }
+  .mono { font-family: "JetBrains Mono", Consolas, "Roboto Mono", monospace; letter-spacing: 0.18em; text-transform: uppercase; }
+  #caption { position: fixed; top: 3vh; left: 4vw; right: 4vw; padding: 1.4vh 1.6vw; border: 1px solid rgba(255,255,255,0.18);
+    background: rgba(8,11,16,0.75); }
+  #caption .label { font-size: 1.1vh; color: var(--accent); }
+  #caption .label i { display: inline-block; width: 0.8vh; height: 0.8vh; border-radius: 50%; background: var(--accent); margin-right: 0.8vh; }
+  #caption .text { margin-top: 0.8vh; font-size: 2.6vh; line-height: 1.35; max-height: 7.2vh; overflow: hidden; }
+  #avatar { position: fixed; left: 50%; top: 54%; width: 62vh; height: 62vh; transform: translate(-50%, -50%); transition: left 0.6s, width 0.6s, height 0.6s; }
+  body.sliding #avatar { left: 14vw; top: 76vh; width: 30vh; height: 30vh; }
+  #state { position: fixed; left: 50%; top: 88vh; transform: translateX(-50%); font-size: 1.3vh; color: var(--dim); transition: left 0.6s; }
+  body.sliding #state { opacity: 0; }
+  body.core #state { display: none; } /* the HUD's core writes NOVA and what she's doing under the orb */
+  .column { position: fixed; top: 18vh; width: 21vw; display: flex; flex-direction: column; gap: 2.4vh; }
+  #left { left: 4vw; } #right { right: 4vw; align-items: flex-end; text-align: right; }
+  body.sliding #right { opacity: 0; }
+  .card { padding: 1.4vh 1.2vw; border-left: 2px solid rgba(var(--accent-rgb), 0.7); background: rgba(8,11,16,0.55); }
+  #right .card { border-left: 0; border-right: 2px solid rgba(var(--accent-rgb), 0.7); }
+  .card .label { font-size: 1.1vh; color: var(--accent); margin-bottom: 0.8vh; }
+  #clock { font-size: 7vh; font-weight: 300; line-height: 1; }
+  #date { font-size: 1.8vh; color: var(--dim); margin-top: 0.6vh; }
+  .big { font-size: 3vh; } .small { font-size: 1.7vh; color: var(--dim); line-height: 1.45; }
+  #disc { width: 16vh; height: 16vh; }
+  #bottom { position: fixed; left: 4vw; right: 4vw; bottom: 3vh; display: flex; gap: 3vw; align-items: center; font-size: 1.5vh; color: var(--dim); }
+  #ticker { flex: 1; overflow: hidden; white-space: nowrap; }
+  #ticker span { display: inline-block; padding-left: 100%; animation: ticker 60s linear infinite; }
+  @keyframes ticker { to { transform: translateX(-100%); } }
+  #slide { position: fixed; right: 4vw; top: 16vh; bottom: 9vh; width: 52vw; padding: 3vh 2.4vw; box-sizing: border-box; overflow: hidden;
+    border: 1px solid rgba(var(--accent-rgb), 0.55); background: rgba(8,11,16,0.85); box-shadow: 0 0 6vh rgba(var(--accent-rgb), 0.18);
+    transform: translateX(120%); transition: transform 0.6s cubic-bezier(.2,.8,.2,1); }
+  body.sliding #slide { transform: none; }
+  #slide h1 { margin: 0 0 2vh; font-size: 4vh; font-weight: 600; }
+  #slide .body { white-space: pre-wrap; font-size: 2.6vh; line-height: 1.5; color: #dfe6ee; max-height: 100%; overflow: hidden; }
+  #slide img { display: block; max-width: 100%; max-height: 52vh; margin: 0 auto 2vh; }
+  #pair { position: fixed; inset: 0; display: none; place-items: center; text-align: center; background: #05070b; }
+  #pair.show { display: grid; }
+  #pair .code { font-size: 16vh; letter-spacing: 0.15em; color: var(--accent); font-weight: 600; }
+  #pair p { font-size: 2.4vh; color: var(--dim); }
+</style>
+</head>
+<body>
+<div id="caption"><div class="label mono"><i></i><span id="who">Nova</span></div><div class="text" id="caption-text">Hello.</div></div>
+<canvas id="avatar" width="900" height="900"></canvas>
+<div id="state" class="mono">Asleep</div>
+<div class="column" id="left">
+  <div class="card"><div id="clock">--:--</div><div id="date"></div></div>
+  <div class="card" id="weather-card" hidden><div class="label mono">Weather</div><div class="big" id="weather-short"></div><div class="small" id="weather-lines"></div></div>
+  <div class="card" id="timers-card" hidden><div class="label mono">Timers</div><div class="small" id="timers"></div></div>
+</div>
+<div class="column" id="right">
+  <div class="card" id="music-card" hidden><div class="label mono">Now playing</div><canvas id="disc" width="300" height="300"></canvas>
+    <div class="big" id="music-title"></div><div class="small" id="music-artist"></div></div>
+  <div class="card" id="brain-card" hidden><div class="label mono">Second brain</div><div class="small" id="brain"></div></div>
+  <div class="card" id="heart-card" hidden><div class="label mono">Heart</div><div class="big" id="heart"></div></div>
+</div>
+<div id="bottom"><span class="mono" id="owner"></span><div id="ticker"><span id="headlines"></span></div></div>
+<div id="slide"><img id="slide-image" alt="" hidden><h1 id="slide-title"></h1><div class="body" id="slide-body"></div></div>
+<div id="pair"><div><p class="mono">Nova on this TV</p><div class="code" id="code">····</div>
+  <p>On your PC, click <b>Allow</b> on the code in Nova's window.</p></div></div>
+<script>
+// Kept to plain old JavaScript on purpose: TV browsers are often years behind.
+var token = "", info = {}, musicKey = "", slideId = "", cover = new Image(), slideImage = "", spin = 0, last = Date.now();
+try { token = localStorage.getItem("nova-screen") || ""; } catch (error) { token = ""; }
+function $(id) { return document.getElementById(id); }
+function request(method, path, done) {
+  var xhr = new XMLHttpRequest();
+  xhr.open(method, path);
+  if (token) xhr.setRequestHeader("Authorization", "Bearer " + token);
+  xhr.onload = function () { var data = {}; try { data = JSON.parse(xhr.responseText); } catch (error) {} done(xhr.status, data); };
+  xhr.onerror = function () { done(0, {}); };
+  xhr.send();
+}
+function pair() {
+  $("pair").className = "show";
+  request("POST", "/api/tv/hello", function (status, data) {
+    if (status !== 200) { setTimeout(pair, 5000); return; }
+    $("code").textContent = data.code;
+    var tries = 0;
+    (function wait() {
+      request("GET", "/api/tv/status?session=" + encodeURIComponent(data.session), function (code, answer) {
+        if (answer.approved) {
+          token = answer.token;
+          try { localStorage.setItem("nova-screen", token); } catch (error) {}
+          $("pair").className = "";
+          poll();
+        } else if (answer.expired || ++tries > 140) { pair(); } else { setTimeout(wait, 2000); }
+      });
+    })();
+  });
+}
+function poll() {
+  request("GET", "/api/screen?music=" + encodeURIComponent(musicKey) + "&slide=" + encodeURIComponent(slideId), function (status, data) {
+    if (status === 401) { token = ""; try { localStorage.removeItem("nova-screen"); } catch (error) {} pair(); return; }
+    if (status === 200) show(data);
+    setTimeout(poll, 1000);
+  });
+}
+// the screen's mode -> the HUD core's mood (asleep it's a line with orbits; awake the line opens into the orb)
+var CORE_MODES = { asleep: "idle", armed: "armed", listen: "listen", think: "think", speak: "speak", act: "think",
+  error: "error", music: "idle" };
+var NAMES = { asleep: "Asleep", armed: "Listening for “Hey Nova”", listen: "Listening", think: "Thinking", speak: "Speaking",
+  act: "Using the PC", error: "Problem", music: "Music" };
+function show(data) {
+  info = data;
+  if (data.accent) document.documentElement.style.setProperty("--accent-rgb", data.accent);
+  if (window.novaCore) {
+    window.novaCore.setAccent(data.accent || "255, 176, 64");
+    window.novaCore.setMode(CORE_MODES[data.mode] || "idle", data.mode === "act" ? "USING THE PC" : "");
+  }
+  $("state").textContent = NAMES[data.mode] || data.mode;
+  $("who").textContent = data.mode === "speak" ? "Nova · speaking" : data.mode === "think" ? "Nova · thinking" : "Nova";
+  $("caption-text").textContent = data.caption || "Say “Hey Nova”.";
+  $("owner").textContent = data.owner ? "Hi, " + data.owner : "";
+  var weather = data.weather;
+  $("weather-card").hidden = !weather;
+  if (weather) { $("weather-short").textContent = weather.short + " · " + weather.place; $("weather-lines").textContent = (weather.lines || []).slice(1, 3).join(" "); }
+  var timers = data.timers || [];
+  $("timers-card").hidden = !timers.length;
+  $("timers").textContent = timers.map(function (timer) {
+    var left = Math.max(0, Math.round((timer.ends - Date.now()) / 1000));
+    return (timer.label || "Timer") + " · " + (timer.done ? "done" : Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2));
+  }).join("\n");
+  var music = data.music;
+  $("music-card").hidden = !music;
+  if (music) {
+    $("music-title").textContent = music.title; $("music-artist").textContent = music.artist;
+    if (music.cover !== undefined) { musicKey = music.key; if (music.cover) cover.src = music.cover; else cover = new Image(); }
+  }
+  var brain = data.brain || {};
+  $("brain-card").hidden = !brain.on;
+  $("brain").textContent = brain.notes_today + " summaries today" + (brain.last ? " · last " + brain.last : "");
+  $("heart-card").hidden = !data.heart; $("heart").textContent = data.heart ? data.heart + " bpm" : "";
+  $("headlines").textContent = (data.headlines || []).join("     ·     ");
+  var slide = data.slide;
+  document.body.className = (slide ? "sliding" : "") + (window.novaCore ? " core" : "");
+  if (slide && slide.id !== slideId) {
+    slideId = slide.id;
+    $("slide-title").textContent = slide.title || "";
+    $("slide-body").textContent = slide.body || "";
+    slideImage = slide.image || "";
+    $("slide-image").hidden = !slideImage;
+    if (slideImage) $("slide-image").src = slideImage;
+  }
+  if (!slide) slideId = "";
+}
+function tick() {
+  var now = new Date();
+  $("clock").textContent = ("0" + now.getHours()).slice(-2) + ":" + ("0" + now.getMinutes()).slice(-2);
+  $("date").textContent = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+}
+setInterval(tick, 1000); tick();
+// Nova's avatar: a wireframe sphere with rings, calm asleep, turning faster when she thinks, pulsing when she talks.
+// t counts from page load: canvas arc angles are 32-bit floats, and at Date.now()/1000 (~2e9) a 1.3 rad sweep rounds to nothing.
+// This sphere is only for TV browsers too old for the HUD's core (an ES module); the core normally arrives well before 1.5 s.
+var born = Date.now();
+function draw() {
+  requestAnimationFrame(draw);
+  var accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+  if (!window.novaCore && Date.now() - born > 1500) drawSphere(accent);
+  drawDisc(accent);
+}
+
+function drawSphere(accent) {
+  var canvas = $("avatar"), c = canvas.getContext("2d"), size = canvas.width, mid = size / 2, t = (Date.now() - born) / 1000;
+  var mode = info.mode || "asleep";
+  var speed = mode === "think" ? 1.6 : mode === "speak" ? 0.7 : mode === "asleep" ? 0.12 : 0.35;
+  var glow = mode === "asleep" ? 0.35 : mode === "speak" ? 0.75 + 0.25 * Math.sin(t * 9) : 0.8;
+  var radius = size * 0.3 * (mode === "speak" ? 1 + 0.03 * Math.sin(t * 9) : 1);
+  c.clearRect(0, 0, size, size);
+  var gradient = c.createRadialGradient(mid, mid, radius * 0.1, mid, mid, radius * 1.3);
+  gradient.addColorStop(0, "rgba(" + accent + "," + 0.28 * glow + ")"); gradient.addColorStop(1, "rgba(" + accent + ",0)");
+  c.fillStyle = gradient; c.beginPath(); c.arc(mid, mid, radius * 1.3, 0, Math.PI * 2); c.fill();
+  c.lineWidth = 1.4;
+  for (var k = 0; k < 9; k++) { // longitudes: ellipses turning around the vertical axis
+    var angle = t * speed + (k * Math.PI) / 9, width = Math.abs(Math.cos(angle)) * radius;
+    c.strokeStyle = "rgba(" + accent + "," + (0.18 + 0.4 * glow * Math.abs(Math.sin(angle))) + ")";
+    c.beginPath(); c.ellipse(mid, mid, Math.max(1, width), radius, 0, 0, Math.PI * 2); c.stroke();
+  }
+  for (var j = 1; j < 6; j++) { // latitudes
+    var y = -radius + (2 * radius * j) / 6, w = Math.sqrt(radius * radius - y * y);
+    c.strokeStyle = "rgba(" + accent + "," + 0.25 * glow + ")";
+    c.beginPath(); c.ellipse(mid, mid + y, w, w * 0.18, 0, 0, Math.PI * 2); c.stroke();
+  }
+  c.lineWidth = 6; // outer rings
+  for (var r = 0; r < 3; r++) {
+    var start = t * speed * (r % 2 ? -1.3 : 1) + r * 2.1;
+    c.strokeStyle = "rgba(" + accent + "," + (0.35 + 0.4 * glow) + ")";
+    c.beginPath(); c.arc(mid, mid, radius * (1.18 + r * 0.1), start, start + 1.3 + r * 0.4); c.stroke();
+  }
+}
+
+function drawDisc(accent) { // the song's cover, spinning (right column)
+  var disc = $("disc"), d = disc.getContext("2d"), elapsed = (Date.now() - last) / 1000; last = Date.now();
+  if (info.music && info.music.playing) spin += elapsed * 3.46;
+  d.clearRect(0, 0, 300, 300); d.save(); d.translate(150, 150); d.rotate(spin);
+  d.fillStyle = "#09090d"; d.beginPath(); d.arc(0, 0, 145, 0, Math.PI * 2); d.fill();
+  d.beginPath(); d.arc(0, 0, 80, 0, Math.PI * 2); d.clip();
+  if (cover.complete && cover.naturalWidth) d.drawImage(cover, -80, -80, 160, 160); else { d.fillStyle = "rgb(" + accent + ")"; d.fillRect(-80, -80, 160, 160); }
+  d.restore(); d.fillStyle = "#05070b"; d.beginPath(); d.arc(150, 150, 8, 0, Math.PI * 2); d.fill();
+}
+requestAnimationFrame(draw);
+if (token) poll(); else pair();
+</script>
+<script type="module">
+  // Nova's core, the same one as in the HUD on the PC: a glowing line with orbits while she sleeps, opening into the orb.
+  import { createCore } from "/core.js";
+  window.novaCore = createCore(document.getElementById("avatar"));
+  document.body.classList.add("core");
+</script>
+</body>
+</html>

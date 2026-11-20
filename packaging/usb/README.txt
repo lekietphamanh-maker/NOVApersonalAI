@@ -1,0 +1,22 @@
+NOVA — USB EDITION
+====================
+
+1. Copy this entire folder to a writable USB drive formatted exFAT or NTFS. Do not use FAT32; the Qwen model layer exceeds FAT32's single-file limit.
+2. Use at least 16 GB free; 32 GB is recommended, especially if you later approve the optional larger model download.
+3. On a Windows 10/11 x64 PC, double-click Start Nova USB.bat. USB insertion alone never runs Nova. The PC must be awake, and Nova must be launched.
+
+This folder contains its own Windows x64 Ollama runtime, qwen2.5:7b Q4_K_M, Python app runtime, offline Vosk English speech model and recognizer runtime, and relative `Data` folder. It does not need a Python or Ollama installation on the destination PC. The service uses a separate model store, binds to 127.0.0.1:11435 only, and disables Ollama cloud features. It refuses to attach to a different service already occupying port 11435.
+
+At each launch, Nova reads the host CPU name and available/total system RAM, and enumerates display adapters via Windows WMI. It selects the largest-parameter installed model whose estimated weight+overhead fits a conservative RAM budget with OS headroom. GPU detection is not GPU-compatibility proof; WMI VRAM can be capped, and the app cannot know exact free VRAM before model load. After a reply, check the live Ollama placement widget. Ollama can use CPU if GPU acceleration is unavailable; another PC's speed and compatibility are not guaranteed, and CPU-only performance has not been tested here.
+
+If the installed baseline is not the best candidate this host can reasonably run, Nova can offer the known Qwen3:8b model (about 5.6 GB) when estimated RAM and free storage allow. A Yes is required before the download begins. It uses internet and USB storage, does not replace the existing model, and Nova will use it after you restart. Declining keeps the current USB model. This is not a full catalogue updater or scheduled model refresh.
+
+Data in `Data` (chat/tasks SQLite and saved visual maps) stays with this edition when you copy the folder. Do not launch this folder directly from the OneDrive Desktop: OneDrive denied Ollama model-store cleanup during a test on this PC. Copy the folder to a writable exFAT/NTFS USB drive first. The executable, isolated Ollama server, model, offline voice assets, and audio endpoint enumeration passed a self-check from a writable local staging folder on this PC; no physical USB or second PC was available. Screen UI Automation is optional and loads only on an explicit screen-read request, so its import cannot block dashboard startup. Desktop credentials/data are never copied to USB.
+
+Voice, screen-reading, and visual-map behavior is the same as described in Desktop Edition README. The core visualizer pulses from the selected microphone's live RMS level only while push-to-talk or wake listening is explicitly active; it is still when muted or after a voice error. Audio Settings chooses input and output devices; settings live under this edition's `Data` folder, separate from Desktop credentials/data. Audio samples are transient in RAM only and are never saved. This meter shows sound level, not speech meaning. If an endpoint is missing on another host, Nova falls back to that PC's Windows default.
+
+The rebuilt USB package passed its self-check with the bundled Vosk model loaded and recognizer initialized; a NexiGo N60 mic test and Yeti speaker playback passed on the development PC. It was run from a writable local staging folder, not a removable USB or second PC. Actual spoken recognition, mic-reactive animation, wake false/missed activations, and live voice-to-map behavior in the packaged USB app remain unverified. English Vosk wake detection can miss or falsely trigger; use push-to-talk if needed. Screen reading requires UI Automation to safely check password controls before OCR. Apps that expose no accessible text may return no content.
+
+This executable supports only Windows 10/11 x64. It will not run natively on iPhone or Android. USB insertion will not wake a sleeping/off PC. A phone client connecting to a powered-on Windows host would be a separate future feature.
+
+Not implemented: email/account authorization, browsing or arbitrary file access, folder indexing, web-source refresh, daily/return-online data refresh, general model/app update checks, cloud sync, or direct Nova-to-HeyClicky homework handoff. Nova cannot read browser passwords or cookies. Model answers can be wrong.

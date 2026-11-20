@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nova">
+<meta name="theme-color" content="#040608">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Nova Lite</title>
+<style>
+  @font-face { font-family: "Rajdhani"; src: url("/fonts/rajdhani-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+  :root { --bg: #040608; --panel: rgba(9, 13, 18, 0.82); --border: rgba(255,255,255,0.12); --accent-rgb: 255, 176, 64; --cyan: rgb(var(--accent-rgb));
+    --mint: #5cf2b0; --text: #e9eef2; --muted: #7d8a96; --red: #ff4d6a; --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; color: var(--text); font: 16px -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    background: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px) 0 0 / 28px 28px,
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px) 0 0 / 28px 28px, var(--bg); }
+  body { display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  header { display: flex; align-items: center; gap: 10px; padding: 12px 16px 4px; font: 600 11px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; }
+  header h1 { margin: 0; flex: 1; font-size: 15px; letter-spacing: 0.32em; display: flex; align-items: center; gap: 10px; }
+  header h1::before { content: ""; width: 11px; height: 11px; border: 2px solid var(--cyan); border-radius: 50%; box-shadow: 0 0 10px var(--cyan); }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
+  #dot.online { background: var(--mint); box-shadow: 0 0 8px var(--mint); }
+  label { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  #screen { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; }
+  #screen > * { flex-shrink: 0; }
+  /* the launcher's ring is centred on its bottom edge (370 × 190); the orb (the HUD's core, 260 × 300, centre 138 px
+     from its top) sits on that centre at any phone width, under the keys */
+  #home { position: relative; height: 352px; height: calc(min(370px, 100vw) * 0.5135 + 162px); }
+  #arcs { position: absolute; left: 50%; top: 0; width: 370px; max-width: 100%; transform: translateX(-50%); overflow: visible; z-index: 1; }
+  .arc { cursor: pointer; }
+  .arc path { fill: rgba(9, 22, 32, 0.85); stroke: rgba(var(--accent-rgb), 0.55); stroke-width: 1.2; }
+  .arc text { fill: #cfe3f0; font: 600 9.5px var(--mono); letter-spacing: 0.14em; text-anchor: middle; dominant-baseline: middle; pointer-events: none; }
+  .arc.hot path { fill: rgba(var(--accent-rgb), 0.85); } .arc.hot text { fill: #000; }
+  #orb { position: absolute; left: 50%; top: 52px; top: calc(min(370px, 100vw) * 0.5135 - 138px); width: 260px; height: 300px;
+    transform: translateX(-50%); pointer-events: none; }
+  body.core #status { display: none; } /* the core writes NOVA and what she's doing under the orb */
+  #status { text-align: center; font: 600 10.5px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--muted); }
+  #status b { color: var(--cyan); } #status i { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--cyan); margin-right: 6px; }
+  #caption { margin: 8px 16px 0; min-height: 44px; padding: 9px 12px; border: 1px solid var(--border); background: var(--panel); line-height: 1.4; font-size: 15px;
+    max-height: 110px; overflow-y: auto; }
+  #widgets { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 16px 0; }
+  .widget { padding: 10px 12px; border: 1px solid var(--border); border-left: 2px solid rgba(var(--accent-rgb), 0.75); background: var(--panel); min-height: 70px; }
+  .widget .label { font: 600 9.5px var(--mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--cyan); margin-bottom: 4px; }
+  #clock { font-size: 30px; font-weight: 300; line-height: 1; } .small { font-size: 12.5px; color: var(--muted); line-height: 1.35; }
+  .big { font-size: 18px; }
+  #music-row { display: flex; gap: 10px; align-items: center; }
+  #disc { width: 46px; height: 46px; flex: none; }
+  #screen > #log { flex: 1 0 auto; padding: 10px 16px 4px; display: flex; flex-direction: column; gap: 8px; }
+  .message { max-width: 85%; padding: 8px 11px; border-radius: 4px; line-height: 1.4; white-space: pre-wrap; word-wrap: break-word; font-size: 15px; }
+  .you { align-self: flex-end; background: rgba(var(--accent-rgb), 0.12); border: 1px solid rgba(var(--accent-rgb), 0.35); }
+  .alfred { align-self: flex-start; background: var(--panel); border: 1px solid var(--border); }
+  .note { align-self: center; color: var(--muted); font: 12px var(--mono); text-align: center; }
+  form { display: flex; gap: 8px; align-items: center; padding: 8px 16px 12px; border-top: 1px solid var(--border); }
+  input[type=text] { flex: 1; min-width: 0; background: rgba(0,0,0,0.45); color: var(--text); border: 1px solid rgba(255,255,255,0.22); border-radius: 3px; padding: 11px 14px; font: inherit; }
+  button { background: rgba(6,9,12,0.7); color: var(--text); border: 1px solid rgba(255,255,255,0.22); border-radius: 3px; font: inherit; }
+  form button[type=submit], #approval .buttons button:last-child { background: var(--cyan); color: #000; border-color: var(--cyan); font: 600 11px var(--mono); letter-spacing: 0.15em; text-transform: uppercase; padding: 12px 14px; }
+  #mic { width: 64px; height: 64px; flex: none; border-radius: 50%; border: 2px solid var(--cyan); background: radial-gradient(circle, rgba(var(--accent-rgb), 0.3), rgba(6,9,12,0.9));
+    color: var(--text); font: 600 8.5px var(--mono); letter-spacing: 0.12em; line-height: 1.2; touch-action: none;
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  #mic.recording { background: var(--red); border-color: var(--red); animation: pulse 0.9s ease-in-out infinite alternate; }
+  @keyframes pulse { to { box-shadow: 0 0 22px var(--red); } }
+  #approval { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: none; place-items: center; background: rgba(3, 8, 13, 0.8); padding: 24px; z-index: 5; }
+  #approval.open { display: grid; }
+  #approval > div { background: #0b1015; border: 1px solid var(--cyan); border-radius: 4px; padding: 18px; max-width: 420px; width: 100%; }
+  #approval p { white-space: pre-wrap; line-height: 1.45; }
+  #approval .buttons { display: flex; gap: 10px; }
+  #approval .buttons button { flex: 1; padding: 12px; font-weight: 600; }
+  #unpaired { display: none; padding: 30px 22px; line-height: 1.6; }
+  body.unpaired #unpaired { display: block; }
+  body.unpaired #screen, body.unpaired form { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NOVA</h1>
+  <label><input id="speak" type="checkbox"> Speak</label>
+  <span id="dot" title="connection"></span>
+</header>
+<section id="unpaired">
+  <b>Not paired yet.</b><br>
+  On your PC, open Nova and turn on <b>PHONE</b>, then scan the QR code with the iPhone camera.
+  After it opens here, tap Share → <b>Add to Home Screen</b>.
+</section>
+<main id="screen">
+<section id="home">
+  <svg id="arcs" viewBox="0 0 370 190"></svg>
+  <canvas id="orb" aria-label="Nova"></canvas>
+</section>
+<div id="status"><i></i><b>NOVA</b> <span id="mode">connecting</span></div>
+<div id="caption">Hello.</div>
+<section id="widgets">
+  <div class="widget"><div class="label">Today</div><div id="clock">--:--</div><div class="small" id="date"></div></div>
+  <div class="widget"><div class="label">Weather</div><div class="big" id="weather">—</div><div class="small" id="place"></div></div>
+  <div class="widget"><div class="label">Agenda</div><div class="small" id="agenda">No timers.</div></div>
+  <div class="widget"><div class="label">Now playing</div><div id="music-row"><canvas id="disc" width="92" height="92"></canvas>
+    <div><div id="music-title" class="small" style="color:var(--text)">Nothing playing</div><div id="music-artist" class="small"></div></div></div></div>
+</section>
+<section id="log" aria-live="polite"></section>
+</main>
+<form id="ask">
+  <button type="button" id="mic" aria-label="Hold to talk to Nova" hidden>HOLD<br>TO TALK</button>
+  <input id="text" type="text" placeholder="Ask Nova…" autocomplete="off" enterkeyhint="send">
+  <button type="submit">Send</button>
+</form>
+<div id="approval" role="dialog" aria-modal="true">
+  <div>
+    <b style="color: var(--cyan)">Nova asks first</b>
+    <p id="question"></p>
+    <div class="buttons"><button id="no">No</button><button id="yes">Yes</button></div>
+  </div>
+</div>
+<script>
+  // The pairing token arrives in the #fragment of the QR link and is kept on this phone only.
+  const fromLink = new URLSearchParams(location.hash.slice(1)).get("token");
+  if (fromLink) localStorage.setItem("alfredToken", fromLink);
+  // Opening a new pairing link in an already open page only changes the #fragment: reload to use it.
+  addEventListener("hashchange", () => location.reload());
+  const token = localStorage.getItem("alfredToken");
+  const log = document.getElementById("log");
+  const dot = document.getElementById("dot");
+  const speakBox = document.getElementById("speak");
+  const $ = (id) => document.getElementById(id);
+  speakBox.checked = localStorage.getItem("alfredSpeak") === "1";
+  speakBox.onchange = () => localStorage.setItem("alfredSpeak", speakBox.checked ? "1" : "0");
+
+  async function api(path, body) {
+    const response = await fetch(path, {
+      method: body ? "POST" : "GET",
+      headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    if (response.status === 401) { document.body.classList.add("unpaired"); throw new Error("not paired"); }
+    if (!response.ok) throw new Error(`Nova answered ${response.status}`);
+    return response.json();
+  }
+
+  function show(text, kind) {
+    const bubble = document.createElement("div");
+    bubble.className = `message ${kind}`;
+    bubble.textContent = text;
+    log.append(bubble);
+    // chat scrolls into view; a note (e.g. after a launcher tap) must not scroll the launcher away
+    if (kind !== "note") $("screen").scrollTop = $("screen").scrollHeight;
+    return bubble;
+  }
+
+  function say(text) {
+    if (!speakBox.checked || !("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    speechSynthesis.speak(new SpeechSynthesisUtterance(text.replace(/[*#`_>]/g, "")));
+  }
+
+  // While Nova works on a request, check whether it needs a yes/no from us.
+  let waiting = false;
+  async function pollApprovals() {
+    if (!waiting) return;
+    try {
+      const pending = await api("/api/pending");
+      if (pending.id && !$("approval").classList.contains("open")) askApproval(pending);
+    } catch {}
+    setTimeout(pollApprovals, 1000);
+  }
+
+  function askApproval(pending) {
+    const box = $("approval");
+    $("question").textContent = pending.summary;
+    box.classList.add("open");
+    const answer = async (approved) => {
+      box.classList.remove("open");
+      await api("/api/answer", { id: pending.id, approved }).catch(() => {});
+    };
+    $("yes").onclick = () => answer(true);
+    $("no").onclick = () => answer(false);
+  }
+
+  async function ask(text) {
+    if (!text || waiting) return;
+    show(text, "you");
+    const thinking = show("…", "alfred");
+    waiting = true;
+    pollApprovals();
+    try {
+      const { reply } = await api("/api/chat", { text });
+      thinking.textContent = reply;
+      $("caption").textContent = reply;
+      say(reply);
+    } catch (error) {
+      thinking.textContent = `Couldn't reach Nova: ${error.message}. Is the PC on and Nova running?`;
+    } finally {
+      waiting = false;
+    }
+  }
+
+  $("ask").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $("text");
+    const text = input.value.trim();
+    input.value = "";
+    ask(text);
+  });
+
+  async function control(action) {
+    try {
+      const { message } = await api("/api/control", { action });
+      if (message) show(message, "note");
+    } catch (error) {
+      show(`Couldn't reach Nova: ${error.message}`, "note");
+    }
+  }
+
+  // ---------- the launcher: a ring of quick actions over Nova's sphere ----------
+  const ARCS = [["VOL−", () => control("volume_down")], ["PLAY", () => control("play_pause")], ["NEXT", () => control("next")],
+    ["CAMERA", () => control("creative")], ["WEATHER", () => ask("What's the weather today?")],
+    ["BRAIN", () => ask("What did I learn today? Use my second brain.")], ["STOP", () => control("stop")], ["VOL+", () => control("volume_up")]];
+  (function drawArcs() {
+    const svg = $("arcs"), cx = 185, cy = 190, inner = 128, outer = 178, from = Math.PI, to = 2 * Math.PI, gap = 0.012;
+    const point = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+    const step = (to - from) / ARCS.length;
+    ARCS.forEach(([label, run], index) => {
+      const a0 = from + index * step + gap, a1 = from + (index + 1) * step - gap;
+      const [x1, y1] = point(outer, a0), [x2, y2] = point(outer, a1), [x3, y3] = point(inner, a1), [x4, y4] = point(inner, a0);
+      const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+      group.setAttribute("class", "arc");
+      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      path.setAttribute("d", `M${x1} ${y1} A${outer} ${outer} 0 0 1 ${x2} ${y2} L${x3} ${y3} A${inner} ${inner} 0 0 0 ${x4} ${y4} Z`);
+      const middle = (a0 + a1) / 2, [tx, ty] = point((inner + outer) / 2, middle);
+      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+      text.setAttribute("x", tx); text.setAttribute("y", ty);
+      text.setAttribute("transform", `rotate(${(middle * 180) / Math.PI + 90} ${tx} ${ty})`);
+      text.textContent = label;
+      group.append(path, text);
+      group.addEventListener("click", () => { group.classList.add("hot"); setTimeout(() => group.classList.remove("hot"), 220); run(); });
+      svg.append(group);
+    });
+  })();
+
+  // ---------- live: what Nova is doing, the weather, timers and the song (from the PC, every 2 s) ----------
+  let latest = {}, musicKey = "", cover = new Image(), spin = 0, lastFrame = Date.now();
+  // the screen's mode -> the HUD core's mood (the core shows the line asleep and opens into the orb when she's awake)
+  const CORE_MODES = { asleep: "idle", armed: "armed", listen: "listen", think: "think", speak: "speak", act: "think",
+    error: "error", music: "idle" };
+  function showCore(data) {
+    if (!window.novaCore) return;
+    if (!data) { novaCore.setMode("offline"); return; }
+    novaCore.setAccent(data.accent || "255, 176, 64");
+    novaCore.setMode(CORE_MODES[data.mode] || "idle", data.mode === "act" ? "USING YOUR PC" : "");
+  }
+  const MODES = { asleep: "asleep", armed: "listening for “Hey Nova”", listen: "listening", think: "thinking", speak: "speaking",
+    act: "using your PC", error: "problem", music: "music" };
+  async function live() {
+    if (token && !document.hidden) {
+      try {
+        const data = await api(`/api/screen?music=${encodeURIComponent(musicKey)}`);
+        latest = data;
+        if (data.accent) document.documentElement.style.setProperty("--accent-rgb", data.accent);
+        showCore(data);
+        $("mode").textContent = MODES[data.mode] || data.mode || "online";
+        if (data.caption && !waiting) $("caption").textContent = data.caption;
+        $("weather").textContent = data.weather ? data.weather.short : "—";
+        $("place").textContent = data.weather ? data.weather.place : "Set your city in Nova";
+        const timers = data.timers || [];
+        $("agenda").textContent = timers.length ? timers.map((timer) => {
+          const left = Math.max(0, Math.round((timer.ends - Date.now()) / 1000));
+          return `${timer.label || "Timer"} · ${timer.done ? "done" : `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`}`;
+        }).concat(data.reminders || []).join("\n") : ((data.reminders || []).join("\n") || "No timers or reminders.");
+        const music = data.music;
+        $("music-title").textContent = music ? music.title : "Nothing playing";
+        $("music-artist").textContent = music ? music.artist : "";
+        if (music && music.cover !== undefined) { musicKey = music.key; cover = new Image(); if (music.cover) cover.src = music.cover; }
+        if (!music) musicKey = "";
+      } catch { showCore(null); }
+    }
+    setTimeout(live, 2000);
+  }
+
+  function tick() {
+    const now = new Date();
+    $("clock").textContent = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+    $("date").textContent = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+  }
+  setInterval(tick, 1000); tick();
+
+  // The song's cover spinning; and, only where the HUD's core can't run (no ES modules), a simple sphere instead.
+  const sphereAfter = performance.now() + 1500; // the core module normally arrives well before this
+  function draw() {
+    requestAnimationFrame(draw);
+    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim();
+    if (!window.novaCore && performance.now() > sphereAfter) drawSphere(accent);
+    drawDisc(accent);
+  }
+
+  function drawSphere(accent) {
+    // from page load: canvas arc angles are 32-bit floats, so Date.now()/1000 (~2e9) would round the rings' sweep to nothing
+    const canvas = $("orb"), t = performance.now() / 1000;
+    if (canvas.width !== 520) { canvas.width = 520; canvas.height = 600; }
+    const c = canvas.getContext("2d"), size = 380, mid = 260, midY = 276;
+    const mode = latest.mode || "asleep";
+    const speed = mode === "think" ? 1.6 : mode === "speak" ? 0.7 : mode === "asleep" ? 0.15 : 0.4;
+    const glow = mode === "asleep" ? 0.4 : mode === "speak" ? 0.75 + 0.25 * Math.sin(t * 9) : 0.85;
+    const radius = size * 0.3 * (mode === "speak" ? 1 + 0.03 * Math.sin(t * 9) : 1);
+    c.clearRect(0, 0, 520, 600);
+    c.save(); c.translate(0, midY - mid);
+    const gradient = c.createRadialGradient(mid, mid, radius * 0.1, mid, mid, radius * 1.4);
+    gradient.addColorStop(0, `rgba(${accent}, ${0.35 * glow})`); gradient.addColorStop(1, `rgba(${accent}, 0)`);
+    c.fillStyle = gradient; c.beginPath(); c.arc(mid, mid, radius * 1.4, 0, Math.PI * 2); c.fill();
+    c.lineWidth = 1.6;
+    for (let k = 0; k < 8; k++) {
+      const angle = t * speed + (k * Math.PI) / 8;
+      c.strokeStyle = `rgba(${accent}, ${0.2 + 0.45 * glow * Math.abs(Math.sin(angle))})`;
+      c.beginPath(); c.ellipse(mid, mid, Math.max(1, Math.abs(Math.cos(angle)) * radius), radius, 0, 0, Math.PI * 2); c.stroke();
+    }
+    for (let j = 1; j < 5; j++) {
+      const y = -radius + (2 * radius * j) / 5, w = Math.sqrt(radius * radius - y * y);
+      c.strokeStyle = `rgba(${accent}, ${0.28 * glow})`;
+      c.beginPath(); c.ellipse(mid, mid + y, w, w * 0.18, 0, 0, Math.PI * 2); c.stroke();
+    }
+    c.lineWidth = 5;
+    for (let r = 0; r < 2; r++) {
+      const start = t * speed * (r ? -1.3 : 1) + r * 2.1;
+      c.strokeStyle = `rgba(${accent}, ${0.4 + 0.4 * glow})`;
+      c.beginPath(); c.arc(mid, mid, radius * (1.2 + r * 0.12), start, start + 1.4); c.stroke();
+    }
+    c.restore();
+  }
+
+  function drawDisc(accent) {
+    const disc = $("disc"), d = disc.getContext("2d"), elapsed = (Date.now() - lastFrame) / 1000;
+    lastFrame = Date.now();
+    if (latest.music && latest.music.playing) spin = (spin + elapsed * 3.46) % (Math.PI * 2);
+    d.clearRect(0, 0, 92, 92); d.save(); d.translate(46, 46); d.rotate(spin);
+    d.fillStyle = "#09090d"; d.beginPath(); d.arc(0, 0, 45, 0, Math.PI * 2); d.fill();
+    d.beginPath(); d.arc(0, 0, 25, 0, Math.PI * 2); d.clip();
+    if (cover.complete && cover.naturalWidth) d.drawImage(cover, -25, -25, 50, 50); else { d.fillStyle = `rgb(${accent})`; d.fillRect(-25, -25, 50, 50); }
+    d.restore(); d.fillStyle = "#040608"; d.beginPath(); d.arc(46, 46, 3, 0, Math.PI * 2); d.fill();
+  }
+  requestAnimationFrame(draw);
+
+  // ---------- talking: hold to talk (or tap, then tap again); 16 kHz mono, turned into text on the PC ----------
+  const mic = $("mic");
+  mic.hidden = !(navigator.mediaDevices && navigator.mediaDevices.getUserMedia); // needs HTTPS
+  let recording = null, starting = false, pressedAt = 0;
+
+  async function startRecording() {
+    // made before the first await, inside the touch: iOS only lets an audio context run when a touch starts it
+    const context = new (window.AudioContext || window.webkitAudioContext)();
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    } catch (error) { context.close(); throw error; }
+    if (context.state === "suspended") await context.resume().catch(() => {});
+    const source = context.createMediaStreamSource(stream);
+    const processor = context.createScriptProcessor(4096, 1, 1);
+    const chunks = [];
+    processor.onaudioprocess = (event) => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+    source.connect(processor);
+    processor.connect(context.destination);
+    recording = { stream, context, source, processor, chunks, timer: setTimeout(stopRecording, 30000) };
+    mic.classList.add("recording");
+  }
+
+  function wav(chunks, fromRate) {
+    const samples = new Float32Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) { samples.set(chunk, offset); offset += chunk.length; }
+    const ratio = fromRate / 16000, length = Math.floor(samples.length / ratio);
+    const buffer = new ArrayBuffer(44 + length * 2), view = new DataView(buffer);
+    const text = (at, value) => [...value].forEach((char, i) => view.setUint8(at + i, char.charCodeAt(0)));
+    text(0, "RIFF"); view.setUint32(4, 36 + length * 2, true); text(8, "WAVE"); text(12, "fmt ");
+    view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+    view.setUint32(24, 16000, true); view.setUint32(28, 32000, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+    text(36, "data"); view.setUint32(40, length * 2, true);
+    for (let i = 0; i < length; i++) {
+      // average the samples that fall into each 16 kHz slot (a simple low-pass before downsampling)
+      const start = Math.floor(i * ratio), end = Math.max(start + 1, Math.floor((i + 1) * ratio));
+      let sum = 0;
+      for (let j = start; j < end && j < samples.length; j++) sum += samples[j];
+      const value = Math.max(-1, Math.min(1, sum / (end - start)));
+      view.setInt16(44 + i * 2, value < 0 ? value * 0x8000 : value * 0x7fff, true);
+    }
+    return buffer;
+  }
+
+  async function stopRecording() {
+    if (!recording) return;
+    const { stream, context, source, processor, chunks, timer } = recording;
+    recording = null;
+    clearTimeout(timer);
+    mic.classList.remove("recording");
+    source.disconnect(); processor.disconnect();
+    stream.getTracks().forEach((track) => track.stop());
+    const audio = wav(chunks, context.sampleRate);
+    context.close();
+    const note = show("Listening on your PC…", "note");
+    try {
+      const response = await fetch("/api/voice", { method: "POST", body: audio,
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "audio/wav" } });
+      const { text, error } = await response.json();
+      note.remove();
+      if (!response.ok || !text) { show(error || "I didn't catch that. Try again.", "note"); return; }
+      ask(text);
+    } catch (error) {
+      note.textContent = `Couldn't reach Nova: ${error.message}`;
+    }
+  }
+
+  // Hold to talk, release to send. A quick tap starts it instead, and the next tap sends.
+  // Touch events where pointer events are missing (iOS before 13: old iPhones).
+  const [pressEvent, releaseEvent] = window.PointerEvent ? ["pointerdown", "pointerup"] : ["touchstart", "touchend"];
+  mic.addEventListener(pressEvent, async (event) => {
+    event.preventDefault();
+    if (recording) { stopRecording(); return; }
+    if (starting) return; // a second tap while the mic opens would open it twice and leave one on
+    starting = true;
+    pressedAt = Date.now();
+    try { await startRecording(); } catch (error) { show(`Microphone: ${error.message}`, "note"); } finally { starting = false; }
+  });
+  mic.addEventListener(releaseEvent, () => { if (recording && Date.now() - pressedAt > 350) stopRecording(); });
+
+  async function heartbeat() {
+    try { await api("/api/hello"); dot.classList.add("online"); } catch { dot.classList.remove("online"); }
+    setTimeout(heartbeat, 5000);
+  }
+
+  if (!token) document.body.classList.add("unpaired");
+  else { show(mic.hidden ? "Connected to Nova on your PC. Type, or tap 🎤 on the keyboard to talk."
+                         : "Connected to Nova on your PC. Hold the button to talk.", "note"); heartbeat(); live(); }
+</script>
+<script type="module">
+  // Nova's core, the same one as in the HUD on the PC: a glowing line with orbits while she sleeps, opening into the orb.
+  import { createCore } from "/core.js";
+  window.novaCore = createCore(document.getElementById("orb"));
+  document.body.classList.add("core");
+</script>
+</body>
+</html>

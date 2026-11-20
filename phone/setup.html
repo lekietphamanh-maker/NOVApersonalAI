@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#040608">
+<title>Set up Nova Lite</title>
+<style>
+  :root { --gold: #ffb040; --text: #e9eef2; --muted: #8a96a2; --ok: #5cf2b0; --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  html, body { margin: 0; background: radial-gradient(600px 400px at 50% 0%, rgba(255,176,64,0.1), transparent 70%), #040608; color: var(--text);
+    font: 16px/1.5 -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 28px 20px 40px; }
+  h1 { font-size: 18px; letter-spacing: 0.3em; margin: 0 0 4px; display: flex; align-items: center; gap: 10px; }
+  h1::before { content: ""; width: 12px; height: 12px; border: 2px solid var(--gold); border-radius: 50%; box-shadow: 0 0 10px var(--gold); }
+  .lead { color: var(--muted); margin: 0 0 22px; }
+  ol { padding: 0; margin: 0; list-style: none; counter-reset: step; }
+  li { counter-increment: step; border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; padding: 14px 16px 16px 50px; margin-bottom: 12px; position: relative; }
+  li::before { content: counter(step); position: absolute; left: 16px; top: 14px; width: 22px; height: 22px; border: 1px solid var(--gold);
+    color: var(--gold); font: 600 12px/22px var(--mono); text-align: center; }
+  li b { color: #fff; }
+  a.button { display: inline-block; margin-top: 10px; padding: 10px 14px; background: var(--gold); color: #000; text-decoration: none;
+    font: 600 12px var(--mono); letter-spacing: 0.15em; text-transform: uppercase; border-radius: 3px; }
+  .small { color: var(--muted); font-size: 13px; }
+  #status { font: 600 12px var(--mono); letter-spacing: 0.08em; margin-top: 8px; }
+  #status.ok { color: var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <h1>NOVA LITE</h1>
+  <p class="lead">One-time setup so your phone talks to Nova privately (HTTPS) and can use its microphone.</p>
+  <ol>
+    <li><b>Get Nova's certificate.</b>
+      <br><a class="button" id="certificate" href="/alfred-ca.crt">Download certificate</a>
+      <p class="small">iPhone: tap <b>Allow</b>, then open <b>Settings → Profile Downloaded → Install</b>.
+        Then <b>Settings → General → About → Certificate Trust Settings</b> and turn on <b>Alfred Local CA</b>.<br>
+        Android: <b>Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate</b>.<br>
+        It only works for addresses on your home network, so it can't be used to fake real websites.</p>
+    </li>
+    <li><b>Open Nova Lite.</b>
+      <br><a class="button" id="open" href="#">Open Nova Lite</a>
+      <p id="status" class="small">Checking the secure connection…</p>
+    </li>
+    <li><b>Keep it on your Home Screen.</b>
+      <p class="small">In Safari, tap <b>Share → Add to Home Screen</b> on the Nova Lite page.</p>
+    </li>
+  </ol>
+</main>
+<script>
+  const params = new URLSearchParams(location.hash.slice(1));
+  const appUrl = `https://${location.hostname}:${params.get("app") || "8766"}/#token=${encodeURIComponent(params.get("token") || "")}`;
+  document.getElementById("open").href = appUrl;
+  const status = document.getElementById("status");
+  // An opaque request succeeds only once the phone trusts Nova's certificate.
+  async function check() {
+    try {
+      await fetch(appUrl.split("#")[0] + "icon.png", { mode: "no-cors", cache: "no-store" });
+      status.textContent = "Secure connection works. Tap Open Nova Lite.";
+      status.className = "ok";
+    } catch {
+      status.textContent = "Not trusted yet: finish step 1, then come back here.";
+      setTimeout(check, 2500);
+    }
+  }
+  check();
+</script>
+</body>
+</html>

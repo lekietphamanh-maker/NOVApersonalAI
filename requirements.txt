@@ -1,0 +1,41 @@
+# Source-run requirements (build-only PyInstaller is listed for clarity).
+# Distribution builds bundle the Python runtime and these dependencies.
+vosk==0.3.45
+sounddevice==0.5.5
+soundcard==0.4.6
+numpy>=2.0
+cffi>=2.0
+mss==10.2.0
+Pillow>=11.0
+pywinauto==0.6.9
+pywin32==312
+winrt-runtime==4.1.0
+winrt-Windows.Foundation==4!10.0.28000.2957
+winrt-Windows.Foundation.Collections==4!10.0.28000.2957
+winrt-Windows.Graphics.Imaging==4!10.0.28000.2957
+winrt-Windows.Media.Control==4!10.0.28000.2957
+winrt-Windows.Media.Ocr==4!10.0.28000.2957
+winrt-Windows.Storage.Streams==4!10.0.28000.2957
+anthropic==2.9.0
+mediapipe==1.2.3
+opencv-python-headless==5.1.0.95
+qrcode==8.2
+# Build time only; package on a supported Python version for Windows x64.
+pyinstaller==6.22.0
+pystray==0.19.5
+cryptography==50.0.2
+bleak==3.1.0
+winrt-Windows.Devices.Bluetooth==4!10.0.28000.2957
+winrt-Windows.Devices.Bluetooth.Advertisement==4!10.0.28000.2957
+winrt-Windows.Devices.Bluetooth.GenericAttributeProfile==4!10.0.28000.2957
+winrt-Windows.Devices.Enumeration==4!10.0.28000.2957
+winrt-Windows.Devices.Geolocation==4!10.0.28000.2957
+winrt-Windows.Devices.Radios==4!10.0.28000.2957
+sherpa-onnx==2.0.1
+pypdf==6.17.0
+# The news desk (news_intel) reads RSS and Atom feeds; HTTP goes through httpx2, which anthropic already brings.
+feedparser==6.0.14
+# Nova's own browser, out of sight (web_tasks.py): drives the Edge already on the PC; no browser download.
+playwright==1.64.0
+# Telegram voice notes (Ogg Opus) are decoded on this PC for Whisper (telegram_remote.py); the wheel brings libsndfile.
+soundfile==0.13.1

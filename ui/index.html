@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="en" data-accent="gold">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Nova</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="hud.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="world.css">
+<script type="module" src="app.js"></script>
+</head>
+<body>
+<div class="backdrop" aria-hidden="true"></div>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">NOVA</span>
+    <span class="brand-sub" id="edition">LOCAL CORE</span>
+  </div>
+  <nav class="toolbar" aria-label="Nova panels">
+    <button class="box" data-pane="history">History</button>
+    <button class="box" data-pane="brief">Brief</button>
+    <button class="box" data-pane="tasks">Tasks</button>
+    <span class="toolbar-gap" aria-hidden="true"></span>
+    <button class="box" data-act="camera" title="Creative mode: webcam mirror with 3D objects">Camera</button>
+    <button class="box" data-act="screen" title="Screen assist, read the screen or a file">Screen</button>
+    <button class="box" data-act="map" title="Brainstorm map">Notes</button>
+    <button class="box" data-act="library" title="Your projects, repos and ideas by topic">Library</button>
+    <button class="box" data-act="world" title="What's happening on Earth: quakes, storms, fires, news">World</button>
+    <span class="toolbar-gap" aria-hidden="true"></span>
+    <button class="box" data-pane="settings">Settings</button>
+  </nav>
+</header>
+
+<aside class="readouts" aria-label="Status">
+  <dl class="readout"><dt>Core status</dt><dd id="ro-core">…</dd></dl>
+  <dl class="readout"><dt>Model</dt><dd id="ro-model">…</dd></dl>
+  <dl class="readout"><dt>Latency</dt><dd id="ro-latency">—</dd></dl>
+  <dl class="readout" id="ro-heart-row" hidden><dt>Heart rate</dt><dd id="ro-heart">—</dd></dl>
+  <dl class="readout" id="ro-weather-row" hidden><dt>Weather</dt><dd id="ro-weather">—</dd></dl>
+  <dl class="readout" id="ro-brain-row" hidden><dt>2nd brain</dt><dd id="ro-brain">—</dd></dl>
+  <div id="timers" class="timers"></div>
+</aside>
+
+<div id="tv-drop" hidden>Drop here to show it on the TV</div>
+<section class="music" id="music" hidden aria-label="Now playing" draggable="true">
+  <span class="music-label">Now playing</span>
+  <canvas id="music-disc" width="440" height="440"></canvas>
+  <b id="music-title"></b>
+  <span id="music-artist"></span>
+  <div class="music-controls">
+    <button class="box" id="music-previous" title="Previous">⏮</button>
+    <button class="box" id="music-play" title="Play / pause">❚❚</button>
+    <button class="box" id="music-next" title="Next">⏭</button>
+  </div>
+</section>
+
+<main class="stage">
+  <canvas id="core" aria-label="Nova status"></canvas>
+  <canvas id="mindmap" aria-label="Brainstorm map" hidden></canvas>
+  <div class="map-tools">
+    <button class="box small on" id="map-add" title="Tab adds a sub-idea to the selected one">+ Idea</button>
+    <button class="box small" id="map-outline-toggle">Outline</button>
+    <button class="box small" id="map-tidy" title="Put every idea back in its automatic place">Tidy up</button>
+    <button class="box small" id="map-undo" title="Ctrl+Z">Undo</button>
+    <button class="box small" id="map-redo" title="Ctrl+Y">Redo</button>
+    <button class="box small" id="map-export" title="Save a picture of the map">Export</button>
+    <button class="box small" id="map-copy" title="Copy the map as text">Copy text</button>
+    <button class="box small" id="map-close" title="Esc">Close map</button>
+    <span id="map-saved-state" class="map-saved"></span>
+  </div>
+  <aside id="map-note" class="map-note" hidden>
+    <h4 id="map-note-title"></h4>
+    <div id="map-colors" class="map-swatches" aria-label="Colour"></div>
+    <div id="map-icons" class="map-icons" aria-label="Icon"></div>
+    <input id="map-own-icon" class="map-own-icon" maxlength="16" placeholder="Or type / paste your own emoji (Win + .)" autocomplete="off">
+    <textarea id="map-note-text" placeholder="Notes for this idea: details, links, to-dos… (saved with the map)"></textarea>
+    <button id="map-link" class="box small" type="button" title="L">🔗 Link to another idea</button>
+  </aside>
+  <form id="map-quick" class="map-quick" autocomplete="off">
+    <span id="map-quick-where" class="map-quick-where"></span>
+    <input id="map-quick-text" placeholder="Type an idea and press Enter · paste many lines · “Idea > sub-idea”" maxlength="2000">
+    <button type="button" class="box small on" id="map-ask" title="Nova adds ideas about the selected idea, or the topic">✦ Ask Nova</button>
+  </form>
+  <p class="map-help">Double-click: new idea (on the core: rename the topic) · drag: move · drop on an idea: sub-idea · drop on the core: main idea ·
+    Tab: sub-idea · Enter: next idea · Shift+Enter while naming: name + next · F2: rename · Del: delete · Ctrl+Z: undo · wheel: zoom · drag empty space: pan</p>
+  <section class="captions" aria-live="polite">
+    <p id="heard"></p>
+    <p id="reply"></p>
+    <ol id="steps" class="steps" hidden></ol>
+    <div id="steps-actions" class="row steps-actions" hidden>
+      <button class="box small" id="step-next" title="Count this step as done">Next step</button>
+      <button class="box small" id="step-stop">Stop guide</button>
+    </div>
+  </section>
+</main>
+
+<section id="library" class="library" hidden aria-label="Library">
+  <header class="lib-head">
+    <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>LIBRARY</b><span id="lib-crumb" class="lib-crumb"></span></div>
+    <nav class="lib-shelves" aria-label="Shelves">
+      <button class="box small" data-shelf="topics" type="button">Topics</button>
+      <button class="box small" data-shelf="projects" type="button">Projects</button>
+      <button class="box small" data-shelf="ideas" type="button">Ideas</button>
+      <button class="box small" data-shelf="needs" type="button">Needs you<span id="lib-needs-count"></span></button>
+    </nav>
+    <label class="lib-search"><span aria-hidden="true">⌕</span><input id="lib-search" placeholder="SEARCH THE LIBRARY" maxlength="80" autocomplete="off" spellcheck="false"></label>
+    <span id="lib-counter" class="lib-counter"></span>
+    <button class="box small on" id="lib-add" type="button">+ New</button>
+    <button class="box small" id="lib-close" type="button" title="Esc">Close</button>
+  </header>
+  <div class="lib-stage" id="lib-stage">
+    <canvas class="lib-orbit" id="lib-orbit" aria-hidden="true"></canvas>
+    <div class="lib-track" id="lib-track"></div>
+    <button class="lib-arrow prev" id="lib-prev" type="button" aria-label="Previous">‹</button>
+    <button class="lib-arrow next" id="lib-next" type="button" aria-label="Next">›</button>
+    <div class="lib-flash" id="lib-flash" aria-live="polite"></div>
+  </div>
+  <nav class="lib-ruler" id="lib-ruler" aria-label="Cards"></nav>
+  <section class="lib-detail" id="lib-detail" aria-live="polite"></section>
+  <p class="lib-hint">✋ swipe: next · previous &nbsp;·&nbsp; ✊ hold: open &nbsp;·&nbsp; 👎 hold: back &nbsp;·&nbsp; ✌ hold: close &nbsp;·&nbsp; say “next”, “open 3”, “open robotics”, “back” &nbsp;·&nbsp; ← → Enter Esc</p>
+  <form class="lib-form" id="lib-form" hidden autocomplete="off">
+    <h3 id="lib-form-title">New project</h3>
+    <label class="field-label" for="lib-f-title">Title</label>
+    <input class="field" id="lib-f-title" name="title" maxlength="80" required>
+    <label class="field-label" for="lib-f-status">Status</label>
+    <select class="field" id="lib-f-status" name="status">
+      <option value="idea">Idea: not started yet</option><option value="building">Building</option>
+      <option value="shipped">Shipped</option><option value="paused">Paused</option>
+    </select>
+    <label class="field-label" for="lib-f-topic">Topic</label>
+    <input class="field" id="lib-f-topic" name="topic" list="lib-topics" maxlength="80" placeholder="e.g. AI, Game dev, Robotics">
+    <datalist id="lib-topics"></datalist>
+    <label class="field-label" for="lib-f-repo">Repo or folder</label>
+    <input class="field" id="lib-f-repo" name="repo" maxlength="400" placeholder="https://github.com/you/project or C:\Projects\…" spellcheck="false">
+    <label class="field-label" for="lib-f-next">Next step</label>
+    <input class="field" id="lib-f-next" name="next" maxlength="200" placeholder="The one thing to do next">
+    <label class="field-label" for="lib-f-note">Notes</label>
+    <textarea class="field" id="lib-f-note" name="note" rows="6" maxlength="4000" placeholder="What it is, the stack, links, what's left…"></textarea>
+    <p class="muted small">Saved as a note in your second brain (library folder), so Obsidian shows it and your laptop gets it too.</p>
+    <div class="row end"><button type="button" class="box danger" id="lib-delete" hidden>Delete</button>
+      <button type="button" class="box" id="lib-cancel">Cancel</button><button type="submit" class="box on">Save</button></div>
+  </form>
+</section>
+
+<section id="world" class="world" hidden aria-label="World">
+  <header class="lib-head">
+    <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>WORLD</b><span class="lib-crumb">live</span></div>
+    <nav class="lib-shelves" aria-label="Time range">
+      <button class="box small" data-world-days="1" type="button">24 h</button>
+      <button class="box small" data-world-days="7" type="button">7 days</button>
+    </nav>
+    <span id="world-status" class="lib-counter world-status" aria-live="polite"></span>
+    <button class="box small" id="world-refresh" type="button">Refresh</button>
+    <button class="box small" id="world-close" type="button" title="Esc">Close</button>
+  </header>
+  <div class="world-body">
+    <div class="world-stage">
+      <canvas id="world-globe" aria-label="Globe with world events (the list beside it has the same events)"></canvas>
+      <div id="world-card" class="world-card" hidden aria-live="polite"></div>
+    </div>
+    <aside class="world-side" aria-label="Layers and events">
+      <div id="world-layers" class="world-layers"></div>
+      <ul id="world-list" class="world-list"></ul>
+      <p class="muted small">USGS earthquakes, GDACS alerts, NASA EONET storms, fires and volcanoes, and your news desk's stories placed on their country. Only plain requests go out: nothing about you.</p>
+    </aside>
+  </div>
+  <p class="lib-hint">drag: turn &nbsp;·&nbsp; scroll: zoom &nbsp;·&nbsp; click a dot: the story &nbsp;·&nbsp; say “what's happening in the Middle East this week?” &nbsp;·&nbsp; Esc</p>
+</section>
+
+<aside id="drawer" class="drawer" aria-hidden="true">
+  <header class="drawer-head">
+    <div class="tabs" role="tablist">
+      <button class="tab" data-pane="history" role="tab">History</button>
+      <button class="tab" data-pane="brief" role="tab">Brief</button>
+      <button class="tab" data-pane="tasks" role="tab">Tasks</button>
+      <button class="tab" data-pane="notes" role="tab">Notes</button>
+      <button class="tab" data-pane="settings" role="tab">Settings</button>
+    </div>
+    <button class="icon-button" id="drawer-close" aria-label="Close panel">✕</button>
+  </header>
+
+  <section class="pane" id="pane-history">
+    <div id="chat" class="chat"></div>
+  </section>
+
+  <section class="pane" id="pane-brief">
+    <div id="brief-setup" class="card">
+      <h3>Daily brief</h3>
+      <p class="muted">Each day Nova collects the headlines from your news sites (through Google News), news on what you're into, new GitHub repos you may like,
+        Hacker News and something from history. Ask “Hey Nova, what's new today?”</p>
+      <label class="field-label" for="interest-input">Your interests</label>
+      <div class="chips" id="interests"></div>
+      <input id="interest-input" class="field" placeholder="Add one and press Enter, e.g. game dev" maxlength="60">
+      <div class="suggestions" id="interest-suggestions"></div>
+      <label class="field-label" for="outlet-input">Headlines from</label>
+      <div class="chips" id="outlets"></div>
+      <input id="outlet-input" class="field" placeholder="Add a news site, e.g. reuters.com, and press Enter" maxlength="200" autocomplete="off" spellcheck="false">
+      <div class="suggestions" id="outlet-suggestions"></div>
+      <label class="field-label" for="brief-region">News from</label>
+      <select id="brief-region" class="field">
+        <option value="US">United States</option><option value="UK">United Kingdom</option>
+        <option value="AU">Australia</option><option value="VN">Việt Nam (tiếng Việt)</option>
+      </select>
+      <div class="row">
+        <button class="box" id="brief-toggle">Turn on</button>
+        <button class="box" id="brief-refresh">Refresh now</button>
+      </div>
+    </div>
+    <div class="card" id="news-desk">
+      <h3>News desk</h3>
+      <p class="muted small" id="news-info"></p>
+      <div class="row wrap"><button class="box" id="news-toggle">Turn on</button>
+        <button class="box" id="news-run" hidden>Collect now</button></div>
+      <p class="status-line" id="news-status"></p>
+      <div class="row"><input id="news-key" class="field" type="password" maxlength="80" autocomplete="off"
+          placeholder="GNews API key (free at gnews.io, optional)">
+        <button class="box" id="news-key-save">Save key</button>
+        <button class="box" id="news-key-forget" hidden>Remove</button></div>
+      <div class="row"><input id="news-query" class="field" maxlength="200" placeholder="Search the news: a company, person or topic" autocomplete="off">
+        <select id="news-days" class="field news-days"><option value="1">Today</option><option value="7">7 days</option>
+          <option value="30">30 days</option><option value="365">A year</option></select></div>
+      <select id="news-category" class="field"><option value="">All topics</option></select>
+      <div id="news-results" class="news-results"></div>
+    </div>
+    <div id="brief-content"></div>
+  </section>
+
+  <section class="pane" id="pane-tasks">
+    <ul id="tasks" class="list"></ul>
+    <p class="muted small">Ask Nova to add a task.</p>
+    <h3>Reminders</h3>
+    <ul id="reminders" class="list"></ul>
+    <h3>Skills</h3>
+    <p class="muted small" id="skills-info">Tasks written down once in your vault (skills/). Say a skill's phrase, press Run, or let its schedule run it; results go to outputs/.</p>
+    <ul id="skills" class="list skills"></ul>
+    <div class="row wrap"><button class="box" id="skills-suggest">Suggest skills from my last 30 days</button>
+      <button class="box" id="outputs-open">Open outputs</button></div>
+    <h3>Discover</h3>
+    <p class="muted small" id="discover-info"></p>
+    <ul id="discover-offers" class="list"></ul>
+    <ul id="discover" class="list"></ul>
+    <div class="row wrap"><button class="box" id="discover-refresh">Find new ones</button></div>
+    <details class="sub"><summary>Tune Discover</summary>
+      <label class="field-label" for="discover-user">Your GitHub username (your repos and stars shape the picks)</label>
+      <div class="row"><input id="discover-user" class="field" maxlength="39" autocomplete="off" spellcheck="false" placeholder="username">
+        <button class="box" id="discover-user-save">Save</button></div>
+      <label class="field-label" for="discover-token">GitHub token (optional, only raises GitHub's rate limit; no scopes needed)</label>
+      <div class="row"><input id="discover-token" class="field" type="password" maxlength="300" autocomplete="off" placeholder="ghp_… or github_pat_…">
+        <button class="box" id="discover-token-save">Save</button><button class="box" id="discover-token-forget" hidden>Remove</button></div>
+    </details>
+    <h3>Reverse engineering</h3>
+    <p class="muted small" id="reverse-info"></p>
+    <div class="row wrap"><button class="box" id="reverse-toggle">Turn on</button></div>
+  </section>
+
+  <section class="pane" id="pane-notes">
+    <p class="muted small">The map fills the screen while this panel is open. Click an idea on it to edit that line.</p>
+    <label class="field-label" for="map-title">Topic</label>
+    <input id="map-title" class="field" maxlength="80">
+    <label class="field-label" for="map-outline">Ideas, one per line · “Idea > sub-idea” or indent to branch</label>
+    <textarea id="map-outline" class="field" rows="10"></textarea>
+    <label class="field-label" for="map-saved">Your maps (saved as you go)</label>
+    <select id="map-saved" class="field"></select>
+    <div class="row wrap">
+      <button class="box" id="map-new">New map</button>
+      <button class="box danger" id="map-delete">Delete this map</button>
+    </div>
+    <p class="muted small">Say “Hey Nova, brainstorm ideas for …” and Nova fills the map itself, or “visualize my idea: …”, “add … to the map”, “remove … from the map”, “rename the map to …”. Saved on this PC.</p>
+  </section>
+
+  <section class="pane" id="pane-settings">
+    <details class="card downloads" id="downloads">
+      <summary><span class="folder" aria-hidden="true"></span>Need to <span id="downloads-count" class="downloads-count"></span></summary>
+      <p class="muted small">What to download, and how to set up everything else: Google, Claude, your Claude apps, Telegram, your iPhone, TV, iPad, fitness band and second laptop, updates, Discover and reverse engineering.</p>
+      <details class="sub" id="need-download" open>
+        <summary><span class="folder" aria-hidden="true"></span>Download</summary>
+        <ul id="downloads-list" class="downloads-list"></ul>
+        <p class="muted small">Everything runs on this PC once it's downloaded. Optional ones are only for the feature they name.</p>
+      </details>
+      <details class="sub" id="need-iphone">
+        <summary><span class="folder" aria-hidden="true"></span>iPhone · Nova Lite <span class="need-state" id="need-iphone-state"></span></summary>
+        <ol class="need-steps">
+          <li>Click <b>iPhone pairing code</b> below (it turns PHONE on). If Windows asks about networks, allow <b>Private networks</b>.</li>
+          <li>Point the iPhone camera at the code and open the link. The phone and this PC must be on the same Wi-Fi.</li>
+          <li>Tap <b>Download certificate</b> → Allow. Then iPhone <b>Settings → Profile Downloaded → Install</b>, and <b>General → About → Certificate Trust Settings</b> → turn on <b>Alfred Local CA</b> (once).</li>
+          <li>Back on the page: <b>Open Nova Lite</b> → <b>Share → Add to Home Screen</b>.</li>
+          <li>Put it on a stand with its charger; <b>Display &amp; Brightness → Auto-Lock → Never</b>. Hold to talk on it like here.</li>
+        </ol>
+        <div class="row"><button class="box on" id="phone-pair">iPhone pairing code</button></div>
+      </details>
+      <details class="sub" id="need-google">
+        <summary><span class="folder" aria-hidden="true"></span>Google · Gmail, Calendar, Drive <span class="need-state" id="need-google-state"></span></summary>
+        <ol class="need-steps">
+          <li>Open <b>console.cloud.google.com</b> with your Google account → <b>Select a project → New project</b> (any name, e.g. Nova).</li>
+          <li><b>APIs &amp; Services → Library</b>: enable the <b>Gmail API</b>, the <b>Google Calendar API</b> and the <b>Google Drive API</b>.</li>
+          <li><b>APIs &amp; Services → OAuth consent screen</b> (Google Auth Platform): <b>Get started</b>, app name Nova, your email, audience <b>External</b>. Under <b>Audience → Test users</b>, add your own Gmail address.</li>
+          <li><b>Clients → Create client</b> → type <b>Desktop app</b> → <b>Create</b> → <b>Download JSON</b>.</li>
+          <li>Save that file as <code id="need-google-path">%LOCALAPPDATA%\Alfred\google_client.json</code> (create the Alfred folder if it isn't there).</li>
+          <li>Click <b>Connect Google</b>. In the browser, pick your account; on “Google hasn't verified this app” click <b>Continue</b> (it's your own app), and tick Gmail, Calendar and Drive.</li>
+          <li>Connected before Calendar or Drive came? Click <b>Add Google Calendar</b> / <b>Add Google Drive</b> in Settings → Connections to allow the new part.</li>
+          <li>Ask: “any new mail?”, “draft a reply to number 2”, “what's on Friday?”, “add dentist Friday at 3”, “find my budget in Drive”, “read file 1”. Mail is only ever drafted, never sent; Drive is read-only.</li>
+        </ol>
+        <div class="row"><button class="box on" id="need-google-connect">Connect Google</button></div>
+      </details>
+      <details class="sub" id="need-claude">
+        <summary><span class="folder" aria-hidden="true"></span>Claude · Nova's online brain <span class="need-state" id="need-claude-state"></span></summary>
+        <h4>On your Claude plan (no API credit)</h4>
+        <ol class="need-steps">
+          <li>Install <b>Claude Code</b>: in PowerShell run <code>irm https://claude.ai/install.ps1 | iex</code> (or get it from claude.com/product/claude-code).</li>
+          <li>Open a new terminal, run <code>claude</code> once and sign in with your Claude account (Pro or Max). Close it with <code>/exit</code>.</li>
+          <li>In Settings → Nova's brain choose <b>Claude</b> (or Auto), and <b>Pay with: My Claude plan</b>. It counts toward your plan's usage limit; at the limit the AI on this PC answers.</li>
+        </ol>
+        <h4>Or with an API key</h4>
+        <ol class="need-steps">
+          <li><b>console.anthropic.com → API keys → Create key</b>, and add a little credit under Billing.</li>
+          <li>Settings → Nova's brain → <b>Pay with: An API key</b>, paste it and click <b>Save key</b>. It stays on this PC.</li>
+        </ol>
+        <h4>Your claude.ai Gmail and Google Drive connectors</h4>
+        <ol class="need-steps">
+          <li>On <b>claude.ai → Settings → Connectors</b>, connect <b>Gmail</b> and <b>Google Drive</b> with the same Claude account Claude Code signed in with.</li>
+          <li>Settings → Nova's brain → tick <b>Also let Claude use my claude.ai Gmail and Google Drive</b> (plan only). Claude then reads, searches and drafts with them; Nova blocks sending, sharing and deleting.</li>
+        </ol>
+      </details>
+      <details class="sub" id="need-claude-apps">
+        <summary><span class="folder" aria-hidden="true"></span>Your Claude apps · Nova's Gmail and Drive <span class="need-state" id="need-claude-apps-state"></span></summary>
+        <p class="muted small">Give Claude Code and Claude Desktop on this PC Nova's Gmail and Google Drive tools (read mail, save drafts, search and read Drive) over MCP, through Nova's own Google sign-in. Only this PC can reach it, with a private key.</p>
+        <ol class="need-steps">
+          <li>Connect Google first (the Google folder above).</li>
+          <li>Click <b>Turn on</b> below. Nova keeps serving it while it runs (keep Nova in the tray).</li>
+          <li><b>Claude Code:</b> click <b>Copy</b> next to the Claude Code command, paste it in a terminal and press Enter. Check with <code>claude mcp list</code>: <b>nova-google</b> shows as connected.</li>
+          <li><b>Claude Desktop:</b> needs Node.js (nodejs.org, LTS). In Claude Desktop: <b>Settings → Developer → Edit Config</b>, put the copied block's <b>nova-google</b> entry inside <code>"mcpServers"</code> (or paste the whole block into an empty file), save, and restart Claude Desktop.</li>
+          <li>Ask your Claude app “check my unread mail with nova-google” or “find my notes on X in Drive”. It asks you before each tool.</li>
+          <li><b>New key</b> shuts out every app set up with the old one; paste the new setup into the apps you still use.</li>
+        </ol>
+        <p class="muted small" id="google-mcp-info"></p>
+        <div id="google-mcp-setup" hidden>
+          <label class="field-label" for="google-mcp-code">Claude Code command</label>
+          <div class="row"><input id="google-mcp-code" class="field" readonly spellcheck="false">
+            <button class="box" data-copy="#google-mcp-code">Copy</button></div>
+          <label class="field-label" for="google-mcp-desktop">Claude Desktop (claude_desktop_config.json)</label>
+          <textarea id="google-mcp-desktop" class="field" rows="7" readonly spellcheck="false"></textarea>
+          <div class="row"><button class="box" data-copy="#google-mcp-desktop">Copy</button></div>
+        </div>
+        <div class="row wrap"><button class="box on" id="google-mcp-toggle">Turn on</button>
+          <button class="box" id="google-mcp-new-key" hidden>New key</button></div>
+      </details>
+      <details class="sub" id="need-telegram">
+        <summary><span class="folder" aria-hidden="true"></span>Telegram · Nova from anywhere <span class="need-state" id="need-telegram-state"></span></summary>
+        <ol class="need-steps">
+          <li>In Telegram, open <b>@BotFather</b> → <b>/newbot</b>, give it a name, and copy the token it sends (123456789:AA…).</li>
+          <li>Paste the token below and click <b>Save token</b>, then turn <b>Telegram</b> on.</li>
+          <li>Open your new bot in Telegram and send it the <b>pairing code</b> shown here. From then on it answers only you.</li>
+          <li>Text it or send a voice note from anywhere. Your PC has to be on and awake (Nova runs on it).</li>
+        </ol>
+        <p class="muted small" id="telegram-info"></p>
+        <p class="small" id="telegram-code-row" hidden>Pairing code: <b id="telegram-code"></b></p>
+        <div class="row"><input id="telegram-token" class="field" type="password" maxlength="80" autocomplete="off"
+            placeholder="Bot token from @BotFather (123456789:AA…)">
+          <button class="box" id="telegram-token-save">Save token</button></div>
+        <div class="row wrap"><button class="box on" id="telegram-toggle">Turn Telegram on</button>
+          <button class="box" id="telegram-unpair" hidden>Unpair my account</button>
+          <button class="box" id="telegram-token-forget" hidden>Remove token</button></div>
+        <h4>Even with the PC off (free Cloudflare relay)</h4>
+        <ol class="need-steps">
+          <li>Make a free account at <b>dash.cloudflare.com</b> (no card needed).</li>
+          <li><b>My Profile → API Tokens → Create Token → Edit Cloudflare Workers</b> template → <b>Continue → Create</b>. Copy it.</li>
+          <li>Paste it below, choose who answers while the PC is off, and click <b>Set up relay</b>. Nova uses the token once and doesn't keep it.</li>
+        </ol>
+        <p class="muted small" id="telegram-relay-info"></p>
+        <input id="telegram-cloudflare" class="field" type="password" maxlength="100" autocomplete="off"
+          placeholder="Cloudflare API token (used once, not kept)">
+        <label class="field-label" for="telegram-relay-brain">While the PC is off</label>
+        <select id="telegram-relay-brain" class="field">
+          <option value="claude">Claude Haiku answers (your API key; about a tenth of a cent a message)</option>
+          <option value="ollama">Ollama Cloud answers (free account; paste an ollama.com API key)</option>
+          <option value="none">Nobody: Nova just says the PC is off (reminders still come)</option>
+        </select>
+        <input id="telegram-relay-key" class="field" type="password" maxlength="300" autocomplete="off" hidden>
+        <div class="row wrap"><button class="box on" id="telegram-relay-setup">Set up relay</button>
+          <button class="box" id="telegram-relay-remove" hidden>Remove relay</button></div>
+      </details>
+      <details class="sub" id="need-tv">
+        <summary><span class="folder" aria-hidden="true"></span>TV</summary>
+        <ol class="need-steps">
+          <li>Turn PHONE on (the iPhone folder's first step does it).</li>
+          <li>Click <b>Show the links</b>, then open the TV address in the TV's web browser and bookmark it.</li>
+          <li>The TV shows a 4-digit code: click <b>Allow</b> on that code here. No browser on the TV? Mirror this PC instead (Win+K, Chromecast or HDMI).</li>
+          <li>Drag a reply (or a photo from Explorer) onto <b>Drop here to show it on the TV</b>, press <b>→ TV</b> on a reply, or say “Hey Nova, put that on the TV”.</li>
+        </ol>
+        <div class="row wrap"><button class="box on" id="screens-show">Show the links</button>
+          <button class="box" id="screens-forget">Forget TVs</button></div>
+        <p class="small" id="screens-info" hidden><b>TV:</b> open <code id="screens-tv"></code> in the TV's browser, then click Allow on the code it shows.</p>
+      </details>
+      <details class="sub" id="need-ipad">
+        <summary><span class="folder" aria-hidden="true"></span>iPad · control deck</summary>
+        <ol class="need-steps">
+          <li>Install Nova's certificate on the iPad first, as in the iPhone folder (step 3).</li>
+          <li>Click <b>Show the deck code</b> and scan it with the iPad camera, open it, then <b>Share → Add to Home Screen</b>.</li>
+          <li>Type on its keyboard: the letters go into the window in front on this PC. <b>Type</b> sends whole text in any language; the widgets show Nova, the time, the weather and your music.</li>
+        </ol>
+        <div class="row"><button class="box on" id="deck-show">Show the deck code</button></div>
+        <div id="deck-info" hidden><img id="screens-qr" alt="Deck code" width="160" height="160"></div>
+      </details>
+      <details class="sub" id="need-fitness">
+        <summary><span class="folder" aria-hidden="true"></span>Fitness band <span class="need-state" id="need-fitness-state"></span></summary>
+        <ol class="need-steps">
+          <li>Wear a band, watch or chest strap that shares heart rate over Bluetooth: Polar, Garmin (turn on <b>Broadcast heart rate</b>), Wahoo, Coros, many Amazfit and Xiaomi bands.</li>
+          <li>Turn Bluetooth on in Windows, then click <b>Connect heart rate</b>.</li>
+          <li>Ask “Hey Nova, how's my heart rate?”: live heart rate, average, lowest, highest and HRV.</li>
+        </ol>
+        <div class="row"><button class="box" id="heart-toggle">Connect heart rate</button></div>
+        <p id="heart-status" class="status-line"></p>
+      </details>
+      <details class="sub" id="need-updates">
+        <summary><span class="folder" aria-hidden="true"></span>Install and updates</summary>
+        <ol class="need-steps">
+          <li>Get <b>Nova-Setup.exe</b> from github.com/lekietphamanh-maker/NOVApersonalAI/releases/latest and run it. It installs for you only (no admin), with Start menu and desktop shortcuts. If SmartScreen warns, click <b>More info → Run anyway</b>.</li>
+          <li>Moving from a zip copy? Install the setup once; your settings, memory and models stay (they live in %LOCALAPPDATA%\Alfred).</li>
+          <li>Settings → Updates: tick <b>Check for new versions…</b>. Nova downloads new versions itself, checks their SHA-256 and waits for you to click <b>Restart to update</b>.</li>
+          <li>Something wrong after an update? <b>Install the previous version</b> rolls back.</li>
+        </ol>
+      </details>
+      <details class="sub" id="need-discover">
+        <summary><span class="folder" aria-hidden="true"></span>Discover · GitHub picks</summary>
+        <ol class="need-steps">
+          <li>BRIEF → <b>Your interests</b>: add up to four (they're what Discover searches for).</li>
+          <li>Tasks → Discover → <b>Tune Discover</b>: your GitHub username (your repos and stars shape the picks).</li>
+          <li>Optional: a token only raises GitHub's rate limit. <b>github.com/settings/personal-access-tokens → Generate new token</b>, public repositories, no permissions; paste it and click Save.</li>
+          <li><b>Add</b> on a pick has Claude Code (your plan) study it read-only at a pinned commit. If it suggests a skill, you read it and choose; nothing from GitHub is installed or run in Nova.</li>
+        </ol>
+      </details>
+      <details class="sub" id="need-reverse">
+        <summary><span class="folder" aria-hidden="true"></span>Reverse engineering · REA</summary>
+        <ol class="need-steps">
+          <li>Set up Claude Code (the Claude folder above).</li>
+          <li>Install <b>Node.js</b> 22.23 or newer (nodejs.org → LTS). Check in a new terminal: <code>node --version</code>.</li>
+          <li>Tasks → Reverse engineering → <b>Turn on</b>, and read what it does.</li>
+          <li>Say “reverse engineer &lt;app, site, file or folder&gt; and tell me how &lt;part&gt; works”. Only on things you're allowed to analyse. The report lands in outputs/ and the Library.</li>
+        </ol>
+      </details>
+      <details class="sub" id="need-ollama-cloud">
+        <summary><span class="folder" aria-hidden="true"></span>Ollama Cloud · free online brain</summary>
+        <ol class="need-steps">
+          <li>Make a free account at <b>ollama.com</b>.</li>
+          <li>Settings → Nova's brain → choose <b>Ollama Cloud</b>, then click <b>Sign in to Ollama</b> and approve this PC in the browser.</li>
+          <li>Free use has session and weekly limits; past them the AI on this PC answers.</li>
+        </ol>
+      </details>
+      <details class="sub" id="need-laptop">
+        <summary><span class="folder" aria-hidden="true"></span>Second laptop <span class="need-state" id="need-laptop-state"></span></summary>
+        <p class="muted small" id="pcs-info"></p>
+        <div class="row wrap" id="pcs-buttons"><button class="box" id="pcs-toggle">Turn on</button>
+        <button class="box" id="pcs-wiki" hidden>Write the wiki on this PC</button></div>
+        <ol class="need-steps" id="pcs-steps">
+        <li>Install Nova on the other PC too. It checks that PC's processor, graphics and memory and offers the model that suits it.</li>
+        <li>Install Syncthing on both PCs (free, PC to PC, no cloud): <b>SyncTrayzor</b> (GermanCoding's version), or in a terminal <code>winget install --id BillStewart.SyncthingWindowsSetup -e</code>.</li>
+        <li>In Syncthing on this PC: <b>Add Folder</b> → the vault folder above, then <b>Add Remote Device</b> with the other PC's ID and share the folder with it. Accept it on the other PC, into a new empty folder.</li>
+        <li>On the other PC: Settings → Second brain → set that folder as the vault, then turn this on there too.</li>
+      </ol>
+        <p class="muted small">On the laptop, Nova uses the same brain choice and the same Library; paste your Claude key there too if Claude answers.</p>
+      </details>
+    </details>
+    <div class="card">
+      <h3>Model</h3>
+      <p id="model-info" class="muted"></p>
+      <label class="field-label" for="model-select">Which model</label>
+      <select id="model-select" class="field"></select>
+      <div id="model-offer" class="offer" hidden>
+        <p id="model-offer-text"></p>
+        <button class="box on" id="model-offer-button">Download</button>
+      </div>
+      <dl class="facts" id="model-facts"></dl>
+      <details class="versions" id="versions">
+        <summary>Custom versions and comparing models</summary>
+        <p class="muted small">Make your own version of an installed model: its own instructions, temperature and context length, under a new name (nova-…). The original stays exactly as it is.</p>
+        <div class="row"><select id="version-base" class="field" aria-label="Start from"></select>
+          <input id="version-name" class="field" maxlength="40" placeholder="Name, e.g. study" autocomplete="off"></div>
+        <textarea id="version-system" class="field" rows="3" maxlength="4000" placeholder="Its own instructions (system prompt), optional"></textarea>
+        <div class="row"><input id="version-temp" class="field" type="number" step="0.1" min="0" max="2" placeholder="Temperature (0–2)">
+          <input id="version-ctx" class="field" type="number" step="1024" min="2048" max="32768" placeholder="Context (e.g. 8192)">
+          <button class="box on" id="version-create">Create</button></div>
+        <ul id="versions-list" class="memory-list"></ul>
+        <label class="field-label">Compare two models (Nova's 7 quick checks)</label>
+        <div class="row"><select id="compare-a" class="field" aria-label="First model"></select>
+          <select id="compare-b" class="field" aria-label="Second model"></select>
+          <button class="box" id="compare-run">Run checks</button></div>
+        <p class="small" id="compare-result"></p>
+      </details>
+      <h3>Nova's brain</h3>
+      <p class="muted small" id="answering-info"></p>
+      <label class="field-label" for="brain-choice">Who answers your questions</label>
+      <select id="brain-choice" class="field">
+        <option value="local">This PC: private, works offline</option>
+        <option value="auto">Auto: this PC for everyday, Claude (or Ollama Cloud) for hard questions</option>
+        <option value="claude">Claude: the best answers (online, on your Claude plan or an API key)</option>
+        <option value="free">Ollama Cloud: a big free model (online, free use is limited)</option>
+      </select>
+      <label class="field-label" for="private-topics">Before sending something online</label>
+      <select id="private-topics" class="field">
+        <option value="secrets">Passwords and mail: Nova asks you out loud first</option>
+        <option value="personal">Anything personal stays on this PC, without asking</option>
+      </select>
+      <label class="field-label">Who answered recently</label>
+      <ul id="answers" class="memory-list answers"></ul>
+      <h3>Claude</h3>
+      <p class="muted small" id="claude-info"></p>
+      <label class="field-label" for="claude-via">Pay with</label>
+      <select id="claude-via" class="field">
+        <option value="plan">My Claude plan, through Claude Code (no API credit)</option>
+        <option value="key">An API key (billed per question, starts a little faster)</option>
+      </select>
+      <label class="check" id="claude-connectors-row"><input type="checkbox" id="claude-connectors"> Also let Claude use my claude.ai Gmail and Google Drive connectors (read and draft only)</label>
+      <div class="row wrap" id="claude-buttons"><button class="box" id="claude-key-forget" hidden>Remove key</button></div>
+      <div class="row"><input id="claude-key" class="field" type="password" maxlength="300" autocomplete="off"
+          placeholder="Anthropic API key (sk-ant-…), from console.anthropic.com">
+        <button class="box" id="claude-key-save">Save key</button></div>
+      <label class="field-label" for="claude-model">Claude model</label>
+      <select id="claude-model" class="field"></select>
+      <label class="field-label" for="claude-effort">How hard Claude thinks</label>
+      <select id="claude-effort" class="field">
+        <option value="low">Low: quickest answers</option>
+        <option value="medium">Medium (default): quick and careful</option>
+        <option value="high">High: most careful, slower</option>
+      </select>
+      <h3>Ollama Cloud (free)</h3>
+      <p class="muted small" id="free-cloud-info"></p>
+      <div class="row wrap"><button class="box" id="free-cloud-signin">Sign in to Ollama</button></div>
+      <label class="field-label" for="free-cloud-model">Cloud model</label>
+      <div class="row"><input id="free-cloud-model" class="field" list="free-cloud-models" maxlength="80" autocomplete="off" spellcheck="false">
+        <button class="box" id="free-cloud-save">Save</button></div>
+      <datalist id="free-cloud-models">
+        <option value="gpt-oss:120b-cloud">default: strong all-rounder</option>
+        <option value="gpt-oss:20b-cloud">quickest</option>
+        <option value="deepseek-v3.1:671b-cloud">large, careful</option>
+        <option value="qwen3-coder:480b-cloud">code</option>
+        <option value="kimi-k2:1t-cloud">large</option>
+      </datalist>
+      <p id="vision-info" class="muted small"></p>
+      <button class="box" id="vision-button" hidden>Download vision model</button>
+    </div>
+    <div class="card">
+      <h3>Voice &amp; audio</h3>
+      <label class="field-label" for="audio-input">Microphone</label>
+      <select id="audio-input" class="field"></select>
+      <label class="field-label" for="audio-output">Speaker</label>
+      <select id="audio-output" class="field"></select>
+      <label class="field-label" for="audio-voice">Nova's voice</label>
+      <select id="audio-voice" class="field"></select>
+      <p id="whisper-info" class="muted small"></p>
+      <div class="row wrap">
+        <button class="box" id="test-mic">Test mic</button>
+        <button class="box" id="test-speaker">Test speaker</button>
+        <button class="box" id="test-voice">Test voice</button>
+        <button class="box" id="install-whisper" hidden>Install Whisper</button>
+        <button class="box on" id="audio-save">Save</button>
+      </div>
+      <p id="audio-status" class="status-line"></p>
+    </div>
+    <div class="card">
+      <h3>Gestures</h3>
+      <p class="muted small">Built in, with Gestures on: 👍 hold: volume up · 👎 hold: volume down · ✋ swipe: next / previous · ✊ hold: play / pause · ✌ hold: creative mode. In the Library: swipe moves, ✊ opens, 👎 goes back, ✌ closes.</p>
+      <label class="field-label">Your own gestures</label>
+      <ul id="gesture-list" class="memory-list"></ul>
+      <label class="field-label" for="gesture-name">Add one</label>
+      <input id="gesture-name" class="field" maxlength="30" placeholder="Its name, e.g. Rock on" autocomplete="off">
+      <div class="row">
+        <select id="gesture-pose" class="field" aria-label="Which hand pose">
+          <option value="record">My own hand pose (Nova records it)</option>
+          <option value="Pointing_Up">☝ Pointing up</option>
+          <option value="ILoveYou">🤟 Love-you sign</option>
+        </select>
+        <select id="gesture-action" class="field" aria-label="What it does"></select>
+      </div>
+      <input id="gesture-phrase" class="field" maxlength="200" placeholder="What to ask Nova, e.g. what's the weather today?" autocomplete="off" hidden>
+      <div class="row"><button class="box on" id="gesture-add">Record · hold your pose 3 s</button></div>
+      <p id="gesture-status" class="status-line"></p>
+    </div>
+    <div class="card">
+      <h3>You and Nova</h3>
+      <label class="field-label" for="owner-name">What should Nova call you?</label>
+      <input id="owner-name" class="field" maxlength="40" placeholder="Your name (optional)" autocomplete="off">
+      <h3>Location</h3>
+      <p class="muted small" id="location-info"></p>
+      <div class="row"><input id="location-city" class="field" maxlength="80" placeholder="Your city, e.g. Da Nang or Sydney, Australia" autocomplete="off">
+        <button class="box" id="location-save">Save</button></div>
+      <div class="row wrap"><button class="box" id="location-device">Use this PC's location</button>
+        <button class="box" id="location-forget" hidden>Forget my location</button></div>
+      <h3>Hotkeys</h3>
+      <div class="row wrap"><span class="muted small">Hold to talk</span> <b id="hotkey-talk">Ctrl+Alt</b>
+        <button class="box" id="hotkey-talk-change">Change</button>
+        <span class="muted small">Stop Nova</span> <b id="hotkey-stop">Esc</b>
+        <button class="box" id="hotkey-stop-change">Change</button>
+        <span class="muted small">Keep highlighted text</span> <b id="hotkey-clip">F9</b>
+        <button class="box" id="hotkey-clip-change">Change</button>
+        <span class="muted small">Answer yes</span> <b id="hotkey-yes">F8</b>
+        <button class="box" id="hotkey-yes-change">Change</button>
+        <span class="muted small">Answer no</span> <b id="hotkey-no">F10</b>
+        <button class="box" id="hotkey-no-change">Change</button>
+        <button class="box" id="hotkey-reset">Reset</button></div>
+      <p class="muted small" id="hotkey-help">Click Change, then press and release the new keys together (up to three).</p>
+      <h3>Second brain (Obsidian)</h3>
+      <p class="muted small" id="brain-info"></p>
+      <div class="row wrap"><button class="box" id="brain-toggle">Turn on</button>
+        <button class="box" id="brain-now" hidden>Sum up now</button>
+        <button class="box" id="brain-ingest" hidden title="Turn new files in raw/ into wiki pages">Ingest</button>
+        <button class="box" id="brain-open">Open in Obsidian</button></div>
+      <div class="row"><input id="brain-vault" class="field" maxlength="400" placeholder="Vault folder, e.g. C:\Users\you\Documents\Second Brain" autocomplete="off">
+        <button class="box" id="brain-vault-save">Save</button></div>
+      <label class="check"><input type="checkbox" id="brain-videos"> Also listen to videos and reels I watch (YouTube, Instagram, Facebook, TikTok) and write down what they say (needs Whisper)</label>
+      <p class="muted small">Never read (one per comma; window titles or app names containing these):</p>
+      <div class="row"><input id="brain-exclude" class="field" maxlength="2000" autocomplete="off">
+        <button class="box" id="brain-exclude-save">Save</button></div>
+      <h3>What Nova remembers</h3>
+      <p class="muted small"><span>Say “Hey Nova, remember …” to add, “forget …” to remove.</span> <span id="facts-where">Kept on this PC only.</span></p>
+      <ul id="facts" class="memory-list"></ul>
+    </div>
+    <div class="card">
+      <h3>Look</h3>
+      <div class="swatches" id="swatches">
+        <button data-accent="gold" aria-label="Gold"></button>
+        <button data-accent="cyan" aria-label="Cyan"></button>
+        <button data-accent="crimson" aria-label="Crimson"></button>
+        <button data-accent="violet" aria-label="Violet"></button>
+        <button data-accent="mint" aria-label="Mint"></button>
+      </div>
+    </div>
+    <div class="card" id="update-card">
+      <h3>Updates</h3>
+      <p class="muted small" id="update-info"></p>
+      <label class="check"><input type="checkbox" id="update-auto"> Check for new versions and download them by themselves (you still choose when to restart)</label>
+      <div class="row wrap"><button class="box" id="update-check">Check for updates</button>
+        <button class="box on" id="update-install" hidden>Restart to update</button>
+        <button class="box" id="update-rollback">Install the previous version</button>
+        <button class="box" id="update-page" hidden>What's new</button></div>
+    </div>
+    <div class="card">
+      <h3>Connections</h3>
+      <div class="row wrap">
+        <button class="box" id="gmail-toggle">Connect Gmail</button>
+        <button class="box on" id="calendar-connect" hidden>Add Google Calendar</button>
+        <button class="box on" id="drive-connect" hidden>Add Google Drive</button>
+      </div>
+      <label class="check"><input type="checkbox" id="mini-orb"> Show mini Nova in the bottom-left corner while you use other apps (drag it anywhere; it flares and warns you whenever Nova uses your mouse)</label>
+      <label class="check"><input type="checkbox" id="keep-running"> Keep Nova running in the tray when this window is closed, so “Hey Nova” still wakes it</label>
+      <p class="muted small" id="connections-info"></p>
+    </div>
+    <div class="card">
+      <h3>This PC</h3>
+      <div class="live-grid" id="pc-live">
+        <div><span>CPU</span><b id="live-cpu">—</b><i class="meter"><i id="live-cpu-bar"></i></i></div>
+        <div><span>RAM</span><b id="live-ram">—</b><i class="meter"><i id="live-ram-bar"></i></i></div>
+        <div><span>GPU</span><b id="live-gpu">—</b><i class="meter"><i id="live-gpu-bar"></i></i></div>
+        <div><span>VRAM</span><b id="live-vram">—</b><i class="meter"><i id="live-vram-bar"></i></i></div>
+      </div>
+      <p class="small" id="live-model"></p>
+      <div class="row wrap"><button class="box" id="model-load">Load model</button>
+        <button class="box" id="model-unload">Unload (free graphics memory)</button></div>
+      <p class="muted small" id="gpu-tip"></p>
+      <dl class="facts" id="system-facts"></dl>
+    </div>
+  </section>
+</aside>
+
+<footer class="statusbar">
+  <div class="status-left">
+    <div class="status-top">
+      <div class="meters"><span id="lvl">LVL --.- dB</span><span id="pk">PK --.- dB</span></div>
+      <p id="status-text" class="status-line"></p>
+    </div>
+    <div class="switches">
+      <button class="box small" data-switch="mic" title="Microphone: Nova listens for its name">Mic</button>
+      <button class="box small" data-switch="gestures" title="Webcam gestures: volume, next, play/pause, creative">Gestures</button>
+      <button class="box small" data-switch="phone" title="Nova Lite on your iPhone">Phone</button>
+      <button class="box small" data-switch="assist" title="Screen assist: Nova sees and works in your apps">Assist</button>
+    </div>
+  </div>
+  <form id="ask" class="ask" autocomplete="off">
+    <button type="button" class="icon-button" id="speak-toggle" aria-pressed="false" title="Speak replies">🔈</button>
+    <input id="text" placeholder="Ask Nova…   ( / )" maxlength="4000" enterkeyhint="send">
+    <button type="submit" class="box on" id="send">Send</button>
+  </form>
+  <div class="status-right">
+    <span id="model-chip" class="chip"></span>
+    <span id="clock" class="clock"></span>
+  </div>
+</footer>
+
+<div id="creative-layer" class="creative-layer" hidden>
+  <iframe id="creative-frame" title="Creative mode" allow="camera; fullscreen"></iframe>
+  <button class="box" id="creative-close">Close camera · Esc</button>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h2 id="modal-title"></h2>
+    <div id="modal-body" class="modal-body"></div>
+    <div id="modal-buttons" class="row end"></div>
+  </div>
+</div>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<div id="takeover" class="takeover" role="alert" hidden>⚠ NOVA IS USING YOUR MOUSE AND KEYBOARD · please don't touch them · <b>Esc</b> stops</div>
+<div id="offline" class="offline" hidden><p>NOVA IS NOT RUNNING</p><span>Start Nova again, or close this window.</span></div>
+<input id="file-input" type="file" accept=".txt,.md,.csv,.html,.json,.py,.log" hidden>
+</body>
+</html>

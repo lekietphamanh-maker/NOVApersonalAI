@@ -1,0 +1,143 @@
+## New in v2.5.0
+
+- **Nova has a new home**: github.com/lekietphamanh-maker/NOVApersonalAI. A Nova installed from the old repository can't see new versions: install **Nova-Setup.exe** from this release once (your settings, memory and models stay), and updates arrive by themselves from then on.
+- **World view** (the new WORLD button): a gold line globe with what's happening on Earth right now. It shows earthquakes (USGS), disaster alerts (GDACS), storms, wildfires and volcanoes (NASA EONET), and, with the news desk on, news and conflict stories on the country they're about. Drag to turn it, scroll to zoom, click a dot for the story and its source, and switch between the last 24 hours and 7 days. Ask "what's happening in the Middle East this week?" and Nova answers from it while the globe flies there. The feeds get plain requests only: nothing about you.
+- **Holograms with a Tron look** in creative mode: glowing wireframe edges over faint faces with drifting scan lines, on by default (**Look** switches back to solid, or press W). **Pinch a hologram twice quickly**, or double-click it, to take it apart into its pieces, and again to put it back. A 3D model you load takes the look too. "Make the holograms solid" works by voice.
+- **Fixed**: in v2.4.0 the switches *Also let Claude use my claude.ai Gmail and Google Drive connectors* and *Your Claude apps → Turn on* answered "Unknown action". They work now, and a new test checks that every button in Nova's window reaches something that runs it.
+- Under the hood, each tool now registers itself with what runs it (Calendar and Drive in their own files), so a new feature is added in one place.
+
+## New in v2.4.0
+
+- **Google Drive**: "find my budget in Drive", "what did I change in Drive lately?", "read file 2". Nova searches your Drive and reads Google Docs, Sheets, Slides, PDFs and text files, read-only: it never changes, shares or deletes anything. It uses the same Google sign-in as Gmail and Calendar; already connected? Turn on the **Google Drive API** for your Google Cloud project and click **Add Google Drive** in SETTINGS → Connections once.
+- **Your claude.ai Gmail and Google Drive inside Nova's Claude**: SETTINGS → Nova's brain → *Also let Claude use my claude.ai Gmail and Google Drive connectors*. When Claude answers on your plan, it can use the connectors you connected on claude.ai. Nova lets it read, search and draft only; sending mail and sharing, changing or deleting files are blocked.
+- **Nova's Gmail and Drive in your own Claude apps**: SETTINGS → Need to → *Your Claude apps* turns on a small MCP server on this PC only (with a private key), and gives you a one-line command for Claude Code and a ready block for Claude Desktop. Then Claude Code or Claude Desktop can read your unread mail, save drafts (never send) and search and read Drive through Nova's sign-in.
+- **Every setup in one place**: SETTINGS → Need to now has step-by-step folders for Google (Gmail, Calendar, Drive), Claude (plan, API key, connectors), your Claude apps, install and updates, Discover, reverse engineering and Ollama Cloud, beside the iPhone, Telegram, TV, iPad, fitness band and laptop ones. Node.js shows up in the Download list when something you turned on needs it.
+
+## In v2.3.0
+
+- **Discover** (TASKS → Discover): GitHub projects picked for you from your interests, and from your own repos and stars if you give your GitHub username. Each says why it was picked. **Not for me** teaches it what to skip; **Add to Nova** pins the project to its current commit, notes its license, and has Claude Code study it read-only and propose how Nova could use it: a skill (which you read and approve before it's added) or a project for Claude Code to build. Nothing from GitHub is ever installed into Nova or run. Say "what should I add to Nova?" or "add number 2" too.
+- **Holo deck, new layout**: the dial now sits on top, smaller, with Nova's latest words on its left and what's coming up (timers, reminders) on its right; the curved keyboard runs the full width underneath, so its keys are bigger. At rest the dial is big in the middle; swipe and it glides up as the keys rise from the bottom.
+- **Reverse engineering with REA** (TASKS → Reverse engineering, off until you turn it on): "reverse engineer Spotify and tell me how its sync works" runs REA (github.com/morluto/rea, pinned to rea-agents 6.9.0) through Claude Code on your plan, in the background. The report goes to outputs/ and your Library under Reverse engineering. It needs Claude Code and Node.js 22.23 or newer, and is only for software you're allowed to analyse.
+
+## In v2.2.0
+
+- **Install once, update forever**: new **Nova-Setup.exe** installs Nova for your Windows user (no admin), with a Start-menu entry, an optional desktop icon and an uninstaller. From now on Nova checks GitHub for new versions, downloads them in the background, checks each download's SHA-256 and asks you to **Restart to update**. SETTINGS → Updates turns it off, checks now, or installs the previous version if an update misbehaves. The zips are still there; a zip copy tells you when a new version is out.
+- **Nova's own icon** on the exe, the installer, the taskbar, shortcuts and the tray.
+- **Holo deck** (the iPad): it rests as a big round dial: Nova's orb in the middle, the time, weather, the song (with ⏮ ⏯ ⏭) and your timers around it, and an outer ring of shortcuts (copy, paste, undo, save, find, snip, files…). **Swipe** across it, or along the bar, and a curved 60% keyboard of glowing line-art keys slides in beside the dial (fn + 1…= for F1–F12, fn + I J K L for the arrows, fn + U / O for Home / End). **Hide keys**, or 3 minutes untouched, puts it away, so nothing types on your PC by accident. **Classic** in the header brings back the old flat layout.
+- **Google Calendar**: "what's on today?", "what's my week look like?", "add dentist Friday at 3". It uses the same Google sign-in as Gmail (SETTINGS → Connect Gmail and Calendar). Already connected Gmail? Click **Add Google Calendar** once.
+- **Fixed**: Gmail stopped working an hour after Nova started (Google's access token expired and was never renewed). It renews itself now.
+
+## In v2.1.0
+
+- **Telegram 24/7, even with the PC off**: SETTINGS → Telegram → *Even with the PC off* puts a small relay on your own free Cloudflare account in about 10 seconds (Nova uses your Cloudflare token once and doesn't keep it). When you shut the PC down, or it stops checking in for about 11 minutes, your bot keeps answering: Claude Haiku (your API key) or Ollama Cloud (free key) replies, knowing your name and what Nova remembers, and your reminders still arrive on time. With the PC off it can't use the PC, read files or hear voice notes. When the PC starts again, Nova takes Telegram back, adds what you said while it was off to the conversation, and doesn't repeat reminders the relay already sent.
+- **Telegram setup guide**: INSTALL.md part G walks through @BotFather, pairing and the relay, step by step.
+
+## In v2.0.0
+
+- **Claude on your Claude plan, no API credit**: Nova's everyday Claude answers now go through Claude Code on the subscription you already pay for (SETTINGS → Claude → Pay with: *My Claude plan*), the default whenever Claude Code is installed and signed in. Claude keeps all of Nova's tools (timers, reminders, web, notes, Library, builds) through a small connection inside Nova that only this PC can use. Answers start a few seconds later than with an API key; when your plan's limit is reached, the AI on your PC answers and Nova says why. You can still choose an API key instead. Screen jobs that send screenshots to Claude still use the API key; without one, the AI on your PC does them.
+- **Nova on Telegram, from anywhere**: make your own bot with @BotFather, paste its token in SETTINGS → Telegram, turn it on and send the bot the pairing code. From then on it answers only you: text or voice notes (heard on your PC, not kept), the same memory and tools, "send me the report on my desktop" sends the file, and with Screen assist on she can work the PC for you while you're out. When she needs a yes or no, she asks in the chat with two buttons. Nothing on your PC opens to the internet. Your PC has to be on; messages travel through Telegram's servers, so don't send passwords there.
+
+## In v1.9.0
+
+- **Reminders at a time**: "remind me at 5 pm to call mom", "every weekday at 8 remind me to stretch". Said out loud on time, listed in TASKS → Reminders (✕ cancels), on the iPad deck and Nova Lite, and kept across restarts; one that came due while the PC was off is said when Nova starts.
+- **Build mode**: "build me a portfolio website", "make a Python script that …": Claude Code builds it on your plan in `Documents\Nova Projects\<name>`, and Nova opens it when it's done. Say the same name again to change it. It can only write files in that folder and use git: no python, node, npm or pip commands, since any of those could run anything on your PC.
+
+## In v1.8.0
+
+- **Web jobs out of sight**: research, reading whole articles, comparing sites and simple web forms now happen in Nova's own browser, the Edge already on your PC running invisibly, so you keep your screen and mouse while she works. She reads the page (long ones in parts), follows links, fills fields by their labels, ticks boxes, picks options and presses buttons. Each time it is a fresh private session: your own Edge logins, cookies and history are never used, only web pages open, and password fields are never offered to her. Screen autopilot is still there for your own desktop apps.
+
+## In v1.7.1
+
+- **Long work always on your Claude plan**: Claude Code now runs on your signed-in Claude plan (Pro or Max) even when an Anthropic API key is set on the PC, so explainers and reports never use API credits.
+
+## In v1.7.0
+
+- **Skills**: a task written down once, as a note in your vault's `skills/`. Say its phrase ("plan my day"), press Run in TASKS → Skills, or let its schedule run it (daily, weekdays, weekly, monthly; a PC that was off catches up the same day). Four to start: Plan my day, Morning brief, Tidy my notes, Weekly review. Make more by voice ("make a skill that…"), or press **Suggest skills from my last 30 days**.
+- **outputs/**: every plan, brief, review and report a skill makes is saved as a dated note in your vault.
+- **Long work on Claude Code**: with Claude Code installed and signed in, big jobs (an explainer, a research report) run in the background on your Claude plan, read-only (your vault and the web), and Nova tells you when the result is in outputs/.
+
+## In v1.6.0
+
+- **Claude sees your screen, like HeyClicky**: with Claude set up (SETTINGS → Claude), screen jobs ("install this", "fill in this form", "do this homework") go to Claude, which gets a screenshot of the window at every step with every control's number drawn on it. It understands pictures, layouts, what is selected and error messages, and drives your mouse by those numbers. Only the newest screenshot is sent each step, and a long job (up to 300 steps) sends only its newest steps, to keep it quick and cheap.
+- The screenshots go to Anthropic and cost a little per step on your own API key. Without Claude, when you start with "privately", or with **SCREEN → See the screen with Claude → Turn off**, the AI on your PC does the job from the list of controls and nothing leaves your PC. If Claude can't be reached, the AI on your PC takes over.
+
+## In v1.5.1
+
+- **Answer keys**: when Nova asks yes or no, press **F8** for yes or **F10** for no instead of speaking (they only count while she is asking). Change them, like every Nova key (talk, stop, keep a highlight), in **SETTINGS → Hotkeys**.
+- Tidier code inside: Nova's question handling, screen steps and hotkeys were reorganized; nothing you use changed.
+
+## In v1.5.0
+
+- **Nova just does what you ask.** No question before any step on your PC: clicking, typing, keys, scrolling, opening programs and web addresses, web searches, saving a task or a library entry, a Gmail draft (never sent), changing your city. Money, sending and deleting included. Esc stops her at once. Only what would send your own words off this PC still asks (a password or mail question going online, "ask Claude"). A safety net is one click away: **SCREEN → Ask before risky steps**.
+- **Screen assist and the second brain are on by themselves** the first time this version runs, and stay on after restarts. They never read private windows, password managers, banking, calls and chats, or password fields (SETTINGS → Second brain has the list; you can add your own).
+- **Highlight, then F9**: select text with the mouse in any window and press F9 (SETTINGS → Hotkeys changes the key). Nova keeps exactly that text in `raw/clips`, folds it into the wiki, and gives your clipboard back as it was.
+- **Up to 300 steps** for one request (Nova sends the model the newest steps plus a digest of the earlier ones).
+- **Questions by voice, no pop-up**: when Nova still has to ask yes or no she says it out loud and you answer by voice (hold the talk key and say yes or no). She asks again after 25 seconds; no answer after 90 seconds is a no. SCREEN → Questions by voice → Turn off brings the pop-up back.
+- Everything the second brain watches is compressed first: only summaries and wiki pages are written, the raw screen text is dropped, and "What did I learn about …?" still finds it.
+
+## In v1.4.0
+
+- **Autopilot for screen assist**: turn Screen assist on once (SCREEN → Screen assist; you are asked one time and it stays on, also after a restart). Then "review this homework", "review this article" or "do this homework" makes Nova read all of it by herself, scrolling down the page, without asking, and "install ArtGuard" or "open notepad and type hello" makes her drive your real mouse and keyboard step after step with no OK at each step.
+- **More she can do**: double-click, right-click, scroll, and open a program, web address, file or folder. Up to 40 steps per request.
+- **What still asks you (out loud, yes or no)**: spending money, sending or posting, deleting or submitting, password, card or account-number fields, bank and payment pages, Shift+Delete, Alt+F4, and opening a script or a command shell. SCREEN → Autopilot → Turn off brings back the question before every step. Esc always stops her.
+- Windows won't let Nova click in a window that runs as administrator (an installer's permission box): press Yes yourself. A page can hold text written to trick an AI, so watch the screen while Nova works on something you don't trust.
+
+## In v1.3.1
+
+- **ABC News headlines are back**: Google News files ABC News under abcnews.com now, so "Headlines from" your sites found nothing for the old abcnews.go.com. Nova moves a saved abcnews.go.com to abcnews.com by itself; nothing to change.
+- **CNN through Google News**: CNN's own news feed hasn't been updated since 2023, so the news desk takes CNN from Google News (one of your sites by default).
+- **Steadier brief**: a news source that times out or is busy gets one more try before the brief gives up on it.
+- **Politer news desk**: when GDELT asks Nova to slow down, Nova waits longer and stops asking it for the rest of that run; the others carry on. A source that sends nothing now says what it sent instead.
+
+## In v1.3.0
+
+- **News desk** (BRIEF → News desk): every morning Nova collects the news from GNews (free key), GDELT and news sites, the AI on your PC summarizes and scores each article (facts, names, place, importance, which claims are only allegations), and keeps it in a searchable database. "What happened today?", "biggest tech news this week?", "latest on Nvidia?" get answers with title, publisher, date and link. Search it yourself in the same panel.
+- **Auto brain**: the AI on your PC answers everyday questions; hard ones (code, research, analysis, long questions) go to Claude or Ollama Cloud. **Who answered recently** shows which brain answered each request and why.
+- **This PC, live**: CPU, RAM, GPU and graphics memory, and where the model really runs as Ollama measures it, with Load / Unload. A Radeon RX 6600 XT that leaves the model on the processor gets the Vulkan fix.
+- **Custom model versions**: your own instructions, temperature and context on an installed model, saved as nova-…; compare two models with Nova's quick checks.
+
+## In v1.2.0
+
+- **Choose Nova's brain** (SETTINGS → Model): this PC, **Claude**, or **Ollama Cloud** (a big open model, free with an Ollama account). Offline, the AI on your PC answers.
+- **Only passwords and mail are private by default**: for those Nova asks out loud "Should I send it to Claude?"; say yes or no (No keeps it on your PC). Weather, news and everyday questions go to the brain you chose. The strict rule is one click away.
+- **Free web search for Claude**: searches go through DuckDuckGo from your PC instead of Claude's paid search.
+- **Library**: your projects, repos and ideas by topic on a gold 3D shelf, linked to your second brain; "Needs you" shows what to do next. Move it by voice ("next", "open 3", "open robotics", "back") or gestures.
+- **Your own gestures**: record a hand pose and choose what it does (music, the Library, stop Nova, or ask Nova something).
+- **Steadier hands in creative mode**: less jitter when still, no lag when moving fast.
+- **Headlines from your news sites**: NBC News, CNN and ABC News to start (BRIEF → Headlines from; add or remove any site), through Google News. A bad reply from a news site no longer breaks the brief.
+- **SETTINGS → Need to**: what's left to download, and how to set up the iPhone, TV, iPad, fitness band and laptop, all in one folder.
+
+## In v1.1.0
+
+- **Claude as Nova's online brain** (Desktop Edition, off until you turn it on): SETTINGS → Claude → Turn on, paste your Anthropic API key. While the PC is online Nova answers with Claude (default Claude Sonnet 5.5 at medium effort; Opus 5.5 or Haiku 5.5 and low/high effort in Settings), speaking while Claude writes and searching the web for anything current. Offline, and for anything personal (mail, notes, what she remembers, where you are, your screen, files, health, money, family, anything you start with "privately"), the AI on your PC answers. Nothing Nova keeps about you is sent to Claude. Your phone and TV use it through the PC; on a laptop, paste the key there too. Billed per question to your Anthropic account.
+- **One way of talking and thinking on both brains**: answer first, honest and direct, sure only when it's sure. The AI on your PC learns from Claude's recent answers and thinks before hard questions.
+- **Nova no longer asks where you are** when your city is saved; other cities' weather doesn't change yours.
+- **Everything to download** in one checklist in [INSTALL.md](https://github.com/lekietphamanh-maker/NOVApersonalAI/blob/main/INSTALL.md).
+
+## Install (Windows 10/11, 64-bit)
+
+Everything step by step (the PC, voice, the iPhone, TV and iPad, the second brain, a laptop):
+[INSTALL.md](https://github.com/lekietphamanh-maker/NOVApersonalAI/blob/main/INSTALL.md).
+
+**Desktop Edition**: uses the Ollama on this PC.
+1. Install [Ollama](https://ollama.com/download).
+2. Download **Nova-Desktop.zip** below and unzip it to a normal folder such as `C:\Nova` (not inside OneDrive).
+3. Double-click **Check Nova.bat**, then **Start Nova.bat**. Nova checks the PC's processor, graphics and memory and offers the model that suits it: click **Download**.
+
+**USB Edition**: carries its own Ollama and models.
+1. Download **Nova-USB.zip** and unzip it onto a USB drive formatted exFAT or NTFS with at least 16 GB free.
+2. On the drive, double-click **Prepare USB.bat** once (about 8.5 GB), or copy the `Ollama` folder from an older USB Edition into it.
+3. Double-click **Start Nova USB.bat**.
+
+## What's inside
+
+- **Nova's gold HUD**: asleep, a glowing line with orbits; say "Hey Nova" and it opens into the orb. Voice with a wake word you can interrupt, hold Ctrl+Alt to talk, natural voices (Kokoro, Piper) and Whisper as optional downloads in SETTINGS → Voice & audio.
+- **Screen assist**, **creative mode** (camera lenses, photo booth), **webcam gestures**, **music mode** (the cover spins as a disc), idea maps, timers, walkthroughs, a daily brief, weather and local news.
+- **Second brain** in Obsidian (off until you turn it on): notes of what you read and watch, summed up into linked topic pages.
+- **Other screens**: an old iPhone as Nova's companion (Nova Lite), the TV as Nova's dashboard, an iPad as a real keyboard for the PC with widgets.
+- **A laptop**: a second Nova that shares memory and the second brain with your PC through one folder synced with Syncthing (PC to PC, no cloud).
+- **Optional, Desktop only**: Claude (your API key) or Ollama Cloud (free account) as Nova's brain, Gmail read and drafts (never sends).
+
+## Tested
+
+On Windows in CI: unit tests, screen assist end to end, voices and Whisper downloads, real keys and text typed into a window from the deck's keyboard, the Claude brain through the real Anthropic SDK against a test server, the packaged app opening and connecting with the Claude SDK bundled. Not yet tried: a real Claude call (that's your key's first question), a real iPhone, iPad or TV, or two real PCs.

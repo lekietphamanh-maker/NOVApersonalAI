@@ -1,0 +1,208 @@
+# Tests Nova on real Windows (screen assist end to end, Whisper and Piper downloads, the daily brief's live
+# sources, creative-mode gestures, the HUD opening in Edge), builds the Desktop and USB Editions, tests the
+# packaged app, and publishes a release for v* tags.
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish, for example v1.0.0"
+        required: true
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  real-model:
+    # A real Ollama on Windows: Nova's own approved download, a real streamed answer, a tool call, vision.
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: start Ollama
+        run: |
+          $ProgressPreference = "SilentlyContinue"
+          Invoke-WebRequest https://github.com/ollama/ollama/releases/latest/download/ollama-windows-amd64.zip -OutFile ollama.zip
+          Expand-Archive ollama.zip -DestinationPath ollama
+          Start-Process ollama\ollama.exe -ArgumentList "serve" -WindowStyle Hidden
+          foreach ($attempt in 1..60) {
+            try { Invoke-RestMethod http://127.0.0.1:11434/api/version; break } catch { Start-Sleep -Seconds 1 }
+          }
+      - name: download a small model through Nova, then a real streamed answer
+        timeout-minutes: 15
+        run: |
+          $env:ALFRED_TEST_OLLAMA = "1"
+          $env:PYTHONIOENCODING = "utf-8"  # the model may answer with emoji
+          python -m unittest tests.test_real_model -v
+      - name: the vision model names a photo (informational; needs Ollama's download server, CPU only)
+        continue-on-error: true
+        timeout-minutes: 30
+        run: |
+          python -m pip install --quiet pillow  # this job skips requirements.txt; the test shrinks the photo like the app
+          $env:ALFRED_TEST_VISION = "1"
+          $env:PYTHONIOENCODING = "utf-8"
+          python -m unittest tests.test_real_vision -v
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: unit tests and screen assist end to end
+        timeout-minutes: 25  # about 8 normally: a stuck test fails the run instead of holding it for hours
+        run: python -m unittest discover -s tests -v
+      - name: creative mode gesture tests
+        run: node --test tests/pages_parse.test.mjs tests/creative_gestures.test.mjs tests/creative_lenses.test.mjs tests/mindmap.test.mjs
+      - name: Whisper, voices, daily brief, weather and local news, real downloads
+        timeout-minutes: 10
+        run: |
+          $env:ALFRED_TEST_DOWNLOADS = "1"
+          python -m unittest tests.test_downloads_windows tests.test_daily_brief tests.test_location -v
+      - name: news desk against the real providers (GDELT, news feeds; GNews with the GNEWS_API_KEY secret)
+        timeout-minutes: 5
+        continue-on-error: true  # a news service's bad hour is reported here without holding up a release
+        env:
+          GNEWS_API_KEY: ${{ secrets.GNEWS_API_KEY }}
+        run: |
+          $env:ALFRED_TEST_DOWNLOADS = "1"
+          python -m unittest tests.test_news_intel.LiveProviderTests -v
+      - name: World view against the real feeds (USGS, NASA EONET, GDACS)
+        timeout-minutes: 3
+        continue-on-error: true  # a feed's bad hour is reported here without holding up a release
+        run: |
+          $env:ALFRED_TEST_DOWNLOADS = "1"
+          python -m unittest tests.test_world_monitor.LiveFeedTests -v
+      - name: source smoke test (the HUD opens in Edge and connects)
+        timeout-minutes: 4
+        run: |
+          $env:ALFRED_DATA_DIR = "$env:RUNNER_TEMP\alfred-source-data"
+          python dashboard.py --smoke-test
+      - name: build
+        env:
+          VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || 'dev' }}
+        run: |
+          Set-Content build_info.py "BUILD = `"$($env:GITHUB_SHA.Substring(0, 7))`"`nVERSION = `"$env:VERSION`""
+          pyinstaller Alfred.spec --noconfirm
+      - name: packaged smoke test (the HUD opens in Edge and connects)
+        timeout-minutes: 4
+        run: |
+          $env:ALFRED_DATA_DIR = "$env:RUNNER_TEMP\alfred-packaged-data"
+          $process = Start-Process dist\Nova\Nova.exe -ArgumentList "--smoke-test" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "packaged smoke test exit code $($process.ExitCode)" }
+      - name: packaged screen assist end to end
+        timeout-minutes: 3
+        run: |
+          $env:ALFRED_ASSIST_COMMAND = '["dist/Nova/Nova.exe", "--screen-assist"]'
+          python -m unittest tests.test_screen_assist_windows -v
+      - name: packaged natural voice (Kokoro installs, speaks, and is heard)
+        timeout-minutes: 6
+        run: |
+          $env:ALFRED_DATA_DIR = "$env:RUNNER_TEMP\nova-voice-test"
+          $process = Start-Process dist\Nova\Nova.exe -ArgumentList "--voice-test" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "packaged voice test exit code $($process.ExitCode)" }
+      - name: packaged gesture control on a video of hands
+        timeout-minutes: 3
+        run: |
+          python -c "from tests.test_gestures import make_video; make_video('hands.avi')"
+          $process = Start-Process dist\Nova\Nova.exe -ArgumentList "--gesture-test", "$PWD\hands.avi" -Wait -PassThru
+          if ($process.ExitCode -ne 0) { throw "packaged gesture test exit code $($process.ExitCode)" }
+      - name: packaged HUD, creative mode and phone files
+        run: |
+          foreach ($file in "creative/index.html", "creative/lenses.js", "creative/vendor/mediapipe/wasm/vision_wasm_internal.wasm", "creative/vendor/models/hand_landmarker.task", "creative/vendor/models/efficientdet_lite0.tflite", "phone/index.html", "phone/icon.png", "ui/index.html", "ui/app.js", "ui/fonts/rajdhani-latin-700-normal.woff2", "packaging/nova.png", "cloud/worker.js") {
+            if (-not (Test-Path "dist/Nova/_internal/$file")) { throw "missing $file in the package" }
+          }
+      - name: assemble Desktop and USB Editions
+        run: |
+          New-Item -ItemType Directory editions | Out-Null
+          Copy-Item dist\Nova editions\Nova-Desktop -Recurse
+          Copy-Item packaging\desktop\* editions\Nova-Desktop\
+          Copy-Item dist\Nova editions\Nova-USB -Recurse
+          Copy-Item packaging\usb\* editions\Nova-USB\
+          New-Item -ItemType Directory editions\Nova-USB\Data | Out-Null
+          Compress-Archive editions\Nova-Desktop\* Nova-Desktop.zip
+          Compress-Archive editions\Nova-USB\* Nova-USB.zip
+      # Code signing is optional: add the repository secrets WINDOWS_CERT_PFX (the .pfx file, base64) and
+      # WINDOWS_CERT_PASSWORD and Nova.exe and the installer are signed; without them this step does nothing.
+      - name: sign Nova.exe (when a certificate is set up)
+        env:
+          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if (-not $env:CERT) { "No signing certificate set up: unsigned build."; exit 0 }
+          [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", [Convert]::FromBase64String($env:CERT))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object FullName -like "*x64*" | Select-Object -Last 1
+          & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:CERT_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 editions\Nova-Desktop\Nova.exe
+          if ($LASTEXITCODE -ne 0) { throw "signing Nova.exe failed" }
+      - name: Windows installer (Nova-Setup.exe) and its checksum
+        env:
+          VERSION: ${{ inputs.version || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || 'v0.0.0' }}
+          CERT: ${{ secrets.WINDOWS_CERT_PFX }}
+          CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y | Out-Null }
+          & $iscc /Qp "/DAppVersion=$($env:VERSION.TrimStart('v'))" "/DSourceDir=..\editions\Nova-Desktop" packaging\nova.iss
+          if ($LASTEXITCODE -ne 0) { throw "the installer didn't build" }
+          if ($env:CERT) {
+            $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe | Where-Object FullName -like "*x64*" | Select-Object -Last 1
+            & $signtool.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:CERT_PASSWORD /fd sha256 /tr http://timestamp.digicert.com /td sha256 Nova-Setup.exe
+            if ($LASTEXITCODE -ne 0) { throw "signing the installer failed" }
+          }
+          "$((Get-FileHash Nova-Setup.exe -Algorithm SHA256).Hash.ToLower())  Nova-Setup.exe" | Set-Content -NoNewline Nova-Setup.exe.sha256
+          Get-Content Nova-Setup.exe.sha256
+      - name: the installer installs, marks itself for updates, and uninstalls
+        timeout-minutes: 10
+        run: |
+          # Not Start-Process -Wait: that waits for the whole process tree, and the installer starts Nova at the end
+          # (as an update does), which keeps running. Wait for the installer alone.
+          $process = Start-Process .\Nova-Setup.exe -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=" -PassThru
+          if (-not $process.WaitForExit(480000)) { throw "the installer didn't finish in 8 minutes" }
+          if ($process.ExitCode -ne 0) { throw "install exit code $($process.ExitCode)" }
+          Start-Sleep -Seconds 5
+          if (-not (Get-Process Nova -ErrorAction SilentlyContinue)) { throw "the installer didn't start Nova" }
+          Get-Process Nova -ErrorAction SilentlyContinue | Stop-Process -Force
+          $app = "$env:LOCALAPPDATA\Programs\Nova"
+          foreach ($file in "Nova.exe", "install.ini", "_internal\ui\index.html") { if (-not (Test-Path "$app\$file")) { throw "missing $file after install" } }
+          Get-Content "$app\install.ini"
+          $process = Start-Process "$app\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES" -PassThru
+          $process.WaitForExit(120000) | Out-Null
+          for ($wait = 0; $wait -lt 60 -and (Test-Path "$app\Nova.exe"); $wait++) { Start-Sleep -Seconds 1 }  # it finishes from a copy in Temp
+          if (Test-Path "$app\Nova.exe") { throw "uninstall left Nova.exe behind" }
+      # Push builds keep the editions for a day to download and try. A release attaches the zips itself, and a
+      # full artifact store (the account's quota) must never stop a release, so release runs skip this.
+      - uses: actions/upload-artifact@v5
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v')
+        continue-on-error: true
+        with:
+          name: Nova-Desktop-Edition
+          path: Nova-Desktop.zip
+          retention-days: 1
+      - uses: actions/upload-artifact@v5
+        if: github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/v')
+        continue-on-error: true
+        with:
+          name: Nova-USB-Edition
+          path: Nova-USB.zip
+          retention-days: 1
+      - name: publish release
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version || github.ref_name }}
+        run: gh release create $env:VERSION Nova-Setup.exe Nova-Setup.exe.sha256 Nova-Desktop.zip Nova-USB.zip --target $env:GITHUB_SHA --title "Nova $env:VERSION" --notes-file packaging/RELEASE_NOTES.md

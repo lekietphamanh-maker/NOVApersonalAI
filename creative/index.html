@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nova · Creative Mode</title>
+<style>
+  @font-face { font-family: "Rajdhani"; src: url("vendor/fonts/rajdhani-latin-700-normal.woff2") format("woff2"); font-weight: 700; }
+  @font-face { font-family: "JetBrains Mono"; src: url("vendor/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); font-weight: 600; }
+  :root { --accent-rgb: 255, 176, 64; --accent: rgb(var(--accent-rgb)); --text: #e9eef2; --dim: #b4bec7; --muted: #74818d;
+    --mono: "JetBrains Mono", Consolas, ui-monospace, monospace; --line: rgba(255, 255, 255, 0.22); }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color: var(--text); font: 13px/1.5 "Segoe UI", system-ui, sans-serif; }
+  #camera, #lens, #scene, #hud { position: fixed; inset: 0; width: 100%; height: 100%; }
+  /* The wireframe look glows: a soft halo around every bright line, kept see-through over the camera. */
+  #scene.glow { filter: drop-shadow(0 0 3px rgba(var(--accent-rgb), 0.9)) drop-shadow(0 0 12px rgba(var(--accent-rgb), 0.45)); }
+  /* A lens (pixel, ASCII, ...) draws the picture itself, undimmed. */
+  #lens { display: none; }
+  body.lensed #camera { visibility: hidden; }
+  body.lensed #lens { display: block; }
+  #flash { position: fixed; inset: 0; background: #fff; opacity: 0; pointer-events: none; }
+  #shot { position: fixed; right: 26px; bottom: 70px; width: min(300px, 28vw); padding: 6px; display: none;
+    background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(var(--accent-rgb), 0.7); box-shadow: 0 0 22px rgba(var(--accent-rgb), 0.35); }
+  #shot.show { display: block; }
+  #shot img { display: block; width: 100%; }
+  #shot span { display: block; margin-top: 6px; font: 600 10px/1.3 var(--mono); letter-spacing: 0.14em; color: var(--accent); word-break: break-all; }
+  /* Mirrored like a mirror; dimmed so the holograms stand out. */
+  #camera { object-fit: cover; transform: scaleX(-1); filter: saturate(0.6) brightness(0.62) contrast(1.12); }
+  #tint { position: fixed; inset: 0; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 45%, rgba(0, 0, 0, 0.65) 100%),
+                repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px); }
+  #hud { pointer-events: none; }
+  /* HUD frame corners */
+  .corner { position: fixed; width: 26px; height: 26px; border: 2px solid rgba(var(--accent-rgb), 0.7); pointer-events: none; }
+  .corner.tl { top: 10px; left: 10px; border-right: 0; border-bottom: 0; } .corner.tr { top: 10px; right: 10px; border-left: 0; border-bottom: 0; }
+  .corner.bl { bottom: 10px; left: 10px; border-right: 0; border-top: 0; } .corner.br { bottom: 10px; right: 10px; border-left: 0; border-top: 0; }
+  #brand { position: fixed; top: 22px; left: 26px; display: flex; align-items: center; gap: 10px; pointer-events: none;
+    font: 700 18px/1 "Rajdhani", "Segoe UI", sans-serif; letter-spacing: 0.3em; text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.6); }
+  #brand i { width: 12px; height: 12px; border: 2px solid var(--accent); border-radius: 50%; box-shadow: 0 0 10px var(--accent); }
+  #brand span { font: 600 9.5px/1 var(--mono); letter-spacing: 0.2em; color: var(--accent); padding: 4px 6px; border: 1px solid rgba(var(--accent-rgb), 0.5); text-shadow: none; }
+  #toolbar { position: fixed; top: 18px; right: 26px; display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; max-width: calc(100vw - 300px); }
+  button, label.button { padding: 7px 10px; border: 1px solid var(--line); border-radius: 2px; background: rgba(0, 0, 0, 0.55); color: var(--dim);
+    font: 600 10.5px/1 var(--mono); letter-spacing: 0.15em; text-transform: uppercase; cursor: pointer; backdrop-filter: blur(4px);
+    transition: color 0.18s, border-color 0.18s, box-shadow 0.25s, background 0.18s; }
+  button:hover, label.button:hover { color: #fff; border-color: var(--accent); box-shadow: inset 0 0 14px rgba(var(--accent-rgb), 0.2); }
+  button.exit { border-color: rgba(255, 110, 130, 0.7); color: #ffb3bf; }
+  button.exit:hover { background: rgba(255, 77, 106, 0.25); border-color: #ff6e82; color: #fff; }
+  button.on { background: var(--accent); border-color: var(--accent); color: #000; box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45); }
+  .gap { width: 10px; }
+  #status { position: fixed; bottom: 22px; left: 26px; font: 600 10.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--dim); text-shadow: 0 1px 3px #000; max-width: 60vw; }
+  #status::before { content: "● "; color: var(--accent); }
+  #trash { position: fixed; bottom: 18px; right: 26px; width: 150px; padding: 14px 0; text-align: center; border: 1px dashed rgba(255, 77, 106, 0.6);
+    color: #ff8a9c; background: rgba(0, 0, 0, 0.45); font: 600 10.5px/1 var(--mono); letter-spacing: 0.2em; transition: background 0.2s, box-shadow 0.2s; }
+  #trash.armed { background: rgba(255, 77, 106, 0.28); box-shadow: 0 0 24px rgba(255, 77, 106, 0.45); }
+  #help { position: fixed; top: 64px; right: 26px; padding: 14px 18px; max-width: 420px; line-height: 1.65; color: var(--dim);
+    background: rgba(6, 9, 12, 0.82); border: 1px solid rgba(var(--accent-rgb), 0.4); backdrop-filter: blur(8px); }
+  #help h3 { margin: 0 0 6px; color: var(--accent); font: 700 13px/1.2 "Rajdhani", sans-serif; letter-spacing: 0.24em; }
+  #help b { color: var(--text); }
+  #drop { position: fixed; inset: 0; display: none; place-items: center; color: var(--accent); background: rgba(0, 0, 0, 0.7);
+    border: 2px dashed var(--accent); font: 600 14px var(--mono); letter-spacing: 0.2em; text-transform: uppercase; }
+  body.dragging #drop { display: grid; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+</script>
+</head>
+<body>
+<video id="camera" playsinline muted></video>
+<canvas id="lens"></canvas>
+<div id="tint"></div>
+<canvas id="scene"></canvas>
+<canvas id="hud"></canvas>
+<div id="flash"></div>
+<div id="shot"><img alt="The photo just taken"><span></span></div>
+<div class="corner tl"></div><div class="corner tr"></div><div class="corner bl"></div><div class="corner br"></div>
+<div id="brand"><i></i>NOVA <span>CREATIVE</span></div>
+<div id="toolbar">
+  <button data-shape="reactor">Reactor</button>
+  <button data-shape="cube">Cube</button>
+  <button data-shape="sphere">Sphere</button>
+  <button data-shape="torus">Knot</button>
+  <button data-shape="cone">Cone</button>
+  <button data-shape="cylinder">Cylinder</button>
+  <span class="gap"></span>
+  <label class="button">Load 3D<input id="file" type="file" accept=".glb,.gltf,.obj,.stl" hidden></label>
+  <button id="explode" title="Or pinch the hologram twice quickly (E)">Explode</button>
+  <button id="style" title="Wireframe glow or solid (W)">Look: Wireframe</button>
+  <button id="clear">Clear</button>
+  <button id="objects" class="on" title="Name and track objects you show the camera">Objects</button>
+  <span class="gap"></span>
+  <button id="photo" title="Take a photo after 3-2-1 (Space, the orb, or hold up a peace sign)">📸 Photo</button>
+  <button id="lens-button" title="Live camera effects (L)">Lens: Normal</button>
+  <button id="kisscam" title="Two faces in the picture for 3 seconds: a photo (K)">Kiss cam</button>
+  <button id="toggle-help">?</button>
+  <button id="exit" class="exit" title="Close creative mode (Esc)">✕ Exit</button>
+</div>
+<div id="help" hidden>
+  <h3>GESTURES</h3>
+  <b>Pinch</b> (thumb + index) on an object to grab it; move your hand to move it.<br>
+  <b>Push or pull</b> your pinching hand toward the camera to bring it closer or farther.<br>
+  <b>Twist your wrist</b> while pinching to turn it.<br>
+  <b>Pinch with both hands</b>: spread to resize, turn the line between your hands to rotate.<br>
+  <b>Swipe</b> an open hand across an object to spin it.<br>
+  <b>Pinch twice quickly</b> on an object to take it apart into its pieces; again to put it back.<br>
+  <b>Move your head</b>: the view shifts with you, like a hologram.<br>
+  <b>Touch the orb</b> in the bottom-left corner with a fingertip: volume, previous / play-pause / next and exit open around it.
+  Hold your fingertip on one until its ring fills; hold on volume to keep changing it.
+  <b>🔍 WHAT IS THIS</b> names anything you hold up (with a vision model; Nova offers the download).<br>
+  <b>📸 Photo</b>, <b>Space</b>, the orb's PHOTO or <b>hold up a peace sign ✌</b>: 3-2-1, then a photo (holograms
+  included) saved to Pictures\Nova. Every photo is also blended into <b>average.jpg</b> there: all of them in one picture.<br>
+  <b>Lens</b> (L): <b>Pixel</b> sharpens as you come closer, <b>ASCII</b> draws you with your name's letters,
+  <b>Glitch</b> calms down when you hold still, <b>Slit-scan</b> stretches what crosses the middle, <b>Echo</b> shows you
+  3 seconds ago.<br>
+  <b>Kiss cam</b> (K): two faces in the picture for 3 seconds and it counts down to a photo.<br>
+  <b>Show an object</b> to the camera: Nova names it (80 everyday kinds) and follows it. Ask “Hey Nova, what am I holding?”<br>
+  Drop an object on <b>DELETE</b> to remove it. Drag a .glb/.obj/.stl file onto the window to load it.<br>
+  No webcam? Drag objects with the mouse and use the wheel to resize. Keys: 1–6 shapes, E explode, C clear, Space photo, L lens, K kiss cam.<br>
+  The camera picture never leaves this computer.
+</div>
+<div id="trash">DELETE</div>
+<div id="status">Starting…</div>
+<div id="drop">Drop a .glb, .gltf, .obj or .stl file</div>
+<script type="module" src="./creative.js"></script>
+</body>
+</html>

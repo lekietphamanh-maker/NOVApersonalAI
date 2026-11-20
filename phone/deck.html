@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Nova Deck">
+<meta name="theme-color" content="#07080b">
+<link rel="apple-touch-icon" href="icon.png">
+<title>Nova Deck</title>
+<style>
+  @font-face { font-family: "Rajdhani"; src: url("/fonts/rajdhani-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
+  @font-face { font-family: "JetBrains Mono"; src: url("/fonts/jetbrains-mono-latin-600-normal.woff2") format("woff2"); font-weight: 600; font-display: swap; }
+  :root { --accent-rgb: 255, 176, 64; --accent: rgb(var(--accent-rgb)); --ink: #ece6da; --dim: #8d9099; --line: rgba(255, 255, 255, 0.07);
+    --card: rgba(20, 22, 28, 0.72); --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --display: "Rajdhani", "Segoe UI", system-ui, sans-serif; --text: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07080b; color: var(--ink); font: 15px var(--text);
+    -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  body { display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background: radial-gradient(1100px 520px at 50% -12%, rgba(var(--accent-rgb), 0.14), transparent 70%),
+      radial-gradient(rgba(255, 255, 255, 0.045) 1px, transparent 1px) 0 0 / 22px 22px, #07080b; }
+  button { font: inherit; color: inherit; touch-action: manipulation; }
+
+  header { flex: none; display: flex; align-items: center; gap: 14px; padding: 10px 20px 6px; }
+  .brand { font: 600 16px var(--display); letter-spacing: 0.38em; display: flex; align-items: center; gap: 10px; }
+  .brand::before { content: ""; width: 11px; height: 11px; border-radius: 50%; border: 2px solid var(--accent); box-shadow: 0 0 10px var(--accent); }
+  .brand b { color: var(--accent); font-weight: 600; }
+  #message { flex: 1; text-align: center; font: 500 12px var(--mono); letter-spacing: 0.06em; color: var(--dim);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #dot { width: 9px; height: 9px; border-radius: 50%; background: #4a4d55; }
+  #dot.on { background: #5cf2b0; box-shadow: 0 0 8px #5cf2b0; }
+
+  /* ---------- widgets ---------- */
+  #widgets { flex: 1; min-height: 0; display: grid; gap: 10px; padding: 4px 14px 10px; grid-template-columns: 1.05fr 1fr 1.05fr 1.35fr; }
+  .card { position: relative; min-height: 0; overflow: hidden; border-radius: 18px; background: var(--card); border: 1px solid var(--line);
+    -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); padding: 14px 16px; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04); }
+  .label { font: 600 10px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); }
+  .orb-card { display: flex; flex-direction: column; padding: 6px 12px 12px; }
+  #orb { flex: 1; min-height: 0; width: 100%; }
+  #state { text-align: center; font: 600 11px var(--mono); letter-spacing: 0.3em; color: var(--accent); text-transform: uppercase; }
+  #caption { margin-top: 6px; font-size: 13px; line-height: 1.35; color: #cfc8bb; text-align: center;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  #clock { font: 600 64px/1 var(--display); letter-spacing: 0.02em; margin-top: 8px; }
+  #date { color: var(--dim); margin-top: 4px; }
+  .info { margin-top: 14px; }
+  .big { font-size: 19px; } .small { font-size: 13px; color: var(--dim); line-height: 1.45; white-space: pre-line; }
+  .music-card { display: flex; flex-direction: column; }
+  .track { display: flex; gap: 14px; align-items: center; flex: 1; min-height: 0; }
+  #disc { width: 92px; height: 92px; flex: none; }
+  #title { font-size: 17px; font-weight: 600; line-height: 1.25; }
+  #artist { color: var(--dim); font-size: 13px; margin-top: 2px; }
+  .buttons { display: flex; gap: 8px; margin-top: 8px; }
+  .buttons button { flex: 1; }
+  .actions-card { display: flex; flex-direction: column; gap: 10px; }
+  .tabs { display: flex; background: rgba(0, 0, 0, 0.35); border-radius: 11px; padding: 3px; }
+  .tabs button { flex: 1; border: 0; background: transparent; padding: 7px 0; border-radius: 8px; color: var(--dim);
+    font: 600 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+  .tabs button.on { background: rgba(var(--accent-rgb), 0.16); color: var(--accent); }
+  #chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; align-content: start; flex: 1; min-height: 0; overflow: auto; }
+  .chip, .buttons button { border: 1px solid var(--line); background: linear-gradient(180deg, #23262d, #1a1c22); color: var(--ink);
+    border-radius: 11px; padding: 10px 6px; font: 600 12.5px/1.2 var(--text); box-shadow: 0 2px 0 #040506; }
+  .chip.nova { border-color: rgba(var(--accent-rgb), 0.45); color: var(--accent); }
+  .chip.down, .buttons button.down { background: var(--accent); color: #1a1206; box-shadow: 0 0 18px rgba(var(--accent-rgb), 0.5); }
+  #type { display: flex; gap: 8px; }
+  #type input { flex: 1; min-width: 0; background: rgba(0, 0, 0, 0.42); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 11px;
+    padding: 10px 12px; color: var(--ink); font: 15px var(--text); -webkit-user-select: text; user-select: text; outline: 0; }
+  #type input:focus { border-color: rgba(var(--accent-rgb), 0.7); }
+  #type button { border: 0; border-radius: 11px; background: var(--accent); color: #1a1206; font: 600 11px var(--mono);
+    letter-spacing: 0.14em; padding: 0 14px; text-transform: uppercase; }
+
+  /* ---------- the keyboard ---------- */
+  #keyboard { flex: none; height: 54vh; display: flex; flex-direction: column; gap: 7px; padding: 12px 14px 14px; margin: 0 8px 8px;
+    border-radius: 22px; background: linear-gradient(180deg, rgba(15, 17, 21, 0.97), rgba(9, 10, 13, 0.98)); border: 1px solid var(--line);
+    box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05); }
+  .krow { flex: 1; display: flex; gap: 7px; min-height: 0; }
+  .krow.fn-row { flex: 0.7; }
+  .key { position: relative; flex: 1 1 0; min-width: 0; border-radius: 10px; color: var(--ink); overflow: hidden;
+    background: linear-gradient(180deg, #25282f, #1b1d23); touch-action: none;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 2px 0 #040506, 0 4px 10px rgba(0, 0, 0, 0.35);
+    display: flex; align-items: center; justify-content: center; transition: transform 0.05s, background 0.08s;
+    font: 500 clamp(13px, 2.4vh, 21px)/1 var(--text); }
+  .key.special { background: linear-gradient(180deg, #1d2026, #16181d); color: #b8b2a5;
+    font: 600 clamp(9px, 1.45vh, 13px)/1 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; }
+  .key .shifted { position: absolute; top: 16%; left: 0; right: 0; text-align: center; font-size: 0.7em; color: #8a8d95; }
+  .key.dual .main { transform: translateY(0.55em); }
+  body.shift .key .shifted { color: var(--accent); }
+  body.shift .key.dual .main { color: #676b73; }
+  .key.down { transform: translateY(1px); background: linear-gradient(180deg, #ffc56e, #ffa22c); color: #1a1206;
+    box-shadow: 0 0 22px rgba(var(--accent-rgb), 0.55); }
+  .key.down .shifted, .key.down .main { color: #2b1d08; }
+  .key.on { color: var(--accent); box-shadow: inset 0 0 0 1px rgba(var(--accent-rgb), 0.85), 0 0 16px rgba(var(--accent-rgb), 0.3); }
+  .key.locked { background: linear-gradient(180deg, rgba(var(--accent-rgb), 0.32), rgba(var(--accent-rgb), 0.18)); }
+  .key.led::after { content: ""; position: absolute; top: 9px; left: 10px; width: 6px; height: 6px; border-radius: 50%; background: #34363c; }
+  .key.led.lit::after { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .arrows { flex: 3 1 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: 1fr 1fr; gap: 4px; }
+  .arrows .key { border-radius: 7px; font-size: clamp(10px, 1.6vh, 14px); }
+  .key.glyph { font: 500 clamp(17px, 3vh, 26px)/1 var(--text); letter-spacing: 0; text-transform: none; }
+  .buttons button.icon { font-size: 20px; padding: 6px; }
+
+  /* ---------- Holo: a round dial (orb in the middle, widgets around it), a curved keyboard that glows, swipe to unlock ---------- */
+  #input-area { flex: none; height: 54vh; display: flex; gap: 10px; margin: 0 8px 8px; align-items: center; }
+  #input-area #keyboard { flex: 1; height: auto; align-self: stretch; margin: 0; min-width: 0; position: relative; }
+  #dial { display: none; flex: none; position: relative; height: 100%; aspect-ratio: 1 / 1; max-width: 46vw; }
+  #dial svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; }
+  #dial-orb { position: absolute; left: 30%; top: 28%; width: 40%; height: 40%; }
+  #dial-orb #orb { width: 100%; height: 100%; }
+  .dial-ring { fill: none; stroke: rgba(120, 226, 255, 0.22); stroke-width: 1; }
+  .dial-ticks { stroke: rgba(120, 226, 255, 0.35); stroke-width: 1; transform-box: view-box; transform-origin: center;
+    animation: dial-turn 60s linear infinite; }
+  @keyframes dial-turn { to { transform: rotate(360deg); } }
+  .dial-frame { fill: rgba(120, 226, 255, 0.035); stroke: rgba(120, 226, 255, 0.45); stroke-width: 1; }
+  .dial-label { fill: rgba(120, 226, 255, 0.65); font: 600 6.5px var(--mono); letter-spacing: 0.24em; }
+  .dial-big { fill: #e6fbff; font: 600 22px var(--display); letter-spacing: 0.04em; }
+  .dial-text { fill: rgba(205, 245, 255, 0.95); font: 600 9.5px var(--text); }
+  .dial-small { fill: rgba(150, 215, 235, 0.8); font: 500 7.5px var(--text); }
+  .dial-state { fill: rgba(120, 226, 255, 0.9); font: 600 7px var(--mono); letter-spacing: 0.3em; text-transform: uppercase; }
+  .dial-part path { fill: rgba(120, 226, 255, 0.04); stroke: rgba(120, 226, 255, 0.55); stroke-width: 1; cursor: pointer; }
+  .dial-part text { fill: rgba(170, 238, 255, 0.95); font: 600 7px var(--mono); letter-spacing: 0.08em; pointer-events: none;
+    text-transform: uppercase; }
+  .dial-part.glyph text { font: 600 11px var(--text); letter-spacing: 0; }
+  .dial-part.down path { fill: rgba(120, 226, 255, 0.45); filter: drop-shadow(0 0 6px rgba(120, 226, 255, 0.9)); }
+  #skin, #lock-now { border: 1px solid var(--line); background: rgba(255, 255, 255, 0.04); color: var(--dim); border-radius: 8px;
+    padding: 5px 10px; font: 600 10px var(--mono); letter-spacing: 0.18em; text-transform: uppercase; }
+  #lock-now { display: none; }
+  body.holo { --holo-rgb: 120, 226, 255; }
+  body.holo #dial, body.holo #lock-now { display: block; }
+  body.holo #widgets { display: none; }
+  /* dial on top (small while typing, big at rest), the keyboard full width underneath */
+  body.holo #input-area { flex: 1; height: auto; min-height: 0; flex-direction: column; align-items: center; gap: 12px; }
+  body.holo #dial { height: 40%; max-width: none; transition: height 0.45s cubic-bezier(0.2, 0.8, 0.2, 1); }
+  body.holo #input-area #keyboard { width: 100%; }
+  .holo-side { display: none; position: absolute; top: 2px; width: 27%; max-height: 38%; overflow: hidden; box-sizing: border-box;
+    padding: 14px 18px; border-radius: 16px; border: 1px solid rgba(var(--holo-rgb), 0.28);
+    background: linear-gradient(160deg, rgba(var(--holo-rgb), 0.07), rgba(4, 12, 18, 0.55) 60%);
+    box-shadow: inset 0 1px 0 rgba(var(--holo-rgb), 0.18), 0 0 26px rgba(var(--holo-rgb), 0.06);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); transition: opacity 0.4s; }
+  .holo-side.left { left: 4px; } .holo-side.right { right: 4px; }
+  .holo-side::before { content: ""; position: absolute; top: 0; left: 18px; right: 18px; height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(var(--holo-rgb), 0.9), transparent); }
+  .side-label { font: 600 9px var(--mono); letter-spacing: 0.32em; color: rgba(var(--holo-rgb), 0.85); display: flex; align-items: center; gap: 8px; }
+  .side-label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: rgb(var(--holo-rgb)); box-shadow: 0 0 8px rgb(var(--holo-rgb)); }
+  #side-caption { margin: 10px 0 0; font: 15px/1.45 var(--text); color: #d6f6ff; display: -webkit-box; -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical; overflow: hidden; }
+  #side-next { margin: 10px 0 0; padding: 0; list-style: none; }
+  #side-next li { font: 14px/1.35 var(--text); color: #d6f6ff; padding: 7px 0; border-bottom: 1px solid rgba(var(--holo-rgb), 0.12);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #side-next li:last-child { border-bottom: 0; }
+  #side-next li.none { color: rgba(170, 225, 240, 0.55); }
+  body.holo .holo-side { display: block; }
+  body.holo header #type { flex: 0 1 360px; }
+  body.holo header #type input { padding: 6px 10px; font-size: 13px; }
+  body.holo header #type button { padding: 0 10px; }
+  body.holo #keyboard { background: linear-gradient(180deg, rgba(6, 18, 26, 0.92), rgba(3, 10, 15, 0.96));
+    border: 1px solid rgba(var(--holo-rgb), 0.35); box-shadow: 0 0 30px rgba(var(--holo-rgb), 0.08), inset 0 0 40px rgba(var(--holo-rgb), 0.05);
+    background-image: repeating-linear-gradient(0deg, rgba(var(--holo-rgb), 0.035) 0 1px, transparent 1px 4px); }
+  body.holo .key { background: rgba(var(--holo-rgb), 0.03); color: rgb(var(--holo-rgb)); border: 1px solid rgba(var(--holo-rgb), 0.5);
+    border-radius: 6px; box-shadow: inset 0 0 10px rgba(var(--holo-rgb), 0.08), 0 0 6px rgba(var(--holo-rgb), 0.12);
+    text-shadow: 0 0 6px rgba(var(--holo-rgb), 0.7); font-family: var(--mono); font-weight: 400; }
+  body.holo .key.special { background: rgba(var(--holo-rgb), 0.02); color: rgba(var(--holo-rgb), 0.85); }
+  body.holo .key .shifted { color: rgba(var(--holo-rgb), 0.5); }
+  body.holo.shift .key .shifted { color: rgb(var(--holo-rgb)); }
+  body.holo .key.down { background: rgba(var(--holo-rgb), 0.38); color: #eaffff; border-color: rgb(var(--holo-rgb));
+    box-shadow: 0 0 22px rgba(var(--holo-rgb), 0.7), inset 0 0 14px rgba(var(--holo-rgb), 0.5); }
+  body.holo .key.on { color: #eaffff; box-shadow: inset 0 0 0 1px rgb(var(--holo-rgb)), 0 0 14px rgba(var(--holo-rgb), 0.45); }
+  body.holo .key.locked { background: rgba(var(--holo-rgb), 0.22); }
+  body.holo .key.led.lit::after { background: rgb(var(--holo-rgb)); box-shadow: 0 0 6px rgb(var(--holo-rgb)); }
+  /* the curve: each key (or the arrow cluster) is lowered and tilted along an arc the script works out */
+  body.holo .krow > .key, body.holo .krow > .arrows { transform: translateY(var(--curve-y, 0px)) rotate(var(--curve-r, 0deg)); }
+  .arrows .key { --curve-y: 0px; --curve-r: 0deg; }
+  body.holo .krow > .key.down { transform: translateY(calc(var(--curve-y, 0px) + 1px)) rotate(var(--curve-r, 0deg)) scale(0.97); }
+  /* keys hidden: only the orb and the widget dial, centred; a swipe anywhere (or along the bar) brings the keyboard in */
+  #input-area { position: relative; }
+  #lock { display: none; position: absolute; left: 0; right: 0; bottom: 6px; z-index: 3; justify-content: center; }
+  body.holo.keys-hidden #lock { display: flex; }
+  body.holo.keys-hidden #input-area { justify-content: center; padding-bottom: 72px; touch-action: none; }
+  body.holo.keys-hidden #input-area #keyboard { display: none; }
+  body.holo.keys-hidden #dial { height: 100%; max-height: 44vw; }  /* fits between the side panels */
+  body.holo.waking #input-area #keyboard { animation: keys-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes keys-in { from { opacity: 0; transform: translateY(80px); } to { opacity: 1; transform: none; } }
+  #lock-track { position: relative; width: min(560px, 70%); height: 58px; border-radius: 30px; border: 1px solid rgba(var(--holo-rgb), 0.6);
+    background: rgba(3, 12, 18, 0.85); box-shadow: 0 0 24px rgba(var(--holo-rgb), 0.25); touch-action: none; overflow: hidden; }
+  #lock-track::after { content: "SWIPE TO OPEN THE KEYBOARD"; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center;
+    font: 600 13px var(--mono); letter-spacing: 0.42em; color: rgba(var(--holo-rgb), 0.85); pointer-events: none;
+    -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,0.35) 30%, #000 50%, rgba(0,0,0,0.35) 70%); -webkit-mask-size: 300% 100%;
+    animation: shimmer 2.4s linear infinite; }
+  @keyframes shimmer { from { -webkit-mask-position: 100% 0; } to { -webkit-mask-position: -100% 0; } }
+  #lock-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 58px; border-radius: 30px; background: rgba(var(--holo-rgb), 0.18); }
+  #lock-thumb { position: absolute; left: 4px; top: 4px; width: 50px; height: 50px; border-radius: 50%; z-index: 1;
+    background: radial-gradient(circle, rgba(var(--holo-rgb), 0.95), rgba(var(--holo-rgb), 0.35) 60%, transparent 70%);
+    box-shadow: 0 0 18px rgba(var(--holo-rgb), 0.9); }
+  body.holo.waking #keyboard .key { animation: draw-in 0.55s ease-out both; animation-delay: calc(var(--i, 0) * 7ms); }
+  @keyframes draw-in { from { opacity: 0; transform: translate(-10px, var(--curve-y, 0px)) rotate(var(--curve-r, 0deg)) scaleY(0.6); }
+    to { opacity: 1; transform: translateY(var(--curve-y, 0px)) rotate(var(--curve-r, 0deg)); } }
+
+  #unpaired { position: fixed; top: 0; right: 0; bottom: 0; left: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(5, 6, 8, 0.92); text-align: center; padding: 30px; z-index: 5; }
+  body.unpaired #unpaired { display: flex; }
+  #unpaired h2 { font: 600 30px var(--display); letter-spacing: 0.2em; margin: 12px 0; }
+  #unpaired p { color: var(--dim); max-width: 520px; line-height: 1.6; }
+
+  @media (orientation: portrait) {
+    #widgets { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+    #keyboard, #input-area { height: 40vh; }
+    body.holo .holo-side { display: none; }  /* no room beside the dial in portrait */
+    body.holo.keys-hidden #dial { max-height: calc(100vw - 24px); }
+    #clock { font-size: 54px; }
+  }
+  @media (max-height: 560px) {
+    #widgets { grid-template-columns: 1fr 1fr; }
+    .time-card, .music-card { display: none; }
+    #keyboard, #input-area { height: 62vh; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">NOVA <b>DECK</b></div>
+  <div id="message">Connecting…</div>
+  <span id="type-slot"></span>
+  <button id="lock-now" type="button" title="Hide the keyboard: just Nova and the widgets">Hide keys</button>
+  <button id="skin" type="button" title="Keyboard look">Holo</button>
+  <span id="dot" title="Connection to your PC"></span>
+</header>
+<section id="widgets">
+  <article class="card orb-card"><canvas id="orb" aria-label="Nova"></canvas><div id="state">Asleep</div><div id="caption"></div></article>
+  <article class="card time-card"><div class="label">Today</div><div id="clock">--:--</div><div id="date"></div>
+    <div class="info"><div class="big" id="weather">—</div><div class="small" id="place"></div></div>
+    <div class="info small" id="timers"></div></article>
+  <article class="card music-card"><div class="label">Now playing</div>
+    <div class="track"><canvas id="disc" width="184" height="184"></canvas><div><div id="title">Nothing playing</div><div id="artist"></div></div></div>
+    <div class="buttons"><button class="icon" data-action="previous" aria-label="Previous">⏮</button><button class="icon" data-action="play_pause" aria-label="Play or pause">⏯</button><button class="icon" data-action="next" aria-label="Next">⏭</button></div>
+    <div class="buttons"><button data-action="volume_down" aria-label="Volume down">VOL −</button><button data-action="mute" aria-label="Mute">MUTE</button><button data-action="volume_up" aria-label="Volume up">VOL +</button></div></article>
+  <article class="card actions-card">
+    <div class="tabs"><button data-tab="nova">Nova</button><button data-tab="shortcuts">Shortcuts</button><button data-tab="apps">Apps</button></div>
+    <div id="chips"></div>
+    <form id="type" autocomplete="off"><input id="type-text" maxlength="1000" placeholder="Type on the PC (any language, emoji)…" enterkeyhint="send"><button>Type</button></form>
+  </article>
+</section>
+<section id="input-area">
+  <aside class="holo-side left"><div class="side-label">NOVA</div><p id="side-caption"></p></aside>
+  <div id="dial" aria-label="Nova and widgets"><div id="dial-orb"></div></div>
+  <aside class="holo-side right"><div class="side-label">UP NEXT</div><ul id="side-next"></ul></aside>
+  <section id="keyboard" aria-label="Keyboard for your PC"></section>
+  <div id="lock"><div id="lock-track" role="slider" aria-label="Swipe to open the keyboard" aria-valuemin="0" aria-valuemax="100"
+    aria-valuenow="0"><div id="lock-fill"></div><div id="lock-thumb"></div></div></div>
+</section>
+<div id="unpaired"><div><div class="label">Nova Deck</div><h2>NOT PAIRED YET</h2>
+  <p>On your PC, open Nova → SETTINGS → Screens → <b>Show the links</b>, then scan the deck code with this iPad's camera.
+  The deck types on your PC like a keyboard; <b>New code</b> on the PC unpairs it.</p></div></div>
+<script>
+  // A touch keyboard and widgets for Nova's PC. Plain enough for older iPads: no optional chaining, touch events if
+  // there are no pointer events.
+  var $ = function (id) { return document.getElementById(id); };
+  var linked = new URLSearchParams(location.hash.slice(1)).get("token");
+  var token = linked || "";
+  try { if (linked) localStorage.setItem("nova-deck", linked); else token = localStorage.getItem("nova-deck") || ""; } catch (error) {}
+  if (linked) history.replaceState(null, "", location.pathname); // keep the code out of sight
+  if (!token) document.body.classList.add("unpaired");
+
+  function say(text) { $("message").textContent = text; }
+  function online(ok) { $("dot").classList.toggle("on", ok); }
+
+  async function post(body) {
+    const response = await fetch("/api/deck", { method: "POST", body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token } });
+    if (response.status === 401) { document.body.classList.add("unpaired"); throw new Error("not paired"); }
+    online(true);
+    return response.json();
+  }
+
+  async function action(name, label) {
+    if (!token) return;
+    try { const answer = await post({ action: name }); say(answer.message || label); }
+    catch (error) { online(false); say("Can't reach Nova on the PC"); }
+  }
+
+  // ---------- keys go out in order; whatever piles up while a request is on its way goes in the next one ----------
+  let queue = [], sending = false;
+  function sendKey(key, mods) {
+    if (!token) return;
+    queue.push({ key: key, mods: mods });
+    flush();
+  }
+  async function flush() {
+    if (sending || !queue.length) return;
+    sending = true;
+    const batch = queue.splice(0, 64);
+    try {
+      const answer = await post({ keys: batch });
+      if (answer.message) say(answer.message);
+    } catch (error) { online(false); queue = []; say("Can't reach Nova on the PC"); }
+    sending = false;
+    flush();
+  }
+
+  // ---------- the layout: a laptop keyboard, 15 units wide ----------
+  const letter = (c) => ({ key: c, label: c.toUpperCase() });
+  const symbol = (key, shifted) => ({ key: key, label: key, shifted: shifted });
+  const special = (key, label, units, extra) => Object.assign({ key: key, label: label, units: units, special: true }, extra || {});
+  const modifier = (name, label, units) => ({ key: name, label: label, units: units, special: true, mod: name });
+  const fkeys = [];
+  for (let n = 1; n <= 12; n++) fkeys.push(special("f" + n, "F" + n, 1));
+  const ROWS = [
+    [special("esc", "esc", 1.5)].concat(fkeys, [special("delete", "del", 1.5)]),
+    "`~1!2@3#4$5%6^7&8*9(0)-_=+".match(/../g).map((pair) => symbol(pair[0], pair[1]))
+      .concat([special("backspace", "⌫", 2, { fnKey: "delete", fnLabel: "del", glyph: true })]),
+    [special("tab", "tab", 1.5)].concat("qwertyuiop".split("").map(letter), [symbol("[", "{"), symbol("]", "}"),
+      Object.assign(symbol("\\", "|"), { units: 1.5 })]),
+    [special("capslock", "caps", 1.75, { led: true, once: true })].concat("asdfghjkl".split("").map(letter),
+      [symbol(";", ":"), symbol("'", "\""), special("enter", "enter", 2.25)]),
+    [modifier("shift", "shift", 2.25)].concat("zxcvbnm".split("").map(letter),
+      [symbol(",", "<"), symbol(".", ">"), symbol("/", "?"), modifier("shift", "shift", 2.75)]),
+    [modifier("ctrl", "ctrl", 1.25), modifier("fn", "fn", 1), Object.assign(modifier("win", "⊞", 1.25), { glyph: true }), modifier("alt", "alt", 1.25),
+      special("space", "", 4.75), modifier("alt", "alt", 1.25), modifier("ctrl", "ctrl", 1.25), "arrows"],
+  ];
+  // Holo is a 60% keyboard: no F-key row, no arrow keys, bigger keys. fn reaches the rest: fn + 1…= is F1–F12,
+  // fn + I J K L the arrows, fn + U / O Home / End, fn + P / ; Page Up / Down, fn + ⌫ Del, fn + Esc a backtick.
+  const FN_60 = { "1": "f1", "2": "f2", "3": "f3", "4": "f4", "5": "f5", "6": "f6", "7": "f7", "8": "f8", "9": "f9", "0": "f10",
+    "-": "f11", "=": "f12", i: "up", j: "left", k: "down", l: "right", u: "home", o: "end", p: "pageup", ";": "pagedown" };
+  const FN_60_LABELS = { up: "▲", left: "◀", down: "▼", right: "▶", home: "home", end: "end", pageup: "pg↑", pagedown: "pg↓" };
+  const withFn = (spec) => (FN_60[spec.key] ? Object.assign({}, spec, { fnKey: FN_60[spec.key],
+    fnLabel: FN_60_LABELS[FN_60[spec.key]] || FN_60[spec.key].toUpperCase() }) : spec);
+  const ROWS_60 = [
+    [special("esc", "esc", 1, { fnKey: "`", fnLabel: "`" })].concat(ROWS[1].slice(1).map(withFn)),
+    ROWS[2].map(withFn),
+    ROWS[3].map(withFn),
+    ROWS[4],
+    [modifier("ctrl", "ctrl", 1.5), Object.assign(modifier("win", "⊞", 1.25), { glyph: true }), modifier("alt", "alt", 1.25),
+      special("space", "", 6.5), modifier("alt", "alt", 1.25), modifier("fn", "fn", 1.25), modifier("ctrl", "ctrl", 1.5)],
+  ];
+  const ARROWS = [
+    { key: "up", label: "▲", fnKey: "pageup", fnLabel: "pg↑", row: 1, column: 2 },
+    { key: "left", label: "◀", fnKey: "home", fnLabel: "home", row: 2, column: 1 },
+    { key: "down", label: "▼", fnKey: "pagedown", fnLabel: "pg↓", row: 2, column: 2 },
+    { key: "right", label: "▶", fnKey: "end", fnLabel: "end", row: 2, column: 3 },
+  ];
+
+  // Hold a modifier and tap a key (as on a real keyboard), or tap the modifier first: once for the next key, twice
+  // to lock it, a third time to let go. A tap on ⊞ opens Start. Held keys repeat.
+  const sticky = { shift: 0, ctrl: 0, alt: 0, fn: 0 };
+  const holding = {};
+  const keys = [];
+  let caps = false;
+  const activeMods = () => ["ctrl", "shift", "alt", "win"].filter((name) => holding[name] || sticky[name]);
+  const fnOn = () => Boolean(holding.fn || sticky.fn);
+
+  function bindPress(element, onDown, onUp) {
+    if (window.PointerEvent) {
+      element.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        try { element.setPointerCapture(event.pointerId); } catch (error) {}
+        onDown();
+      });
+      element.addEventListener("pointerup", onUp);
+      element.addEventListener("pointercancel", onUp);
+    } else {
+      element.addEventListener("touchstart", (event) => { event.preventDefault(); onDown(); }, { passive: false });
+      element.addEventListener("touchend", (event) => { event.preventDefault(); onUp(); });
+      element.addEventListener("touchcancel", onUp);
+      element.addEventListener("mousedown", (event) => { event.preventDefault(); onDown(); });
+      element.addEventListener("mouseup", onUp);
+    }
+  }
+
+  function makeKey(spec) {
+    const element = document.createElement("div");
+    element.className = "key" + (spec.special ? " special" : "") + (spec.shifted ? " dual" : "") + (spec.led ? " led" : "")
+      + (spec.glyph ? " glyph" : "");
+    element.style.flexGrow = spec.units || 1;
+    element.setAttribute("role", "button");
+    element.setAttribute("aria-label", spec.label || spec.key);
+    if (spec.shifted) element.appendChild(Object.assign(document.createElement("span"), { className: "shifted", textContent: spec.shifted }));
+    spec.main = element.appendChild(Object.assign(document.createElement("span"), { className: "main", textContent: spec.label }));
+    spec.element = element;
+    keys.push(spec);
+    bindPress(element, () => down(spec), () => up(spec));
+    return element;
+  }
+
+  function down(spec) {
+    if (spec.isDown || isLocked()) return;
+    touched();
+    spec.isDown = true;
+    spec.element.classList.add("down");
+    if (navigator.vibrate) navigator.vibrate(4);
+    if (spec.mod) { holding[spec.mod] = { used: false }; render(); return; }
+    // what this press means is fixed when it starts, so a held key repeats it (fn + ▼ keeps paging down)
+    const key = fnOn() && spec.fnKey ? spec.fnKey : spec.key, mods = activeMods();
+    fire(key, mods);
+    if (!spec.once) spec.timer = setTimeout(function repeat() { sendKey(key, mods); spec.timer = setTimeout(repeat, 70); }, 420);
+  }
+
+  function up(spec) {
+    if (!spec.isDown) return;
+    spec.isDown = false;
+    clearTimeout(spec.timer);
+    setTimeout(() => spec.element.classList.remove("down"), 60);
+    if (!spec.mod) return;
+    const held = holding[spec.mod];
+    delete holding[spec.mod];
+    if (held && !held.used) {
+      if (spec.mod === "win") sendKey("win", []);
+      else sticky[spec.mod] = (sticky[spec.mod] + 1) % 3;
+    }
+    render();
+  }
+
+  function fire(key, mods) {
+    if (key === "capslock") caps = !caps;
+    sendKey(key, mods);
+    Object.keys(holding).forEach((name) => { holding[name].used = true; });
+    Object.keys(sticky).forEach((name) => { if (sticky[name] === 1) sticky[name] = 0; });
+    render();
+  }
+
+  function render() {
+    document.body.classList.toggle("shift", Boolean(holding.shift || sticky.shift));
+    keys.forEach((spec) => {
+      if (spec.mod) {
+        spec.element.classList.toggle("on", Boolean(holding[spec.mod] || sticky[spec.mod]));
+        spec.element.classList.toggle("locked", sticky[spec.mod] === 2);
+      }
+      if (spec.fnKey) spec.main.textContent = fnOn() ? spec.fnLabel : spec.label;
+      if (spec.led) spec.element.classList.toggle("lit", caps);
+    });
+  }
+
+  // Builds the keys of a layout (the full one for Classic, the 60% one for Holo); the lock stays where it is.
+  function buildKeyboard(rows, full) {
+    Array.prototype.slice.call($("keyboard").querySelectorAll(".krow")).forEach((row) => row.remove());
+    keys.length = 0;
+    rows.forEach((row, index) => {
+      const line = $("keyboard").appendChild(Object.assign(document.createElement("div"),
+        { className: "krow" + (full && !index ? " fn-row" : "") }));
+      row.forEach((spec) => {
+        if (spec !== "arrows") { line.appendChild(makeKey(Object.assign({}, spec))); return; }
+        const cluster = line.appendChild(Object.assign(document.createElement("div"), { className: "arrows" }));
+        ARROWS.forEach((arrow) => {
+          const element = cluster.appendChild(makeKey(Object.assign({ special: true }, arrow)));
+          element.style.gridRow = arrow.row;
+          element.style.gridColumn = arrow.column;
+        });
+      });
+    });
+    keys.forEach((spec, index) => spec.element.style.setProperty("--i", index));
+    render();
+  }
+  buildKeyboard(ROWS, true);
+
+  // ---------- Holo: the round dial and the curved keyboard ----------
+  // The dial: Nova's orb in the middle, the widgets on a ring around it (time, weather, the song with its controls,
+  // timers), and real shortcuts on the outer ring (the same actions as the Shortcuts chips).
+  const SVG = "http://www.w3.org/2000/svg";
+  const SHORTCUTS = [["copy", "Copy"], ["paste", "Paste"], ["cut", "Cut"], ["undo", "Undo"], ["redo", "Redo"], ["save", "Save"],
+    ["find", "Find"], ["snip", "Snip"], ["explorer", "Files"], ["desktop", "Desk"], ["switch_app", "Apps"], ["browser", "Web"]];
+  const MUSIC = [["previous", "⏮", "Previous"], ["play_pause", "⏯", "Play or pause"], ["next", "⏭", "Next"]];
+  const WIDGET_RING = [116, 168], SHORTCUT_RING = [174, 198];
+  const dialText = {};
+  function polar(radius, degrees) {
+    const angle = (degrees * Math.PI) / 180;
+    return [200 + Math.cos(angle) * radius, 200 + Math.sin(angle) * radius];
+  }
+  function segment(inner, outer, from, to) {
+    const a = polar(outer, from), b = polar(outer, to), c = polar(inner, to), d = polar(inner, from), large = to - from > 180 ? 1 : 0;
+    return "M" + a + " A" + outer + " " + outer + " 0 " + large + " 1 " + b + " L" + c + " A" + inner + " " + inner + " 0 " + large + " 0 " + d + "Z";
+  }
+  function svgAdd(parent, tag, attributes, text) {
+    const element = parent.appendChild(document.createElementNS(SVG, tag));
+    Object.keys(attributes).forEach((name) => element.setAttribute(name, attributes[name]));
+    if (text !== undefined) element.textContent = text;
+    return element;
+  }
+  function dialButton(svg, inner, outer, from, to, label, onPress, extra) {
+    const group = svgAdd(svg, "g", { class: "dial-part" + (extra || ""), role: "button", "aria-label": label[1] || label[0] });
+    svgAdd(group, "path", { d: segment(inner, outer, from, to) });
+    const middle = (from + to) / 2, at = polar((inner + outer) / 2, middle);
+    // labels run along the ring, turned so they read upright on the bottom half too
+    const turn = middle > 0 && middle < 180 ? middle - 90 : middle + 90;
+    svgAdd(group, "text", { x: at[0], y: at[1], "text-anchor": "middle", "dominant-baseline": "central",
+      transform: extra ? "" : "rotate(" + turn + " " + at[0] + " " + at[1] + ")" }, label[0]);
+    bindPress(group, () => {  // the dial works with the keys hidden too: it's what's on screen then
+      touched();
+      group.classList.add("down");
+      if (navigator.vibrate) navigator.vibrate(4);
+      onPress();
+    }, () => setTimeout(() => group.classList.remove("down"), 120));
+  }
+  function buildDial() {
+    const svg = document.createElementNS(SVG, "svg");
+    svg.setAttribute("viewBox", "0 0 400 400");
+    [62, 110, 171, 199].forEach((radius) => svgAdd(svg, "circle", { cx: 200, cy: 200, r: radius, class: "dial-ring" }));
+    const ticks = svgAdd(svg, "g", { class: "dial-ticks" });
+    for (let tick = 0; tick < 72; tick++) {
+      const inner = polar(tick % 6 ? 102 : 96, tick * 5), outer = polar(108, tick * 5);
+      svgAdd(ticks, "line", { x1: inner[0], y1: inner[1], x2: outer[0], y2: outer[1] });
+    }
+    // four widgets on the ring: time on top, weather right, the song at the bottom, timers left
+    [[-133, -47], [-37, 37], [47, 133], [143, 217]].forEach((span) => {
+      svgAdd(svg, "path", { d: segment(WIDGET_RING[0], WIDGET_RING[1], span[0], span[1]), class: "dial-frame" });
+    });
+    svgAdd(svg, "text", { x: 200, y: 44, "text-anchor": "middle", class: "dial-label" }, "TODAY");
+    dialText.clock = svgAdd(svg, "text", { x: 200, y: 66, "text-anchor": "middle", class: "dial-big" }, "--:--");
+    dialText.date = svgAdd(svg, "text", { x: 200, y: 78, "text-anchor": "middle", class: "dial-small" }, "");
+    svgAdd(svg, "text", { x: 342, y: 176, "text-anchor": "middle", class: "dial-label" }, "WEATHER");
+    dialText.weather = svgAdd(svg, "text", { x: 342, y: 196, "text-anchor": "middle", class: "dial-text" }, "—");
+    dialText.sky = svgAdd(svg, "text", { x: 342, y: 208, "text-anchor": "middle", class: "dial-small" }, "");
+    dialText.place = svgAdd(svg, "text", { x: 342, y: 220, "text-anchor": "middle", class: "dial-small" }, "");
+    svgAdd(svg, "text", { x: 58, y: 182, "text-anchor": "middle", class: "dial-label" }, "TIMERS");
+    dialText.timer = svgAdd(svg, "text", { x: 58, y: 200, "text-anchor": "middle", class: "dial-text" }, "—");
+    dialText.timerNext = svgAdd(svg, "text", { x: 58, y: 213, "text-anchor": "middle", class: "dial-small" }, "");
+    svgAdd(svg, "text", { x: 200, y: 352, "text-anchor": "middle", class: "dial-label" }, "NOW PLAYING");
+    dialText.song = svgAdd(svg, "text", { x: 200, y: 364, "text-anchor": "middle", class: "dial-small" }, "Nothing playing");
+    MUSIC.forEach((control, index) => {
+      const from = 110 - (index + 1) * 13.4; // angles grow clockwise, so at the bottom the first one goes on the left
+      dialButton(svg, WIDGET_RING[0] + 3, WIDGET_RING[0] + 27, from + 0.8, from + 12.6, [control[1], control[2]],
+        () => action(control[0], control[2]), " glyph");
+    });
+    dialText.state = svgAdd(svg, "text", { x: 200, y: 258, "text-anchor": "middle", class: "dial-state" }, "");
+    const step = 360 / SHORTCUTS.length;
+    SHORTCUTS.forEach((shortcut, index) => {
+      const from = -90 - step / 2 + index * step;
+      dialButton(svg, SHORTCUT_RING[0], SHORTCUT_RING[1], from + 1, from + step - 1, [shortcut[1]], () => action(shortcut[0], shortcut[1]));
+    });
+    $("dial").insertBefore(svg, $("dial-orb"));
+  }
+  const clip = (text, size) => (text.length > size ? text.slice(0, size - 1) + "…" : text);
+  function renderDial() {
+    if (!dialText.clock || !document.body.classList.contains("holo")) return;
+    dialText.clock.textContent = $("clock").textContent;
+    dialText.date.textContent = clip($("date").textContent, 26);
+    const weather = $("weather").textContent.split(" · ");
+    dialText.weather.textContent = weather[0] || "—";
+    dialText.sky.textContent = clip(weather[1] || "", 14);
+    dialText.place.textContent = clip($("place").textContent, 14);
+    const timers = $("timers").textContent.split("\n").filter(Boolean);
+    dialText.timer.textContent = clip(timers[0] || "None", 14);
+    dialText.timerNext.textContent = timers.length > 1 ? "+" + (timers.length - 1) + " more" : "";
+    const song = $("title").textContent, artist = $("artist").textContent;
+    dialText.song.textContent = clip(artist ? song + " · " + artist : song, 30);
+    dialText.state.textContent = $("state").textContent;
+    // beside the dial: what Nova said last, and the timers and reminders ahead
+    $("side-caption").textContent = $("caption").textContent || "Say “Hey Nova”, or swipe for the keys.";
+    const ahead = $("timers").textContent.split("\n").filter(Boolean).slice(0, 4);
+    const list = $("side-next");
+    if (list.dataset.signature !== ahead.join("|")) {
+      list.dataset.signature = ahead.join("|");
+      list.textContent = "";
+      (ahead.length ? ahead : ["Nothing coming up"]).forEach((line) => {
+        list.appendChild(Object.assign(document.createElement("li"), { textContent: line, className: ahead.length ? "" : "none" }));
+      });
+    }
+  }
+  buildDial();
+  setInterval(renderDial, 1000);
+
+  // The curve: every key in a row sits on one arc, lower and turned at the ends (a parabola across the board).
+  const CURVE_DEPTH = 0.04; // how far the ends drop, as a share of the keyboard's width
+  function curveKeys() {
+    const board = $("keyboard"), width = board.clientWidth, holo = document.body.classList.contains("holo");
+    const depth = holo ? width * CURVE_DEPTH : 0;
+    board.style.paddingBottom = holo ? Math.round(depth + 14) + "px" : "";
+    board.querySelectorAll(".krow").forEach((row) => {
+      Array.prototype.forEach.call(row.children, (item) => {
+        const along = width ? (item.offsetLeft + item.offsetWidth / 2 - width / 2) / (width / 2) : 0;
+        item.style.setProperty("--curve-y", (depth * along * along).toFixed(1) + "px");
+        item.style.setProperty("--curve-r", ((Math.atan((2 * depth * along) / (width / 2 || 1)) * 180) / Math.PI).toFixed(2) + "deg");
+      });
+    });
+  }
+  window.addEventListener("resize", () => requestAnimationFrame(curveKeys));
+
+  // Holo rests with the keyboard hidden: Nova's orb and the widget dial, centred. A swipe brings the keys in; Hide keys,
+  // or three untouched minutes, puts them away again (so nothing types on the PC by accident).
+  const LOCK_AFTER_MS = 3 * 60 * 1000;
+  const SWIPE_PX = 80;
+  let lastTouch = Date.now();
+  function touched() { lastTouch = Date.now(); }
+  function isLocked() { return document.body.classList.contains("holo") && document.body.classList.contains("keys-hidden"); }
+  function lock() {
+    Object.keys(sticky).forEach((name) => { sticky[name] = 0; });
+    render();
+    document.body.classList.add("keys-hidden");
+    moveThumb(0);
+  }
+  function unlock() {
+    document.body.classList.remove("keys-hidden");
+    document.body.classList.add("waking");
+    touched();
+    requestAnimationFrame(curveKeys); // the keys had no size while hidden
+    setTimeout(() => document.body.classList.remove("waking"), 1200);
+  }
+  // a swipe anywhere over the dial area (left, right or up, at least SWIPE_PX) opens the keyboard
+  let swipeFrom = null;
+  function swipeStart(x, y, target) { if (isLocked() && !$("lock").contains(target)) swipeFrom = [x, y]; }
+  function swipeEnd(x, y) {
+    if (!swipeFrom) return;
+    const across = x - swipeFrom[0], up = swipeFrom[1] - y;
+    swipeFrom = null;
+    if (isLocked() && (Math.abs(across) >= SWIPE_PX || up >= SWIPE_PX)) unlock();
+  }
+  if (window.PointerEvent) {
+    $("input-area").addEventListener("pointerdown", (event) => swipeStart(event.clientX, event.clientY, event.target));
+    $("input-area").addEventListener("pointerup", (event) => swipeEnd(event.clientX, event.clientY));
+  } else {
+    $("input-area").addEventListener("touchstart", (event) => swipeStart(event.touches[0].clientX, event.touches[0].clientY, event.target));
+    $("input-area").addEventListener("touchend", (event) => swipeEnd(event.changedTouches[0].clientX, event.changedTouches[0].clientY));
+  }
+  function setSkin(skin) {
+    const holo = skin === "holo";
+    document.body.classList.toggle("holo", holo);
+    $("skin").textContent = holo ? "Classic" : "Holo";
+    try { localStorage.setItem("nova-deck-skin", skin); } catch (error) {}
+    // Holo moves the orb into the dial and the typing box into the header (the widget cards are hidden)
+    buildKeyboard(holo ? ROWS_60 : ROWS, !holo);
+    if (holo) { $("dial-orb").appendChild($("orb")); $("type-slot").appendChild($("type")); }
+    else { $("state").parentNode.insertBefore($("orb"), $("state")); document.querySelector(".actions-card").appendChild($("type")); }
+    requestAnimationFrame(() => { curveKeys(); renderDial(); window.dispatchEvent(new Event("resize")); });
+    if (holo) lock();
+  }
+  $("skin").addEventListener("click", () => setSkin(document.body.classList.contains("holo") ? "classic" : "holo"));
+  $("lock-now").addEventListener("click", lock);
+  setInterval(() => { if (document.body.classList.contains("holo") && !isLocked() && Date.now() - lastTouch > LOCK_AFTER_MS) lock(); }, 5000);
+
+  // The slider: drag the glowing thumb across; let go before the end and it slides back.
+  const track = $("lock-track"), thumb = $("lock-thumb"), fill = $("lock-fill");
+  let dragFrom = null, travel = 0;
+  function moveThumb(x) {
+    const room = track.clientWidth - thumb.offsetWidth - 8;
+    travel = Math.max(0, Math.min(room, x));
+    thumb.style.transform = "translateX(" + travel + "px)";
+    fill.style.width = (travel + 58) + "px";
+    track.setAttribute("aria-valuenow", room > 0 ? Math.round((travel / room) * 100) : 0);
+    return room > 0 ? travel / room : 0;
+  }
+  function slideStart(x) { dragFrom = x - travel; thumb.style.transition = fill.style.transition = "none"; }
+  function slideMove(x) { if (dragFrom !== null) moveThumb(x - dragFrom); }
+  function slideEnd() {
+    if (dragFrom === null) return;
+    dragFrom = null;
+    thumb.style.transition = fill.style.transition = "transform 0.25s, width 0.25s";
+    if (moveThumb(travel) >= 0.86) { moveThumb(track.clientWidth); setTimeout(unlock, 120); } else moveThumb(0);
+  }
+  if (window.PointerEvent) {
+    track.addEventListener("pointerdown", (event) => { event.preventDefault(); try { track.setPointerCapture(event.pointerId); } catch (error) {} slideStart(event.clientX); });
+    track.addEventListener("pointermove", (event) => slideMove(event.clientX));
+    track.addEventListener("pointerup", slideEnd);
+    track.addEventListener("pointercancel", slideEnd);
+  } else {
+    track.addEventListener("touchstart", (event) => { event.preventDefault(); slideStart(event.touches[0].clientX); }, { passive: false });
+    track.addEventListener("touchmove", (event) => { event.preventDefault(); slideMove(event.touches[0].clientX); }, { passive: false });
+    track.addEventListener("touchend", slideEnd);
+  }
+  let firstSkin = "holo";
+  try { firstSkin = localStorage.getItem("nova-deck-skin") || "holo"; } catch (error) {}
+  setSkin(firstSkin);
+
+  // ---------- widgets: quick actions, music, typing text ----------
+  const CHIPS = {
+    nova: [["nova_stop", "Stop Nova"], ["creative", "Creative"], ["photo", "Photo"], ["brain_now", "Sum up brain"], ["tv_clear", "Clear TV"]],
+    shortcuts: [["copy", "Copy"], ["paste", "Paste"], ["cut", "Cut"], ["undo", "Undo"], ["redo", "Redo"], ["select_all", "Select all"],
+      ["save", "Save"], ["find", "Find"], ["snip", "Snip"], ["switch_app", "Switch app"], ["desktop", "Desktop"], ["task_view", "Task view"],
+      ["new_tab", "New tab"], ["close_tab", "Close tab"], ["reopen_tab", "Reopen tab"]],
+    apps: [["notepad", "Notepad"], ["calculator", "Calculator"], ["explorer", "Files"], ["browser", "Web"], ["spotify", "Spotify"]],
+  };
+  function flash(element) { element.classList.add("down"); setTimeout(() => element.classList.remove("down"), 160); }
+  function showTab(tab) {
+    try { localStorage.setItem("nova-deck-tab", tab); } catch (error) {}
+    document.querySelectorAll(".tabs button").forEach((button) => button.classList.toggle("on", button.dataset.tab === tab));
+    $("chips").textContent = "";
+    CHIPS[tab].forEach((chip) => {
+      const button = $("chips").appendChild(Object.assign(document.createElement("button"),
+        { className: "chip" + (tab === "nova" ? " nova" : ""), textContent: chip[1] }));
+      button.addEventListener("click", () => { flash(button); action(chip[0], chip[1]); });
+    });
+  }
+  document.querySelectorAll(".tabs button").forEach((button) => button.addEventListener("click", () => showTab(button.dataset.tab)));
+  let firstTab = "nova";
+  try { firstTab = localStorage.getItem("nova-deck-tab") || "nova"; } catch (error) {}
+  showTab(CHIPS[firstTab] ? firstTab : "nova");
+  document.querySelectorAll(".buttons button").forEach((button) => button.addEventListener("click", () => {
+    flash(button);
+    action(button.dataset.action, button.getAttribute("aria-label"));
+  }));
+  $("type").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = $("type-text").value;
+    if (!text || !token) return;
+    try {
+      const answer = await post({ text: text });
+      say(answer.message || "Typed on the PC");
+      if (!answer.message) $("type-text").value = "";
+    } catch (error) { online(false); say("Can't reach Nova on the PC"); }
+  });
+
+  // ---------- what Nova is doing, the time, weather, timers and the song (from the PC, every 2 s) ----------
+  const CORE_MODES = { asleep: "idle", armed: "armed", listen: "listen", think: "think", speak: "speak", act: "think", error: "error", music: "idle" };
+  const NAMES = { asleep: "Asleep", armed: "Say “Hey Nova”", listen: "Listening", think: "Thinking", speak: "Speaking",
+    act: "Using your PC", error: "Problem", music: "Asleep" };
+  let latest = {}, musicKey = "", cover = new Image(), spin = 0, lastFrame = Date.now();
+  async function live() {
+    if (token && !document.hidden) {
+      try {
+        const response = await fetch("/api/screen?music=" + encodeURIComponent(musicKey), { headers: { "Authorization": "Bearer " + token } });
+        if (response.status === 401) { document.body.classList.add("unpaired"); return; }
+        const data = await response.json();
+        latest = data;
+        online(true);
+        if ($("message").textContent === "Connecting…") say("Connected to Nova on your PC");
+        if (data.accent) document.documentElement.style.setProperty("--accent-rgb", data.accent);
+        if (window.novaCore) { window.novaCore.setAccent(data.accent || "255, 176, 64"); window.novaCore.setMode(CORE_MODES[data.mode] || "idle"); }
+        $("state").textContent = NAMES[data.mode] || "Online";
+        $("caption").textContent = data.caption || "";
+        $("weather").textContent = data.weather ? data.weather.short : "—";
+        $("place").textContent = data.weather ? data.weather.place : "Set your city in Nova";
+        $("timers").textContent = (data.timers || []).map((timer) => {
+          const left = Math.max(0, Math.round((timer.ends - Date.now()) / 1000));
+          return (timer.label || "Timer") + " · " + (timer.done ? "done" : Math.floor(left / 60) + ":" + String(left % 60).padStart(2, "0"));
+        }).concat(data.reminders || []).join("\n");
+        const music = data.music;
+        $("title").textContent = music ? music.title : "Nothing playing";
+        $("artist").textContent = music ? music.artist : "";
+        if (music && music.cover !== undefined) { musicKey = music.key; cover = new Image(); if (music.cover) cover.src = music.cover; }
+        if (!music) musicKey = "";
+      } catch (error) {
+        online(false);
+        if (window.novaCore) window.novaCore.setMode("offline");
+      }
+    }
+    setTimeout(live, 2000);
+  }
+
+  function tick() {
+    const now = new Date();
+    $("clock").textContent = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+    $("date").textContent = now.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "long" });
+  }
+  setInterval(tick, 1000);
+  tick();
+
+  function drawDisc() {
+    requestAnimationFrame(drawDisc);
+    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim();
+    const d = $("disc").getContext("2d"), elapsed = (Date.now() - lastFrame) / 1000;
+    lastFrame = Date.now();
+    if (latest.music && latest.music.playing) spin = (spin + elapsed * 3.46) % (Math.PI * 2);
+    d.clearRect(0, 0, 184, 184); d.save(); d.translate(92, 92); d.rotate(spin);
+    d.fillStyle = "#0a0a0e"; d.beginPath(); d.arc(0, 0, 90, 0, Math.PI * 2); d.fill();
+    d.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    for (let groove = 58; groove < 88; groove += 5) { d.beginPath(); d.arc(0, 0, groove, 0, Math.PI * 2); d.stroke(); }
+    d.beginPath(); d.arc(0, 0, 50, 0, Math.PI * 2); d.clip();
+    if (cover.complete && cover.naturalWidth) d.drawImage(cover, -50, -50, 100, 100);
+    else { d.fillStyle = "rgb(" + accent + ")"; d.fillRect(-50, -50, 100, 100); }
+    d.restore(); d.fillStyle = "#07080b"; d.beginPath(); d.arc(92, 92, 5, 0, Math.PI * 2); d.fill();
+  }
+  requestAnimationFrame(drawDisc);
+  if (token) live();
+</script>
+<script type="module">
+  // Nova's core, the same one as on the PC, sized for this card: a line with orbits asleep, the orb when she's awake.
+  import { createCore } from "/core.js";
+  window.novaCore = createCore(document.getElementById("orb"), { widget: true });
+</script>
+</body>
+</html>

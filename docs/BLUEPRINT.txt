@@ -1,0 +1,242 @@
+ALFRED — FULL LOCAL-ASSISTANT FUNCTIONAL BLUEPRINT
+For Claude Code / the coding assistant called “Clockwork”
+
+PURPOSE
+
+This is a practical specification for developing Alfred into a capable, local-first Windows assistant. It is inspired by the observable experience of conversational assistants such as HeyClicky, but it does not claim access to HeyClicky’s proprietary internals and does not ask for an exact visual or implementation clone. Keep Alfred’s identity.
+
+The goal is a clear working loop: Alfred hears or receives a request, understands it in context, observes the screen only when asked, proposes a safe next step, draws a useful annotation or performs an authorized action, verifies what happened, and responds naturally. Build the parts as connected, testable components rather than a collection of demo features.
+
+HOW TO USE THIS FILE
+
+Open the Alfred project folder in Claude Code (or the coding assistant you call Clockwork). Give it this entire file as the project specification. Ask it to read the full file, inspect the repository and existing packages, then propose a phased implementation plan before making changes. Start with the audit and baseline phase; do not attempt a risky all-at-once rewrite. Keep this file as the reference specification while building and testing.
+
+PROJECT ROOT: <your folder>\Alfred
+SOURCE:       <your folder>\Alfred\Developer Source
+PACKAGES:     <your folder>\Alfred\Desktop Edition
+              <your folder>\Alfred\USB Edition
+
+1. CURRENT PROJECT AND HARDWARE BASELINE
+
+Inspect the current source, tests, launchers, packaging flow, Git status, README files, EVALUATION.md, and data locations before editing. Relevant source modules include agent.py, dashboard.py, voice.py, screen_reader.py, visual_notes.py, memory.py, tools.py, hardware_advisor.py, and portable_ollama.py. Reuse what works and adapt interfaces rather than replacing the project without reason.
+
+Preserve all user code, data, settings, tasks, maps, notes, memories, model files, and unrelated files. Never reset a database or delete a model to make a test pass. If a proposed change might overwrite existing work, stop and explain the conflict first. Test using disposable databases and writable staging folders.
+
+The development PC runs Windows 10/11 x64 with 32 GB RAM and a 12 GB AMD graphics card. The current packaged Desktop Edition uses the PC’s Ollama and defaults to qwen3:8b. The USB Edition carries an Ollama runtime and currently includes qwen2.5:7b. Preserve both model choices; do not silently switch or download a replacement. The known local Ollama endpoint has been 127.0.0.1:11434, but read existing configuration instead of hard-coding assumptions.
+
+A previous test saw qwen3:8b fully GPU-resident on this PC, while Ollama also reported an AMD driver warning. Windows/WMI once reported only 4 GiB for the Radeon. Do not treat that WMI value as authoritative VRAM, and do not promise GPU acceleration. Verify actual placement and measure latency. The USB model chooser should use conservative host RAM/storage estimates, select among already-installed models, and ask before offering a larger download.
+
+The Desktop data has been configured outside the OneDrive-redirected Desktop, under the user’s local Alfred data area; preserve that arrangement. USB data must remain separate. Do not launch or test USB Ollama cleanup directly from the OneDrive Desktop: it was previously denied there. Use a writable staging folder or a writable exFAT/NTFS USB. Earlier guidance recommends at least 16 GB free and 32 GB for more room.
+
+Existing features include local chat, approval-gated task capture, editable idea maps, optional Vosk voice input, audio-device selectors and short tests, user-triggered screen reading with review, and hardware-aware USB model choice. Packaged voice-resource loading was fixed; Desktop push-to-talk transcribed live audio in a previous test. The user later reported that sound did not work well. Treat audio reliability as unresolved until separately diagnosed and retested in the packaged apps. Spoken replies, voice-to-map edits, precise microphone-reactive core behavior, wake-word reliability, real-app screen reading, and physical USB portability still require clear end-to-end test results.
+
+2. EXPERIENCE AND STATE MODEL
+
+Alfred should be conversational, clear about uncertainty, useful without being pushy, and transparent about what it is doing. The distinguishing experience is an integrated loop—conversation, optional screen context, safe action, visible progress, verified result—not a decorative dashboard or an imitation of another product.
+
+Represent every typed or spoken request as a Turn with a unique ID, source, time, content, permitted context, and cancellation token. Use explicit states such as:
+
+idle -> listening -> transcribing -> understanding -> planning -> awaiting_approval -> executing -> verifying -> responding -> complete
+
+Every active stage can end as cancelled or error. The UI must distinguish listening, model reasoning, waiting for approval, controlling another application, speaking, success, and failure. Do not display “done” until a result is verified. Serialize mouse/keyboard jobs so two turns cannot race to control the same desktop.
+
+Use a small event/state layer to communicate between UI and workers. Keep slow model inference, STT, TTS, screen capture, and automation off the UI thread. Every job must have cancellation, a timeout, an error result, and a visible status. Check cancellation before and after every external action.
+
+3. COMPONENTS AND DATA CONTRACTS
+
+Adapt these proposed responsibilities to the current Python code and build system. Do not introduce a large framework unless it provides a needed, tested capability.
+
+- AudioInput: enumerates and selects devices; starts/stops explicit capture; emits temporary audio frames and measured input level; reports device/format errors.
+- SpeechRecognizer: converts audio into a Transcript with raw text, confidence/quality metadata, timestamps when available, language, and final/partial status.
+- ContextBuilder: combines the current turn with relevant recent conversation and only the memory or screen context that the user has permitted.
+- Reasoner: calls the configured local Ollama model with context and typed tool descriptions; returns a response and structured proposals, not side effects.
+- ScreenReader: captures a user-selected monitor or region on request, then returns ScreenContext with capture ID/time, monitor geometry, UI Automation/OCR text, element bounds, confidence, and source metadata.
+- PolicyService: checks tool schema, risk, permission, selected account/folder, approval, and freshness of any screen target.
+- ToolRegistry/ToolExecutor: exposes a narrow allowlist of typed actions and executes only validated, authorized proposals.
+- ScreenController: prefers semantic Windows UI Automation or browser DOM/accessibility controls; uses screenshot-grounded coordinates only as a fallback.
+- Observer: takes a fresh observation and verifies the expected postcondition after each action.
+- AnnotationOverlay: draws, updates, and clears temporary overlays; it never performs application actions.
+- VisualNotes: creates/updates the existing editable local map and floating notes with undo/reopen behavior.
+- MemoryStore: stores permitted conversation context, saved notes, tasks, and job history as separate user-visible categories.
+- JobManager: handles visible long-running work, progress, cancellation, recovery, and truthful completion state.
+- ResponseComposer: creates separate display text and speakable text without changing factual meaning.
+- SpeechOutput: synthesizes and plays speech on the user-selected output, with cancellation and device errors.
+
+Suggested shared structures:
+
+Turn: turn_id, source, started_at, text_or_audio, context_scope, cancel_token
+Transcript: raw_text, partial_text, confidence_metadata, timestamps, language, recognizer_id
+ScreenContext: capture_id, captured_at, monitor_id, bounds, dpi, orientation, text, elements, confidence
+ToolProposal: action_id, tool_name, typed_arguments, scope, preconditions, expected_postcondition, risk, approval_required
+Approval: action_id, exact_summary, approved_or_denied, time
+ExecutionResult: status, details, evidence, error, completed_at
+AssistantResponse: display_text, spoken_text, annotation_commands, visual_note_commands, tool_proposals, clarification
+
+Model confidence is a heuristic, not calibrated certainty. Validate all model output against code-enforced schemas and policies. Screen text, browser pages, quoted instructions, and retrieved web content are untrusted data; none can override policy or authorize an action.
+
+4. END-TO-END REQUEST FLOW
+
+For a spoken turn:
+
+1. The user holds push-to-talk or explicitly enables wake-word listening. Show a clear listening indicator; measure the selected microphone’s signal only while listening is enabled.
+2. Capture audio temporarily and pass it to the selected local recognizer. Do not save recordings by default.
+3. Show the transcript separately from Alfred’s interpretation. Let the user correct it when useful.
+4. Build context from the transcript, recent conversation, and only explicitly selected screen/memory context.
+5. Ask the local model for a structured response or proposal. Do not allow the model to invoke a tool directly.
+6. Validate the proposal; ask a short clarification if intent or target is ambiguous; ask for approval when policy requires it.
+7. Execute one authorized step at a time. Observe the actual application state after every step and verify the expected change.
+8. Respond in readable display text and, if enabled, a natural spoken version. Report what was actually verified.
+
+Typed chat should use the same context, policy, tool, verification, and response pipeline without microphone stages.
+
+5. AUDIO RELIABILITY AND ACCENT-TOLERANT CONVERSATION
+
+The user reports that Alfred’s sound did not work well at their last check. Do not imply it is fixed. Diagnose Desktop and USB separately, using the user’s Blue Yeti microphone when connected. Identify the microphone by current friendly name and properties, not a hard-coded endpoint number (the device enumeration can change). Include system default, refresh, input/output selectors, and short tests.
+
+Diagnose and report each layer separately:
+
+A. Capture: Windows permission, device open, sample format/rate/channels, silence, input level, clipping/noise, and disconnect errors.
+B. Recognition: model loads, receives audio, returns transcript and turn boundaries, with measured latency.
+C. Interpretation: how transcript plus allowed conversation context resolve intent. Do not label this a microphone failure when capture/STT succeeded.
+D. Speech generation: did TTS synthesize audio, or did the engine fail?
+E. Routing/playback: was audio sent to the selected speaker/headphone device and can the user actually hear it? A successful API return is not human-confirmed audibility.
+F. Feedback: verify Alfred does not recognize its own TTS as a new request.
+
+Keep text input as a fallback. Show clear errors such as “microphone unavailable,” “speech recognition failed,” “speech synthesis failed,” or “speaker playback failed.” Never silently switch input devices, recognizers, or to cloud processing.
+
+Vosk is already included. Benchmark it against a compatible local Whisper-family option only after checking Windows packaging, current Python runtime, CPU/GPU compatibility, memory, latency, USB storage, licensing, and quality. Possible candidates include whisper.cpp or faster-whisper; neither is guaranteed compatible or faster here. Do not assume AMD GPU support. Before a large model download, state size/resource needs and ask for consent. Never upload audio or choose cloud STT by default.
+
+Improve understanding of accented, conversational English: tolerate pauses, fillers, repetitions, restarts, and incomplete sentences. Configure voice activity detection/end-of-turn pauses to avoid premature cut-off. Partial transcripts must be marked provisional and must never trigger an action. Preserve the raw transcript; any cleaned display transcript is separate and editable. Do not silently insert missing names, numbers, negations, or words.
+
+Use recent conversation context for references like “that one” or “do it,” but don’t use long-term memory to fabricate words. Offer a user-approved vocabulary list for terms they choose (for example Alfred, Ollama, or course vocabulary). Language hints may help where supported, but do not claim they guarantee accent recognition. Keywords are clues only: “send,” “delete,” “submit,” or “buy” never causes an action by itself. Ask a short clarification if two meanings remain plausible or the action is consequential.
+
+With user consent, benchmark on voluntary live speech through the Yeti. Ask the user to confirm/type intended wording; do not retain recordings by default. Measure word error rate separately from intent/task success, correction/clarification rate, and latency. Report the tested microphone, recognizer, package, and whether tests used live speech, synthetic fixtures, or typed text. Results on this user’s voice do not guarantee performance for every accent.
+
+6. NATURAL, WARM, EXPRESSIVE ALFRED VOICE
+
+Make speech sound more natural than flat translation-style output. Implement conversational wording and TTS as separate components:
+
+- ResponseComposer creates concise, friendly, context-appropriate wording.
+- TTS converts it into audio with supported voice, pronunciation, pacing, rhythm, pauses, emphasis, and intonation.
+
+Give Alfred a consistent personality: warm, patient, clear, helpful, and not overly formal. Use contractions, varied sentence lengths, and natural but restrained emphasis. Use a calmer tone when the user is frustrated and a lively tone when appropriate. Avoid excessive “um/uh,” forced laughter, exaggerated emotion, fake intimacy, or pretending to have consciousness or real feelings. Do not mimic or mock the user’s accent. Keep replies understandable and concise; do not make the assistant verbose just to sound human.
+
+Keep displayed text and spoken meaning aligned. The speakable rendering may expand abbreviations, read punctuation naturally, or explain symbols, but must not alter facts. Add a pronunciation dictionary for user-approved names/terms. Normalize numbers, math, code, and URLs into a clear spoken form (for example, distinguish reading a decimal from reading a web address).
+
+Evaluate local neural TTS candidates on Windows/CPU/AMD compatibility, latency, naturalness, intelligibility, license, packaging, model size, and memory use. Piper or another maintained local engine may be evaluated but is not a promised choice. Keep Windows SAPI as a clearly identified fallback if available. Cloud TTS is off by default and requires explicit opt-in. Ask before large downloads.
+
+Provide voice audition samples and selectable voices. Offer rate/pitch/style controls only where the selected engine supports them. Use phrase-level streaming or chunks that preserve prosody between phrases; do not restart the intonation unnaturally for every sentence. Include a pronunciation/user vocabulary list. Coordinate TTS and microphone capture so Alfred does not hear itself: start with half-duplex (pause command recognition while speaking) unless tested echo cancellation works. Let the user stop or interrupt speech immediately; cancel queued chunks.
+
+Evaluate TTS with actual user listening comparisons: intelligibility, naturalness, pronunciation, pace, and whether the voice feels warm without being theatrical. Record human feedback separately from synthesis success. Do not promise perfect human realism or cloud-level quality.
+
+7. DIRECT DESKTOP OVERLAYS AND VISUAL NOTES
+
+Alfred must draw over the actual Windows desktop, not just inside its dashboard. Build transparent, always-on-top overlay windows per monitor for highlights, rings, frames, arrows, labels, and editable floating notes. They explain or teach; they do not click or change the underlying app.
+
+In normal display mode, overlay windows must be click-through and non-activating so the underlying app receives mouse clicks, typing, and scrolling. A possible Win32 approach is a layered, topmost, no-activate window with transparent hit-testing; adapt to the actual UI framework and verify the behavior. Provide a clear edit mode to move/resize/edit notes; visibly indicate edit mode and restore click-through afterward. Provide hide/clear/restore controls and a configurable shortcut. Escape cancels editing or hides marks only during an active Alfred overlay session; do not interfere with other apps while Alfred is idle.
+
+The model may emit only a fixed structured drawing vocabulary such as highlight_rect, ring, arrow, label, frame, and floating_note. Never execute model-generated code, HTML, JavaScript, CSS, or arbitrary coordinates. Example contract:
+
+{
+  "kind": "highlight_rect",
+  "monitor_id": "from-current-capture",
+  "capture_id": "fresh-capture-id",
+  "target_id": "grounded-ui-element-id",
+  "bounds_px": "measured bounds, not guessed",
+  "label": "Save",
+  "style": "approved-style",
+  "expires_ms": 12000
+}
+
+Validate the command, target, bounds, label length, style, expiry, and capture freshness before drawing. Ground bounds in current UI Automation/OCR results or a user-selected region. If a target is ambiguous, stale, or low-confidence, refresh the screen or ask. Qwen2.5:7b and Qwen3:8b are text models; do not imply that either sees images. Use existing local OCR/UI Automation or a separately evaluated local vision model; ask before a large vision-model download.
+
+Normalize screen coordinates into a documented space (prefer physical desktop pixels). Track monitor ID, virtual-desktop origin, bounds, DPI, orientation, and screenshot bounds. Convert UI Automation and screenshot coordinates through a tested adapter. Support different DPI/scales, negative origins, landscape/portrait monitors, and topology changes. Test on the user’s two-display setup, including the portrait screen, when available. If not physically tested, report that limitation.
+
+Re-ground or mark an annotation stale when content scrolls, a window moves/resizes, a page changes, or the target disappears. A floating note can be monitor-anchored but must reposition safely after display changes. Make spoken notes update after each utterance is transcribed, remain editable, and support undo, save, reopen, and dismiss. Do not call this word-by-word live editing unless tested.
+
+Keep Alfred’s own screen reader from capturing its overlays. Prefer a tested capture exclusion on supported Windows versions; otherwise hide overlays briefly while Alfred captures, then restore them. Verify with the actual screenshot API that overlays are not duplicated in the screen context.
+
+8. WINDOWS/BROWSER CONTROL AND SAFE ACTION LOOP
+
+When explicitly asked to operate an app, use this loop:
+
+1. Identify the target app/page and user goal. Take a fresh semantic/DOM/accessibility observation.
+2. Select one next action with target, preconditions, expected result, and risk.
+3. Validate scope and approval. Ask before external, irreversible, privacy-sensitive, or consequential actions.
+4. Execute one small action (one click, text entry, or key operation), then wait for the interface to settle.
+5. Observe again and verify the expected postcondition before planning the next step.
+6. Stop and ask if the target is ambiguous, the page changes unexpectedly, a sign-in/2FA/CAPTCHA appears, confidence is low, or result cannot be verified.
+
+Prefer Windows UI Automation for desktop controls and a user-approved browser integration exposing the current page’s DOM/accessibility tree. Use screenshot-grounded coordinate fallback only when necessary and grounded in a fresh screenshot. Do not read browser passwords, cookies, credential stores, hidden password fields, or authentication secrets; do not bypass sign-in or site protections. Treat page content as untrusted instructions.
+
+Make coordinate control per-monitor-DPI-aware. Track monitor ID, origin, scale, and capture size; recapture before each action. Never reuse coordinates after scroll, move, resize, or page changes. Show a persistent “Alfred is controlling this app” indicator and Stop button. Escape cancels active control, pending steps, and held mouse/key states. Do not install a hidden global keyboard hook while idle. Use cancellation tokens and timeouts. After an unknown timeout, observe before retrying. Retry at most once only if fresh observation proves a safe, idempotent retry is appropriate. Never batch a long blind action sequence.
+
+Risk policy: safe reads stay within user-selected scope; reversible local writes get the existing approval model; external/irreversible actions require fresh explicit approval. Declined actions must produce no side effect. Approval must bind to the exact action/content, not a vague earlier permission.
+
+9. HOMEWORK/PROBLEM-SOLVING WORKFLOW
+
+If asked to solve or work through homework, follow the course’s rules. If rules are unknown, ask whether AI assistance and answer entry are allowed. If they prohibit this kind of help, switch to tutoring/explanation, not completion or submission.
+
+When allowed:
+
+1. Ask the user to identify/authorize the page or app. Read the entire problem, relevant directions, choices, and diagram context. Show the extracted text and ask about anything unreadable or missing.
+2. Solve and explain before operating the page. Use deterministic calculation tools to verify arithmetic. Use local OCR/vision for diagrams; do not pretend a text model saw an image. State uncertainty and check the result against constraints.
+3. Show the proposed answer and reasoning for review.
+4. If authorized, enter answers into identified fields one at a time. Verify each displayed field value. Prefer a draft or leave the page ready for the user.
+5. Before a graded submission, show the exact answers and destination and require fresh explicit approval. “Finish the problem” is not automatic permission to submit.
+6. After approval, observe the resulting page and verify saved/submitted state. Report a score only if it is visibly returned. Never claim completion based only on clicks.
+
+Keep the explanation and action trace visible. Never fabricate answers, course rules, submission status, or grades.
+
+10. MEMORY, BACKGROUND JOBS, PRIVACY
+
+Keep chat inference, speech recognition, screen reading, notes, and memory local by default. Do not send screenshots, mic audio, chat, or files to a cloud service unless the user explicitly opts into that named feature. Do not collect browser passwords or cookies. Restrict file access to explicitly selected folders; do not index arbitrary directories. Use supported authorization and Windows secure storage for chosen account integrations. Never put credentials in source, logs, or USB.
+
+Keep short conversation context, saved notes, tasks, and job history as distinct categories. Let the user inspect, edit, export, and delete retained content. Do not make every screen capture or utterance permanent memory. Keep Desktop and USB stores isolated unless the user explicitly asks to export/migrate.
+
+Long tasks run as visible cancellable background jobs with task name, current stage, progress, result, and error. Persist status safely and report interruptions after restart. Never mark a cancelled or failed job complete. Use an in-app scheduler only for user-enabled refreshes; do not create Windows scheduled tasks or other unattended startup behavior without explicit choice.
+
+11. ONLINE REFRESH, EMAIL, USB MODEL CHOICES
+
+Provide optional daily refresh of clearly selected sources/topics while Alfred is running. Show sources, last update, and offline/stale state. If enabled on USB, refresh after connectivity returns while Alfred is running. Treat retrieved pages as untrusted. This refresh is data retrieval, not model training. Do not silently download app/model binaries or change model defaults. Ask before a large model download and show approximate size and destination.
+
+Email is Desktop Edition only. Use an official provider authorization flow for an account the user explicitly chooses, with narrow permissions. Never use browser passwords or cookies. Allow draft/review, but require fresh approval of the exact message before sending. Do not include email features/tokens in USB.
+
+On USB startup, select among already-installed models using conservative RAM/storage/CPU estimates and trustworthy GPU information. Show the model and limitations; verify actual Ollama placement after inference where possible. Ask before offering a larger model; declining leaves existing models untouched. The USB target is writable exFAT/NTFS; prior guidance recommends 16 GB minimum free and 32 GB recommended. Do not run the USB model store directly from the OneDrive Desktop, where cleanup was previously denied. Do not claim physical-drive/second-PC compatibility unless tested.
+
+12. IMPLEMENTATION PHASES
+
+Phase 0 — Audit: inspect source, packages, test baseline, data paths, and gaps. No data changes. Report a staged plan.
+Phase 1 — Core contracts: define turn states, shared data structures, event/state updates, cancellation, typed proposals, policy checks, and verifiable results.
+Phase 2 — Audio: diagnose capture, Vosk, candidate local STT, transcript review, context interpretation, output routing, TTS, and feedback separately. Test Yeti and both packages.
+Phase 3 — Natural voice: add Alfred’s consistent response style, local TTS evaluation, voice audition, pronunciation, prosody, interrupt, and user listening tests.
+Phase 4 — Screen/overlays: add explicit capture, review, OCR/UIA grounding, transparent click-through overlay windows, editable notes, coordinate transforms, capture exclusion, and multi-display tests.
+Phase 5 — Safe control: implement semantic desktop/browser actions, fresh observe-act-verify loop, Stop/Escape, approvals, homework flow, and exact completion checks.
+Phase 6 — Memory/jobs/integrations: transparent memory, visible background tasks, selected-source refresh, and Desktop-only email with approval.
+Phase 7 — Packaging: rebuild Desktop and USB through existing build flow; verify launchers, data preservation, runtime resources, and package-specific tests.
+
+Work in small, reviewable changes. Don’t rewrite unrelated modules or build all features in one untested step. Keep the current builds usable. Ask before destructive changes, account authorization, large downloads, email sending, or graded submission.
+
+13. ACCEPTANCE TEST PLAN
+
+Use unit tests with synthetic audio/screen fixtures and disposable databases. Then test the actual packaged Desktop and USB builds separately. Record which tests used synthetic data, simulated transcripts, live devices, or human listening.
+
+A. Audio capture/STT: select the Yeti by current name; show live level on voice and silence; mute/stop; disconnected device and permission errors; test end-to-end push-to-talk. Compare Vosk with a compatible local Whisper-family option on user-consented speech. Measure word error rate, task intent success, latency, and resource use separately. Test pauses, fillers, repetitions, incomplete phrases, vocabulary, and references to prior turns.
+
+B. Interpretation: retain raw transcript; show any normalized version separately; use recent conversation accurately; never invent names/numbers/negations; ambiguous and high-impact meaning asks a concise question; keywords alone never execute tools.
+
+C. Natural TTS: audition available voices; user compares intelligibility, pronunciation, pace, naturalness, warmth, and appropriate emotion. Test contractions, numbers/math/code, phrase continuity, pause/emphasis, selected output routing, stop/interruption, synthesis error, and human-confirmed audibility. Keep software success distinct from “user heard and liked it.”
+
+D. Feedback/privacy: Alfred does not hear its own reply as a command; no recording is saved by default; no cloud upload occurs; text fallback works when audio fails; device settings persist separately per edition.
+
+E. Overlay: show a known highlight on each display, including portrait/mixed DPI; click-through underlying app works; edit mode is obvious; Escape/hide/restore works; moves/scrolls invalidate or re-ground; overlay does not appear in Alfred’s own capture; invalid/stale/model-invented bounds are rejected. Test physical two-monitor geometry when connected; otherwise state it is unverified.
+
+F. Control/homework: one action per fresh observation; Stop/Escape cancels and releases held inputs; timeout does not cause blind duplicate; declined action produces no write; fields read back; course restriction switches to tutoring; exact graded submission requires approval; saved state and score are verified from the page.
+
+G. Memory/jobs/integrations/packaging: inspect/edit/delete memory; Desktop/USB data remain separate; jobs report progress/cancel/restart/errors accurately; refresh stays within selected sources and responds safely to reconnect; no unapproved download; email draft does not send and exact approval is required; both launchers and package runtime work without overwriting data. Report physical USB/other-PC behavior as unverified if not tested.
+
+14. FINAL REPORT REQUIRED FROM CLAUDE CODE
+
+After each implementation phase report: what changed, files touched, exact test commands/results, whether each test was source-only or packaged, what remains unverified, any dependency/model downloads requested, and how to launch the affected edition. Distinguish microphone capture, recognition, interpretation, speech generation, playback, annotation, and action verification. Do not claim success because a click was sent, a model returned text, an API call completed, or a simulated transcript passed.
+
+The finished Alfred should be useful, warm, transparent, local-first, interruptible, and safe: conversational when asked, visually helpful on the real desktop, careful with actions, honest about uncertainty, and verified by real packaged tests—not a false claim of perfect accuracy or human consciousness.
