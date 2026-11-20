@@ -240,6 +240,9 @@ class SessionProcess:
 class SessionTests(unittest.TestCase):
     def test_one_claude_code_answers_question_after_question(self) -> None:
         started: list[SessionProcess] = []
+        platform = patch.object(plan_brain.sys, "platform", "linux")  # stopping uses kill() here, not Windows' taskkill
+        platform.start()
+        self.addCleanup(platform.stop)
 
         def start(arguments, **options):
             started.append(SessionProcess())
