@@ -1,3 +1,23 @@
+## New in v2.9.0
+
+- **Set up everything**: on the first start, Nova downloads and turns on what every feature needs by herself, one step after another: Ollama (no administrator prompt), the strongest model for your PC (measured), the meaning-search model, her natural voice, Whisper, the vision model, ffmpeg, Node.js, and the Claude Code, Codex and Gemini CLIs. Anything already there is just turned on. If a step fails, the rest still run, and a step that would fill the disk is skipped. Watch it or run it again from SETTINGS → Downloads → **Set up everything**; the first-start message has **Stop**. Two things can't be automatic: Docker Desktop (it needs an administrator prompt and a restart) and signing in to your accounts.
+- **Advance mode** (the new ADVANCE button, or say "advance mode"): the HUD turns red, the orb moves to the left, and a board fills the right side:
+  - **Library**: every topic and project.
+  - **What Nova can do**: every skill, with what to say.
+  - **Widgets**: clock, weather, timers, reminders, tasks, now playing, this PC, who answered, headlines. **Edit** adds, removes and reorders them.
+  - **Separate apps**: Rea and Shannon each open in their own window. OpenProject runs in Docker on this PC only. AppFlowy, Cap and OpenWhispr open once installed (else their download page). VoiceStudio, Chatwoot, Open Generative AI, Cal.diy and open-seo open their pages. **+ Your app** adds any site or program.
+  
+  "Exit advance mode" goes back.
+- **API brain** (was "Claude with a key"): add any AI with your own API key. That's Claude, OpenAI, Google Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI or Together, or any OpenAI-compatible address such as LM Studio. **Load models** lists what your key can use. Add several and switch between them. Keys stay sealed on this PC.
+- **Cloud brain** (was "Claude plan"): an AI you sign in to, no key needed. That's Claude Code (Claude plan), Codex (ChatGPT plan) or Gemini CLI (Google account). **Install** and **Connect account** are one click each.
+- **From the repos you sent, built into Nova:**
+  - **Dictation**: hold Ctrl+Win, speak, and the words are typed where you are (from OpenWhispr).
+  - **Screen recording**: "record my screen" … "stop recording" saves an MP4 in Videos\Nova Recordings (from Cap's idea).
+  - **SEO check**: "SEO check klee.dev" lists what to fix first (from open-seo).
+  - **Free time**: "when am I free for an hour this week" reads your Google Calendar and drafts a message (from cal.diy).
+  - **Pictures**: "make a picture of …" uses your OpenAI API brain (from Open Generative AI).
+- **Fixed**: Rea's side card could show "nullnull".
+
 ## New in v2.8.1
 
 - **Rea, redrawn as an orbit**: the app you analyse is a small glowing core, and its parts orbit it on tilted rings, each leaving a faint trail, with their links arcing through the core. Around the edges: the app's name, the counts, the chosen part's card (what Rea found, what it talks to), the stages, and a live timeline of what Rea is doing. Drag to spin and tilt it, scroll or pinch to zoom, click a part to bring it round to the front; ← → go part by part.
