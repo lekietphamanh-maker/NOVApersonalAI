@@ -39,6 +39,7 @@ import drive_tools
 import node_runtime
 import google_mcp
 import world_monitor
+import routes
 import hotkeys
 import media_keys
 import kokoro_voice
@@ -298,6 +299,7 @@ class AlfredApp:
         self.agent.reverse = self.reverse.start if self.settings.get("reverse_on") else None
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
+        self.agent.route = self._route_tool
         self.agent.web = self.web
         self.agent.claude = claude_expert.available()
         self.agent.on_brain = lambda label, why: self.events.put(("brain", (label, why)))
@@ -318,6 +320,7 @@ class AlfredApp:
         self.agent.library = _LibraryTools(self)
         self.news_store: NewsStore | None = None  # the news desk's database, opened when first needed
         self.world_monitor = world_monitor.WorldMonitor(news=self._world_news)
+        self.router = routes.Router(_data_dir() / "routes", near=self._route_city)
         self.news_running = False
         self.agent.news = self._news_lookup if self.settings.get("news_on") else None
         self.answers = deque(maxlen=12)  # who answered the latest requests (also in answers.jsonl in the data folder)
@@ -698,7 +701,7 @@ class AlfredApp:
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
-               "world", "claude_connectors", "google_mcp", "node_path"}
+               "world", "claude_connectors", "google_mcp", "node_path", "route"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2139,6 +2142,36 @@ class AlfredApp:
         if action == "show":
             return f"The World view is open on {focus['name']}. Say so in a few words."
         return text
+
+    # ---------- fastest routes on OpenStreetMap roads (routes.py), shown on the Route screen ----------
+
+    def _route_city(self) -> str:
+        place = getattr(self.agent.location, "place", None) if self.agent.location is not None else None
+        if not place:
+            return ""
+        from location import label
+        return label(place)
+
+    def _route_tool(self, start: str, end: str, stops: list[str], mode: str, best_order: bool) -> str:
+        try:
+            found = self.router.route(start, end, stops, mode, best_order)
+        except (ValueError, OSError) as exc:
+            self.ui.emit({"type": "route_error", "text": f"No route: {exc}."})
+            return f"Not done: {exc}."
+        data = {key: getattr(found, key) for key in ("places", "mode", "seconds", "metres", "legs", "line", "searched",
+                                                      "roads", "reordered")}
+        self.ui.emit({"type": "route_view", "route": {**data, "google_maps": found.google_maps()}})
+        return found.summary()
+
+    def _act_route(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The Route screen's form: worked out on a thread (the map data can take a while), then drawn."""
+        start, end = " ".join(str(args.get("start") or "").split()), " ".join(str(args.get("end") or "").split())
+        if not start or not end:
+            return {"ok": False, "error": "Say where from and where to."}
+        stops = [stop.strip() for stop in str(args.get("stops") or "").split(",") if stop.strip()][:4]
+        mode = str(args.get("mode") or "motorbike")
+        threading.Thread(target=self._route_tool, args=(start, end, stops, mode, True), name="NovaRoute", daemon=True).start()
+        return {"ok": True}
 
     def _news_lookup(self, query: str, category: str, days: int, offset_days: int) -> str:
         return news_assistant.lookup(self._news(), query, category, days, offset_days)

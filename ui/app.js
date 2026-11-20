@@ -3,6 +3,7 @@ import { createCore } from "./core.js";
 import { createMindMap, ICONS, PALETTE } from "./mindmap.js";
 import { createLibrary } from "./library.js";
 import { createWorld } from "./world.js";
+import { createRoute } from "./route.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -28,6 +29,11 @@ const world = createWorld($("#world"), { act: (...args) => act(...args), onOpenC
   $("[data-act=world]").classList.toggle("on", open);
   if (open && library.isOpen()) library.close();
   if (open && mapOpen) openMap(false);
+} });
+const routeView = createRoute($("#route"), { act: (...args) => act(...args), onOpenChange: (open) => {
+  $("[data-act=route]").classList.toggle("on", open);
+  if (open && world.isOpen()) world.close();
+  if (open && library.isOpen()) library.close();
 } });
 let online = false;
 let offlineTimer = 0;
@@ -113,6 +119,8 @@ function handle(event) {
     case "library_changed": library.reload(); break;
     case "world_focus": world.open(event); break;
     case "world_data": if (world.isOpen()) world.setData(event); break;
+    case "route_view": routeView.show(event.route); break;
+    case "route_error": routeView.open(); routeView.error(event.text); break;
   }
 }
 
@@ -1336,6 +1344,7 @@ $("[data-act=screen]").onclick = screenMenu;
 $("[data-act=map]").onclick = () => openMap(!mapOpen);
 $("[data-act=library]").onclick = () => (library.isOpen() ? library.close() : library.open());
 $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.open());
+$("[data-act=route]").onclick = () => (routeView.isOpen() ? routeView.close() : routeView.open());
 $("#map-add").onclick = () => mindmap.addIdea();
 $("#map-outline-toggle").onclick = () => setPane("notes");
 $("#map-tidy").onclick = () => mindmap.tidy();
@@ -1649,6 +1658,7 @@ document.addEventListener("keydown", (event) => {
     if (!$("#creative-layer").hidden) closeCreative();
     else if (openPane) setPane(openPane);
     else if (world.isOpen()) world.close();
+    else if (routeView.isOpen()) routeView.close();
     else if (mapOpen) openMap(false);
     else act("stop");
     return;

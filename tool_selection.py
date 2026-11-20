@@ -37,6 +37,8 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("fitness_status",), r"heart|pulse|bpm|hrv|fitness|workout|exercise"),
     (("ask_claude",), r"claude"),
     (("send_file",), r"send (me )?(the|my|a|that)|telegram"),
+    (("route",), r"route|directions?|way (to|from)|get (to|from)|fastest|quickest|drive to|ride to|walk to|"
+                 r"how far|from .+ to|đường|chỉ đường"),
 )
 _GROUPS = tuple((names, re.compile(rf"(?<!\w)({words})(?!\w)", re.IGNORECASE)) for names, words in GROUPS)
 

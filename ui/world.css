@@ -12,6 +12,7 @@
 .world-body { display: grid; grid-template-columns: minmax(0, 1fr) 340px; min-height: 0; }
 .world-stage { position: relative; min-height: 0; }
 #world-globe { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#route-map { position: absolute; inset: 0; width: 100%; height: 100%; }
 .world-card { position: absolute; left: 24px; bottom: 20px; display: grid; gap: 6px; max-width: 420px; padding: 14px 16px;
   border: 1px solid var(--line-strong); background: rgba(5, 7, 9, 0.88); backdrop-filter: blur(6px); }
 .world-card b { color: #fff; font-weight: 500; line-height: 1.35; }
@@ -33,3 +34,12 @@
   .world-body { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 40%; }
   .world-side { border-left: 0; border-top: 1px solid var(--line); }
 }
+
+/* Route: the same frame, a form in the header and the details beside the map. */
+.route-form { display: flex; gap: 6px; flex: 1; min-width: 0; margin-left: 10px; }
+.route-form .field { margin: 0; min-width: 0; width: auto; flex: 1 1 140px; padding: 6px 8px; font-size: 12px; }
+.route-form select.field { flex: 0 0 120px; width: 120px; }
+.route-side { display: flex; flex-direction: column; gap: 8px; align-content: start; }
+.route-side b { color: #fff; font: 600 18px/1.2 var(--mono); }
+.route-side i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+@media (max-width: 900px) { .route-form { flex-wrap: wrap; } }

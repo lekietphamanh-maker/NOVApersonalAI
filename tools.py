@@ -240,7 +240,15 @@ WORLD_TOOL = _tool(
     "place. brief: say what's happening there; show: only open the globe there. place: a country, city or region "
     "(e.g. the Middle East, Japan, Europe), empty for the whole world. days: 1 (default) or up to 7.",
     {"action": {"type": "string", "enum": ["brief", "show"]}, "place": _TEXT, "days": {"type": "integer"}}, ["action"])
-SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL]
+ROUTE_TOOL = _tool(
+    "route", "The fastest way on real roads from one place to another, through any stops, worked out on this PC from "
+    "OpenStreetMap; Nova's screen shows it on a map. start and end: place names (a district, street, landmark or "
+    "address). stops: places to pass on the way, comma-separated. mode: motorbike (default), car or walk. "
+    "best_order: put the stops in the quickest order (default true).",
+    {"start": _TEXT, "end": _TEXT, "stops": _TEXT, "mode": {"type": "string", "enum": ["motorbike", "car", "walk"]},
+     "best_order": {"type": "boolean"}}, ["start", "end"])
+SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
+               ROUTE_TOOL]
 
 
 
@@ -641,6 +649,14 @@ def _run_world(_name: str, arguments: dict[str, Any], context: ToolContext) -> s
     return context.world(str(arguments["action"]), _words(arguments.get("place"), 80), int(arguments.get("days") or 1))
 
 
+def _run_route(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
+    if context.route is None:
+        return "Routes aren't available here."
+    stops = [stop for stop in (" ".join(part.split()) for part in str(arguments.get("stops") or "").split(",")) if stop]
+    return context.route(_words(arguments["start"], 120), _words(arguments["end"], 120), stops[:4],
+                         str(arguments.get("mode") or "motorbike"), arguments.get("best_order") is not False)
+
+
 def _run_discover(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
     if context.discover is None:
         return "Discover isn't available here."
@@ -712,6 +728,7 @@ register([SKILLS_TOOL], lambda _name, arguments, context: execute_skills_tool(ar
 register([BUILD_TOOL], _run_build)
 register([REVERSE_TOOL], _run_reverse)
 register([WORLD_TOOL], _run_world)
+register([ROUTE_TOOL], _run_route)
 register([DISCOVER_TOOL], _run_discover)
 register([SEND_FILE_TOOL], _run_send_file)
 register([DEEP_WORK_TOOL], _run_deep_work)

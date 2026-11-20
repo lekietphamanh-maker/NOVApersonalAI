@@ -83,12 +83,12 @@ jobs:
         run: |
           $env:ALFRED_TEST_DOWNLOADS = "1"
           python -m unittest tests.test_news_intel.LiveProviderTests -v
-      - name: World view against the real feeds (USGS, NASA EONET, GDACS)
-        timeout-minutes: 3
+      - name: World view and routes against the real services (USGS, NASA EONET, GDACS, OpenStreetMap)
+        timeout-minutes: 6
         continue-on-error: true  # a feed's bad hour is reported here without holding up a release
         run: |
           $env:ALFRED_TEST_DOWNLOADS = "1"
-          python -m unittest tests.test_world_monitor.LiveFeedTests -v
+          python -m unittest tests.test_world_monitor.LiveFeedTests tests.test_routes.LiveRouteTests -v
       - name: source smoke test (the HUD opens in Edge and connects)
         timeout-minutes: 4
         run: |

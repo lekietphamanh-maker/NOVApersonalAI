@@ -40,6 +40,7 @@ class ToolContext:
     discover: Callable[[str, int], str] | None = None
     drive: Any = None
     world: Callable[[str, str, int], str] | None = None
+    route: Callable[[str, str, list[str], str, bool], str] | None = None
 
 
 Run = Callable[[str, dict[str, Any], ToolContext], str]

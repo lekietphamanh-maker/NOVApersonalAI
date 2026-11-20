@@ -30,6 +30,7 @@
     <button class="box" data-act="map" title="Brainstorm map">Notes</button>
     <button class="box" data-act="library" title="Your projects, repos and ideas by topic">Library</button>
     <button class="box" data-act="world" title="What's happening on Earth: quakes, storms, fires, news">World</button>
+    <button class="box" data-act="route" title="The fastest way from A to B, with stops">Route</button>
     <span class="toolbar-gap" aria-hidden="true"></span>
     <button class="box" data-pane="settings">Settings</button>
   </nav>
@@ -144,6 +145,25 @@
     <div class="row end"><button type="button" class="box danger" id="lib-delete" hidden>Delete</button>
       <button type="button" class="box" id="lib-cancel">Cancel</button><button type="submit" class="box on">Save</button></div>
   </form>
+</section>
+
+<section id="route" class="world" hidden aria-label="Route">
+  <header class="lib-head">
+    <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>ROUTE</b><span class="lib-crumb">fastest way</span></div>
+    <form id="route-form" class="route-form" autocomplete="off">
+      <input class="field" name="start" placeholder="From" maxlength="120" required aria-label="From">
+      <input class="field" name="stops" placeholder="Stops (comma-separated)" maxlength="300" aria-label="Stops">
+      <input class="field" name="end" placeholder="To" maxlength="120" required aria-label="To">
+      <select class="field" name="mode" aria-label="How"><option value="motorbike">Motorbike</option><option value="car">Car</option><option value="walk">Walk</option></select>
+      <button class="box small on" type="submit">Go</button>
+    </form>
+    <button class="box small" id="route-close" type="button" title="Esc">Close</button>
+  </header>
+  <div class="world-body">
+    <div class="world-stage"><canvas id="route-map" aria-label="Map of the route (the panel beside it has the same details)"></canvas></div>
+    <aside class="world-side route-side" id="route-info" aria-live="polite"><span class="muted small">Say “fastest way from District 12 to District 7 via Ben Thanh”, or type it above.</span></aside>
+  </div>
+  <p class="lib-hint">roads from OpenStreetMap, worked out on this PC &nbsp;·&nbsp; normal speeds, no live traffic &nbsp;·&nbsp; Esc</p>
 </section>
 
 <section id="world" class="world" hidden aria-label="World">
