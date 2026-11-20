@@ -19,6 +19,7 @@ from memory import Memory, default_database_path
 from plain_text import without_emoji
 from calendar_tools import CALENDAR_TOOLS
 from drive_tools import DRIVE_TOOLS
+import instant_commands
 from tool_selection import about_the_screen, fit, for_question
 from tools import (CLAUDE_TOOL, GENERAL_TOOLS, GMAIL_TOOLS, LIBRARY_TOOL, LOCATION_TOOLS, NEWS_TOOL, PERSONAL_TOOLS,
                    SCREEN_TOOLS, SECOND_BRAIN_TOOLS, SKILL_TOOLS, TOOLS, TV_TOOL, execute_tool)
@@ -158,6 +159,8 @@ def describe_timing(stats: dict[str, Any]) -> str:
         parts.append(f"reading the screen {stats['screen_ms'] / 1000:.1f} s")
     if "tools" in stats:
         parts.append(f"{stats['tools']} tools")
+    if "instant_ms" in stats:
+        parts.append(f"done at once, without AI ({stats['instant_ms']} ms)")
     return " · ".join(parts)
 
 
@@ -614,6 +617,33 @@ class Agent:
         self.memory.save_message({"role": "assistant", "content": answer, "brain": "claude-plan"})
         return answer
 
+    def _run_instant(self, quick: Any, prompt: str, approve_tool: Callable[[str, dict[str, Any]], bool]) -> str | None:
+        """An instant command, done without any AI. None when its feature isn't available here (the AI answers)."""
+        started = time.monotonic()
+        if quick.tool == "time":
+            answer = instant_commands.spoken_time()
+        elif quick.tool == "date":
+            answer = instant_commands.spoken_date()
+        elif quick.tool == "open":
+            try:
+                answer = instant_commands.open_app(quick.arguments["app"])
+            except OSError:
+                return None
+        elif quick.tool in ("set_timer", "cancel_timer") and self.timers is None:
+            return None
+        else:
+            try:
+                result = self._run_tool(quick.tool, dict(quick.arguments), approve_tool, prompt, None)
+            except Exception:  # e.g. media keys outside Windows: the AI answers it the usual way
+                return None
+            answer = quick.said or result
+        self._private = False
+        self._save({"role": "user", "content": prompt})
+        self.memory.save_message({"role": "assistant", "content": answer, "brain": "instant"})
+        self.turn_stats = {"instant_ms": round((time.monotonic() - started) * 1000)}
+        self._tell_brain("Instant (no AI)", "instant")
+        return answer
+
     def _plan_system(self) -> str:
         return self._online_system(CLAUDE_SYSTEM) + PLAN_NOTE + (CONNECTORS_NOTE if getattr(self.cloud, "connectors", False) else "")
 
@@ -791,6 +821,11 @@ class Agent:
             return "Type a message and I can help."
 
         self.turn_stats = {}
+        quick = None if self.only_tools is not None else instant_commands.match(prompt)
+        if quick is not None:
+            answer = self._run_instant(quick, prompt, approve_tool)
+            if answer is not None:
+                return answer
         if screen is not None and not about_the_screen(prompt):
             screen = None  # not about the screen: don't read it, and the brain the owner chose may answer
         online = self.cloud is not None or self._free_cloud_ready()
