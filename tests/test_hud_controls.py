@@ -333,7 +333,8 @@ class ClaudePlanChoiceTests(unittest.TestCase):
         app = types.SimpleNamespace(settings=settings, agent=types.SimpleNamespace(cloud=None, warm_plan=lambda: warmed.append(True)),
                                     tool_server=None, _update=lambda **changes: updates.append(changes))
         app.warmed = warmed
-        for method in ("_claude_via", "_claude_ready", "_brain_choice", "_apply_claude", "_cloud_tool"):
+        for method in ("_claude_via", "_claude_ready", "_brain_choice", "_apply_claude", "_cloud_tool", "_cloud_agent",
+                       "_api_entries", "_api_entry", "_api_key", "_brains_state"):
             setattr(app, method, types.MethodType(getattr(dashboard.AlfredApp, method), app))
         app.updates = updates
         return app

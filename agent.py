@@ -530,6 +530,9 @@ class Agent:
             history.pop(0)
         return history
 
+    def _online_name(self) -> str:
+        return str(getattr(self.cloud, "name", "") or "Claude")
+
     def _ask_claude(self, prompt: str, approve_tool: Callable[[str, dict[str, Any]], bool], cancel: Any) -> str | None:
         """One turn on Claude. None when Claude couldn't be reached before saying anything (the local model answers)."""
         from datetime import datetime
@@ -565,7 +568,7 @@ class Agent:
                 if not said and round_number == 0:
                     self._fallback = exc.why
                     return None
-                on_text(f" (I lost Claude part way: {exc.why}.)")
+                on_text(f" (I lost {self._online_name()} part way: {exc.why}.)")
                 break
             if response is None:  # stopped
                 break
@@ -592,7 +595,7 @@ class Agent:
                     results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
             messages.append({"role": "user", "content": results})
         answer = without_emoji("".join(said)).strip() or ("Stopped." if cancel is not None and cancel.is_set()
-                                                           else "I didn't get an answer from Claude. Please try again.")
+                                                           else f"I didn't get an answer from {self._online_name()}. Please try again.")
         self.memory.save_message({"role": "assistant", "content": answer, "brain": "claude"})
         return answer
 
@@ -625,10 +628,10 @@ class Agent:
             if not said:
                 self._fallback = exc.why
                 return None
-            on_text(f" (I lost Claude part way: {exc.why}.)")
+            on_text(f" (I lost {self._online_name()} part way: {exc.why}.)")
             answer = "".join(said)
         answer = without_emoji(answer or "").strip() or ("Stopped." if cancel is not None and cancel.is_set()
-                                                         else "I didn't get an answer from Claude. Please try again.")
+                                                         else f"I didn't get an answer from {self._online_name()}. Please try again.")
         self.memory.save_message({"role": "assistant", "content": answer, "brain": "claude-plan"})
         return answer
 
@@ -742,7 +745,7 @@ class Agent:
                 if not said and round_number == 0:
                     self._fallback = exc.why
                     return None
-                on_text(f" (I lost Claude part way: {exc.why}.)")
+                on_text(f" (I lost {self._online_name()} part way: {exc.why}.)")
                 break
             if response is None:  # stopped
                 break
@@ -753,7 +756,7 @@ class Agent:
             messages.append({"role": "user", "content": [self._screen_step_result(block, names, approve_tool, prompt, screen, repeats)
                                                          for block in tool_uses]})
         answer = without_emoji("".join(said)).strip() or ("Stopped." if cancel is not None and cancel.is_set()
-                                                           else "I didn't get an answer from Claude. Please try again.")
+                                                           else f"I didn't get an answer from {self._online_name()}. Please try again.")
         self.memory.save_message({"role": "assistant", "content": answer, "brain": "claude"})
         return answer
 

@@ -595,8 +595,9 @@
       <label class="field-label" for="brain-choice">Who answers your questions</label>
       <select id="brain-choice" class="field">
         <option value="local">This PC: private, works offline</option>
-        <option value="auto">Auto: this PC for everyday, Claude (or Ollama Cloud) for hard questions</option>
-        <option value="claude">Claude: the best answers (online, on your Claude plan or an API key)</option>
+        <option value="auto">Auto: this PC for everyday, your online brain for hard questions</option>
+        <option value="api">API brain: any AI with your API key (Claude, OpenAI, Gemini, Groq…)</option>
+        <option value="cloud">Cloud brain: an AI you sign in to (Claude Code, Codex, Gemini)</option>
         <option value="free">Ollama Cloud: a big free model (online, free use is limited)</option>
       </select>
       <label class="field-label" for="private-topics">Before sending something online</label>
@@ -606,20 +607,22 @@
       </select>
       <label class="field-label">Who answered recently</label>
       <ul id="answers" class="memory-list answers"></ul>
-      <h3>Claude</h3>
+      <h3>API brain</h3>
       <p class="muted small" id="claude-info"></p>
-      <label class="field-label" for="claude-via">Pay with</label>
-      <select id="claude-via" class="field">
-        <option value="plan">My Claude plan, through Claude Code (no API credit)</option>
-        <option value="key">An API key (billed per question, starts a little faster)</option>
-      </select>
-      <label class="check" id="cloud-fallback-row"><input type="checkbox" id="cloud-fallback"> When a tool can't run on this PC (offline Wikipedia not downloaded, map servers down, code to run), let Claude do it in the cloud. Private turns and the strict privacy setting keep everything here.</label>
-      <label class="check" id="claude-connectors-row"><input type="checkbox" id="claude-connectors"> Also let Claude use my claude.ai Gmail and Google Drive connectors (read and draft only)</label>
-      <div class="row wrap" id="claude-buttons"><button class="box" id="claude-key-forget" hidden>Remove key</button></div>
-      <div class="row"><input id="claude-key" class="field" type="password" maxlength="300" autocomplete="off"
-          placeholder="Anthropic API key (sk-ant-…), from console.anthropic.com">
-        <button class="box" id="claude-key-save">Save key</button></div>
-      <label class="field-label" for="claude-model">Claude model</label>
+      <ul class="memory-list brain-list" id="api-list" aria-label="Your API brains"></ul>
+      <details class="brain-add" id="api-add">
+        <summary>Add an API brain</summary>
+        <label class="field-label" for="api-provider">Provider</label>
+        <select id="api-provider" class="field"></select>
+        <input id="api-base" class="field" maxlength="200" placeholder="Address (https://…/v1)" autocomplete="off" spellcheck="false">
+        <input id="api-key" class="field" type="password" maxlength="400" autocomplete="off" placeholder="API key">
+        <div class="row"><input id="api-model" class="field" list="api-models" maxlength="120" placeholder="Model" autocomplete="off" spellcheck="false">
+          <button class="box" id="api-load-models" type="button">Load models</button></div>
+        <datalist id="api-models"></datalist>
+        <p class="muted small" id="api-hint"></p>
+        <button class="box on" id="api-add-save" type="button">Add</button>
+      </details>
+      <label class="field-label" for="claude-model">Claude model (for a Claude API brain)</label>
       <select id="claude-model" class="field"></select>
       <label class="field-label" for="claude-effort">How hard Claude thinks</label>
       <select id="claude-effort" class="field">
@@ -627,6 +630,11 @@
         <option value="medium">Medium (default): quick and careful</option>
         <option value="high">High: most careful, slower</option>
       </select>
+      <h3>Cloud brain</h3>
+      <p class="muted small" id="cloud-info"></p>
+      <ul class="memory-list brain-list" id="cloud-agents" aria-label="AI agents you can sign in to"></ul>
+      <label class="check" id="claude-connectors-row"><input type="checkbox" id="claude-connectors"> Also let Claude Code use my claude.ai Gmail and Google Drive connectors (read and draft only)</label>
+      <label class="check" id="cloud-fallback-row"><input type="checkbox" id="cloud-fallback"> When a tool can't run on this PC (offline Wikipedia not downloaded, map servers down, code to run), let Claude do it in the cloud. Private turns and the strict privacy setting keep everything here.</label>
       <h3>Ollama Cloud (free)</h3>
       <p class="muted small" id="free-cloud-info"></p>
       <div class="row wrap"><button class="box" id="free-cloud-signin">Sign in to Ollama</button></div>

@@ -89,6 +89,9 @@ import cloud_relay
 import discover as discovery
 import reverse_engineering
 import auto_tune
+import api_brains
+import cloud_agents
+import secret_store
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -443,7 +446,7 @@ class AlfredApp:
                        "effort": cloud_brain.DEFAULT_EFFORT, "models": cloud_brain.MODELS, "usb": USB},
             "free_cloud": {"on": False, "model": FREE_CLOUD_DEFAULT, "status": "", "usb": USB},
             "telegram": {"on": False, "token": False, "owner": "", "bot": "", "code": "", "status": "", "usb": USB},
-            "answering": {"brain": self._brain_choice(), "private": self._private_topics(), "usb": USB},
+            "answering": self._answering_state(),
             "brain": {"label": "", "why": ""},
             "gestures": self._gestures_state(),
             "news": {"on": bool(self.settings.get("news_on")), "running": False, "status": "", "key": False, "last": None,
@@ -744,7 +747,8 @@ class AlfredApp:
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
                "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report",
-               "tune_now", "auto_tune", "cloud_fallback", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
+               "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
+               "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
                "shannon_fix"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
@@ -1696,7 +1700,118 @@ class AlfredApp:
         return "plan" if claude_code.find() else "key"
 
     def _claude_ready(self) -> bool:
-        return (claude_code.find() is not None) if self._claude_via() == "plan" else claude_expert.key() is not None
+        """The online brain the owner chose can answer: the Cloud brain's agent is installed, or the API brain has a key."""
+        if self._claude_via() == "plan":
+            return cloud_agents.find(self._cloud_agent()) is not None
+        entry = self._api_entry()
+        return entry is not None and self._api_key(entry) is not None
+
+    # ---------- the API brain (any provider's key) and the Cloud brain (an agent signed in with an account) ----------
+
+    def _api_entries(self) -> list[api_brains.Entry]:
+        found = api_brains.entries(self.settings.get("api_brains"))
+        if not any(entry.provider == "anthropic" for entry in found) and claude_expert.key():
+            # A Claude key saved before there was a list: it shows up as the first API brain.
+            model = self.settings.get("claude_model", cloud_brain.DEFAULT_MODEL)
+            found.insert(0, api_brains.Entry("claude", "anthropic", model, "", f"Claude · {cloud_brain.MODELS.get(model, model)}"))
+        return found
+
+    def _api_entry(self) -> api_brains.Entry | None:
+        found = self._api_entries()
+        chosen = self.settings.get("api_brain")
+        return next((entry for entry in found if entry.id == chosen), found[0] if found else None)
+
+    def _api_key(self, entry: api_brains.Entry) -> str | None:
+        return claude_expert.key() if entry.provider == "anthropic" else secret_store.load(f"api_key_{entry.id}")
+
+    def _cloud_agent(self) -> cloud_agents.Agent:
+        return cloud_agents.agent(str(self.settings.get("cloud_agent") or "claude-code"))
+
+    def _brains_state(self) -> dict[str, Any]:
+        active = self._api_entry()
+        return {
+            "api": {"active": active.id if active else "",
+                    "entries": [{**entry.as_dict(), "has_key": self._api_key(entry) is not None,
+                                 "provider_label": api_brains.provider(entry.provider).label} for entry in self._api_entries()],
+                    "providers": [{"key": item.key, "label": item.label, "base_url": item.base_url, "kind": item.kind,
+                                   "hint": item.hint} for item in api_brains.PROVIDERS],
+                    "claude_models": cloud_brain.MODELS},
+            "cloud": {"agent": self._cloud_agent().key,
+                      "agents": [{"key": item.key, "label": item.label, "account": item.account, "full": item.full,
+                                  "installed": cloud_agents.find(item) is not None} for item in cloud_agents.AGENTS]},
+        }
+
+    def _act_api_brain_add(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        found = api_brains.provider(str(args.get("provider") or ""))
+        key = " ".join(str(args.get("key") or "").split())
+        if found.kind == "anthropic":
+            if key:
+                claude_expert.save_key(key)
+            if not claude_expert.key():
+                return {"ok": False, "error": "Paste the Anthropic API key (sk-ant-…)."}
+            if args.get("model") in cloud_brain.MODELS:
+                self._save_setting("claude_model", args["model"])
+            self._save_setting("api_brain", "claude")
+        else:
+            entry = api_brains.Entry.new(found.key, str(args.get("model") or ""), str(args.get("base_url") or ""),
+                                         str(args.get("label") or ""))
+            if not key and found.key != "custom":
+                return {"ok": False, "error": f"Paste your {found.label.split(' (')[0]} API key ({found.hint})."}
+            if key:
+                secret_store.save(f"api_key_{entry.id}", key)
+            saved = [item for item in (self.settings.get("api_brains") or []) if isinstance(item, dict)]
+            self._save_setting("api_brains", [*saved, entry.as_dict()])
+            self._save_setting("api_brain", entry.id)
+        self._save_setting("claude_via", "key")
+        self._apply_claude()
+        self._toast("API brain added. Choose API brain above to use it.", "ok")
+        return None
+
+    def _act_api_brain_use(self, args: dict[str, Any]) -> None:
+        self._save_setting("api_brain", str(args.get("id") or ""))
+        self._apply_claude()
+
+    def _act_api_brain_remove(self, args: dict[str, Any]) -> None:
+        entry_id = str(args.get("id") or "")
+        if entry_id == "claude":
+            claude_expert.forget_key()
+        else:
+            secret_store.forget(f"api_key_{entry_id}")
+            self._save_setting("api_brains", [item for item in (self.settings.get("api_brains") or [])
+                                              if isinstance(item, dict) and item.get("id") != entry_id])
+        self._apply_claude()
+
+    def _act_api_brain_models(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The models a provider's key can use (Load models)."""
+        found = api_brains.provider(str(args.get("provider") or ""))
+        if found.kind == "anthropic":
+            return {"ok": True, "models": list(cloud_brain.MODELS)}
+        key = " ".join(str(args.get("key") or "").split())
+        if not key and args.get("id"):
+            key = secret_store.load(f"api_key_{args['id']}") or ""
+        return {"ok": True, "models": api_brains.list_models(str(args.get("base_url") or found.base_url), key)}
+
+    def _act_cloud_agent_use(self, args: dict[str, Any]) -> None:
+        self._save_setting("cloud_agent", cloud_agents.agent(str(args.get("agent") or "")).key)
+        self._save_setting("claude_via", "plan")
+        self._apply_claude()
+
+    def _act_cloud_agent_install(self, args: dict[str, Any]) -> None:
+        item = cloud_agents.agent(str(args.get("agent") or ""))
+
+        def work() -> None:
+            try:
+                self.events.put(("toast", (cloud_agents.install(item), "ok")))
+            except Exception as exc:
+                self.events.put(("toast", (f"Couldn't install {item.label}: {exc}", "warn")))
+            self.events.put(("claude_refresh", None))
+        self._toast(f"Installing {item.label}…", "info")
+        threading.Thread(target=work, name="NovaAgentInstall", daemon=True).start()
+
+    def _act_cloud_agent_connect(self, args: dict[str, Any]) -> None:
+        item = cloud_agents.agent(str(args.get("agent") or ""))
+        cloud_agents.connect(item)
+        self._toast(f"Sign in to {item.account} in the window that opened, then come back here.", "info")
 
     def _apply_claude(self) -> None:
         key = claude_expert.key()
@@ -1709,6 +1824,8 @@ class AlfredApp:
         old = self.agent.cloud
         if not on:
             self.agent.cloud = None
+        elif via == "plan" and not self._cloud_agent().full:
+            self.agent.cloud = cloud_agents.CliBrain(self._cloud_agent())
         elif via == "plan":
             if self.tool_server is None:
                 self.tool_server = ToolServer()
@@ -1717,7 +1834,12 @@ class AlfredApp:
             if on:
                 self.agent.warm_plan()  # Claude Code starts now, not on the first question
         else:
-            self.agent.cloud = cloud_brain.CloudBrain(key, model, effort)
+            entry = self._api_entry()
+            if entry.provider == "anthropic":
+                chosen = entry.model if entry.model in cloud_brain.MODELS else model
+                self.agent.cloud = cloud_brain.CloudBrain(self._api_key(entry), chosen, effort)
+            else:
+                self.agent.cloud = api_brains.OpenAIBrain(entry.base_url, self._api_key(entry) or "", entry.model, entry.label)
         if old is not None and old is not self.agent.cloud and hasattr(old, "close"):
             old.close()
         cloud_tools_on = (not USB and self.settings.get("cloud_fallback", True) is not False
@@ -1729,7 +1851,7 @@ class AlfredApp:
                              "connectors": bool(self.settings.get("claude_connectors")),
                              "model": self.settings.get("claude_model", cloud_brain.DEFAULT_MODEL),
                              "effort": self.settings.get("claude_effort", cloud_brain.DEFAULT_EFFORT),
-                             "models": cloud_brain.MODELS, "usb": USB})
+                             "models": cloud_brain.MODELS, "usb": USB, **self._brains_state()})
 
     def _cloud_tool(self, tool: str, description: str, arguments: dict[str, Any], reason: str) -> str | None:
         """A tool that can't run on this PC, done by Claude (cloud_tools): the API key when there is one, else the plan."""
@@ -1762,10 +1884,16 @@ class AlfredApp:
         return "personal" if self.settings.get("private_topics") == "personal" else "secrets"
 
     def _answering_state(self) -> dict[str, Any]:
-        return {"brain": self._brain_choice(), "private": self._private_topics(), "usb": USB}
+        brain = self._brain_choice()
+        if brain == "claude":  # shown as the API brain or the Cloud brain
+            brain = "cloud" if self._claude_via() == "plan" else "api"
+        return {"brain": brain, "private": self._private_topics(), "usb": USB}
 
     def _act_brain_choose(self, args: dict[str, Any]) -> dict[str, Any] | None:
         brain = str(args.get("brain", ""))
+        if brain in ("api", "cloud"):  # both run through the online-brain slot ("claude"); how is claude_via
+            self._save_setting("claude_via", "key" if brain == "api" else "plan")
+            brain = "claude"
         if brain not in ("local", "claude", "free", "auto"):
             return {"ok": False, "error": "Choose this PC, Auto, Claude or Ollama Cloud."}
         if USB and brain != "local":
@@ -2723,6 +2851,10 @@ class AlfredApp:
             "mic": (READY, "") if self.voice.available else (SETUP, "no microphone input found"),
             "claude": (READY, "") if (claude_expert.available() or claude_code.find()) else (SETUP, "SETTINGS → Model → Claude"),
             "cloud": (READY, "") if cloud else (SETUP, "a Claude API key or Claude Code, and the cloud switch on"),
+            "api": (READY, self._api_entry().label) if self._api_entry() and self._api_key(self._api_entry())
+                   else (SETUP, "SETTINGS → Model → API brain → Add an API brain"),
+            "cloud_brain": (READY, self._cloud_agent().label) if cloud_agents.find(self._cloud_agent())
+                           else (SETUP, f"install {self._cloud_agent().label} and connect your account"),
             "tune": (READY, f"{tuned.get('model')} · {round(tuned.get('tokens_per_second') or 0)} tokens/s") if tuned
                     else (SETUP, "not measured yet: SETTINGS → This PC → Tune now"),
             "wikipedia": (READY, "offline") if self.wikipedia.installed() else
@@ -3912,6 +4044,8 @@ class AlfredApp:
             self._update(local_news=payload)
         elif event_type == "knowledge":
             self._apply_knowledge()
+        elif event_type == "claude_refresh":
+            self._apply_claude()
         elif event_type == "toast":
             self._toast(*payload)
         elif event_type == "brief":

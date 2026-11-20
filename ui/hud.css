@@ -383,3 +383,11 @@ body.mapping.drawer-open .map-note { display: none; }
 .versions > summary { cursor: pointer; font: 600 11px/1.4 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--dim); }
 
 .knowledge-packs li { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+/* API brain / Cloud brain lists */
+.brain-list li { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.brain-list li > span:first-child { flex: 1; min-width: 160px; }
+.brain-list li.on b { color: var(--accent); }
+.brain-active { color: var(--ok); font: 600 10px/1 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; }
+.brain-add summary { cursor: pointer; color: var(--accent); margin: 8px 0; }
+.brain-add .field { margin-bottom: 6px; }

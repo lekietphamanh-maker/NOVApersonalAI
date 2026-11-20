@@ -7,6 +7,7 @@ import { createRoute } from "./route.js";
 import { createRea } from "./rea.js";
 import { createShannon } from "./shannon.js";
 import { createSkills } from "./skills.js";
+import { h } from "./lab.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -581,8 +582,7 @@ function renderAccent() {
 }
 
 function renderClaude() {
-  const claude = state.claude || {};
-  $("#claude-key").placeholder = claude.key ? `Key saved (${claude.hint}). Paste a new one to replace it.` : "Anthropic API key (sk-ant-…), from console.anthropic.com";
+  const claude = state.claude || {}, api = claude.api || { entries: [], providers: [] }, cloud = claude.cloud || { agents: [] };
   const models = Object.entries(claude.models || {});
   const select = $("#claude-model");
   if (select.dataset.signature !== JSON.stringify(models)) {
@@ -591,24 +591,51 @@ function renderClaude() {
   }
   if (document.activeElement !== select) select.value = claude.model || "claude-sonnet-5-5";
   if (document.activeElement !== $("#claude-effort")) $("#claude-effort").value = claude.effort || "medium";
-  if (document.activeElement !== $("#claude-via")) $("#claude-via").value = claude.via || "plan";
+  const providers = $("#api-provider");
+  if (providers.dataset.signature !== String(api.providers.length)) {
+    providers.replaceChildren(...api.providers.map((item) => new Option(item.label, item.key)));
+    providers.dataset.signature = String(api.providers.length);
+    providerChanged();
+  }
+  $("#api-list").replaceChildren(...(api.entries.length ? api.entries.map((entry) => h("li", { class: entry.id === api.active ? "on" : "" },
+    h("span", {}, h("b", {}, entry.label), h("small", {}, ` ${entry.provider_label}${entry.has_key ? "" : " · no key"}`)),
+    entry.id === api.active ? h("span", { class: "brain-active" }, "in use") :
+      h("button", { class: "box small", type: "button", onclick: () => act("api_brain_use", { id: entry.id }) }, "Use"),
+    h("button", { class: "box small", type: "button", onclick: () => act("api_brain_remove", { id: entry.id }) }, "Remove")))
+    : [h("li", { class: "muted small" }, "No API brain yet: add one below with your key.")]));
+  $("#cloud-agents").replaceChildren(...cloud.agents.map((agent) => h("li", { class: agent.key === cloud.agent ? "on" : "" },
+    h("span", {}, h("b", {}, agent.label), h("small", {}, ` ${agent.account}${agent.full ? " · uses Nova's tools" : " · answers only"}`)),
+    agent.installed ? h("button", { class: "box small", type: "button", onclick: () => act("cloud_agent_connect", { agent: agent.key }) }, "Connect account")
+      : h("button", { class: "box small", type: "button", onclick: () => act("cloud_agent_install", { agent: agent.key }) }, "Install"),
+    agent.key === cloud.agent ? h("span", { class: "brain-active" }, "in use") :
+      h("button", { class: "box small", type: "button", onclick: () => act("cloud_agent_use", { agent: agent.key }) }, "Use"))));
   const onPlan = claude.via === "plan";
-  $("#claude-connectors-row").hidden = !onPlan || claude.usb;
+  $("#claude-connectors-row").hidden = cloud.agent !== "claude-code" || claude.usb;
   $("#cloud-fallback-row").hidden = Boolean(claude.usb);
   $("#cloud-fallback").checked = Boolean(claude.cloud_fallback);
   $("#claude-connectors").checked = Boolean(claude.connectors);
   $("#need-claude-state").textContent = claude.on ? "on" : "";
-  for (const id of ["#claude-key", "#claude-key-save"]) $(id).hidden = onPlan;
-  $("#claude-key-forget").hidden = onPlan || !claude.key;
   const brain = state.brain || {};
   const lastAnswer = claude.on && brain.label ? ` Last answer: ${brain.label}${brain.why && !/^(online|asked)$/.test(brain.why) ? ` (${brain.why})` : ""}.` : "";
-  $("#claude-info").textContent = claude.usb ? "The USB Edition stays fully offline: Claude is for the Desktop Edition."
-    : onPlan ? (claude.claude_code
-        ? `${(claude.models || {})[claude.model] || "Claude"} at ${claude.effort} effort on your Claude plan, through Claude Code: no API credit, it counts toward your plan's usage limit. Answers start a few seconds later than with a key; when the limit is reached the AI on this PC answers.${claude.on ? "" : " Choose Claude above to use it."}` + lastAnswer
-        : "Claude Code isn't on this PC yet. Install it (claude.com/product/claude-code), open a terminal, run claude once and sign in with your Claude account. Until then the AI on this PC answers.")
-    : !claude.key ? "No API key yet: paste yours below (console.anthropic.com → API keys). Billed per question to your Anthropic account (Haiku 5.5 is the cheapest)."
-    : `Key saved (${claude.hint}). ${(claude.models || {})[claude.model] || "Claude"} at ${claude.effort} effort${claude.on ? " answers while this PC is online" : ": choose Claude above to use it"}.`
-      + lastAnswer;
+  const activeEntry = api.entries.find((entry) => entry.id === api.active);
+  const activeAgent = cloud.agents.find((agent) => agent.key === cloud.agent);
+  $("#claude-info").textContent = claude.usb ? "The USB Edition stays fully offline."
+    : activeEntry ? `${activeEntry.label}: billed per question to your account with that provider.${claude.on && !onPlan ? " It's answering now." : " Choose API brain above to use it."}` + (!onPlan ? lastAnswer : "")
+    : "Any AI with an API key: Claude, OpenAI, Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, or your own server.";
+  $("#cloud-info").textContent = claude.usb ? "" : activeAgent ? (activeAgent.installed
+    ? `${activeAgent.label} on ${activeAgent.account}: no API key, it counts toward that account's usage.${claude.on && onPlan ? " It's answering now." : " Choose Cloud brain above to use it."}` + (onPlan ? lastAnswer : "")
+    : `${activeAgent.label} isn't on this PC yet: Install, then Connect account and sign in.`) : "";
+}
+
+function providerChanged() {
+  const providers = (state.claude?.api?.providers) || [];
+  const chosen = providers.find((item) => item.key === $("#api-provider").value) || providers[0];
+  if (!chosen) return;
+  $("#api-base").value = chosen.base_url;
+  $("#api-base").hidden = chosen.kind === "anthropic";
+  $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-…)" : `API key${chosen.key === "custom" ? " (if the server needs one)" : ""}`;
+  $("#api-hint").textContent = chosen.hint ? `Key from: ${chosen.hint}` : "";
+  $("#api-models").replaceChildren(...(chosen.kind === "anthropic" ? Object.keys(state.claude?.models || {}) : []).map((id) => new Option(id, id)));
 }
 
 function renderTelegram() {
@@ -644,7 +671,11 @@ function renderAnswering() {
   }
   $("#brain-choice").disabled = Boolean(answering.usb);
   $("#private-topics").disabled = answering.brain === "local";
-  const name = answering.brain === "claude" ? ((claude.models || {})[claude.model] || "Claude") : answering.brain === "free" ? "Ollama Cloud" : "";
+  const apiEntry = (claude.api?.entries || []).find((entry) => entry.id === claude.api?.active);
+  const cloudAgent = (claude.cloud?.agents || []).find((agent) => agent.key === claude.cloud?.agent);
+  const name = answering.brain === "api" ? `Your API brain (${apiEntry ? apiEntry.label : "none added yet"})`
+    : answering.brain === "cloud" ? `Your Cloud brain (${cloudAgent ? cloudAgent.label : "Claude Code"})`
+    : answering.brain === "free" ? "Ollama Cloud" : "";
   const answers = state.answers || [];
   const list = $("#answers");
   if (list.dataset.signature !== JSON.stringify(answers)) {
@@ -654,7 +685,7 @@ function renderAnswering() {
   }
   $("#answering-info").textContent = answering.usb ? "The USB Edition stays fully offline: the AI on this PC answers everything."
     : answering.brain === "local" ? "The AI on this PC answers everything: private, and it works offline."
-    : answering.brain === "auto" ? `The AI on this PC answers everyday questions; hard ones (code, research, analysis, long or multi-part questions) go to ${claude.key || (claude.via === "plan" && claude.claude_code) ? ((claude.models || {})[claude.model] || "Claude") : "Ollama Cloud"} while this PC is online. Passwords and mail: Nova asks first. Say “ask Claude …” to send any question, “privately …” to keep it here.`
+    : answering.brain === "auto" ? `The AI on this PC answers everyday questions; hard ones (code, research, analysis, long or multi-part questions) go to ${claude.via === "plan" ? (cloudAgent ? cloudAgent.label : "your Cloud brain") : apiEntry ? apiEntry.label : "Ollama Cloud"} while this PC is online. Passwords and mail: Nova asks first. Say “ask Claude …” to send any question, “privately …” to keep it here.`
     : `${name} answers while this PC is online; offline, the AI on this PC does. `
       + (answering.private === "personal" ? "Anything personal (mail, notes, what Nova remembers, where you are, your screen, health, money, family) stays on this PC."
         : "Weather, news and everyday questions go to it. Passwords and mail: Nova asks you out loud first (“yes” sends it, “no” keeps it here). Start with “privately” to keep any question here.");
@@ -1652,17 +1683,24 @@ $("#brain-choice").onchange = async (event) => {
   if (result.ok === false || result.cancelled) render(); // not changed: show the brain still in use
 };
 $("#private-topics").onchange = (event) => act("privacy", { private: event.target.value });
-$("#claude-key-save").onclick = async () => {
-  const result = await act("claude_key", { key: $("#claude-key").value });
-  if (result && result.ok !== false) $("#claude-key").value = "";
+$("#api-provider").onchange = providerChanged;
+$("#api-load-models").onclick = async () => {
+  const result = await act("api_brain_models", { provider: $("#api-provider").value, base_url: $("#api-base").value, key: $("#api-key").value });
+  if (result && result.models) {
+    $("#api-models").replaceChildren(...result.models.map((id) => new Option(id, id)));
+    toast(`${result.models.length} models: start typing to pick one.`, "info");
+  }
 };
-$("#claude-key-forget").onclick = () => act("claude_key_forget");
+$("#api-add-save").onclick = async () => {
+  const result = await act("api_brain_add", { provider: $("#api-provider").value, base_url: $("#api-base").value,
+    key: $("#api-key").value, model: $("#api-model").value });
+  if (result && result.ok !== false) { $("#api-key").value = ""; $("#api-model").value = ""; $("#api-add").open = false; }
+};
 $("#free-cloud-signin").onclick = () => act("free_cloud_signin");
 $("#free-cloud-save").onclick = () => act("free_cloud_settings", { model: $("#free-cloud-model").value });
 $("#free-cloud-model").addEventListener("keydown", (event) => { if (event.key === "Enter") $("#free-cloud-save").click(); });
 $("#claude-model").onchange = (event) => act("claude_settings", { model: event.target.value });
 $("#claude-effort").onchange = (event) => act("claude_settings", { effort: event.target.value });
-$("#claude-via").onchange = (event) => act("claude_settings", { via: event.target.value });
 $("#telegram-token-save").onclick = async () => {
   const result = await act("telegram_token", { token: $("#telegram-token").value });
   if (result && result.ok !== false) $("#telegram-token").value = "";

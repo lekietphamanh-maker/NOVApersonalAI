@@ -1,0 +1,150 @@
+"""The API brain (any provider's key) and the Cloud brain (an agent signed in with an account): Claude's message shape
+in and out of the OpenAI chat format, streamed text and tool calls, plain errors, sealed keys, and the agents' command
+lines."""
+from __future__ import annotations
+
+import io
+import json
+import os
+import subprocess
+import tempfile
+import unittest
+from types import SimpleNamespace
+from unittest import mock
+from urllib.error import HTTPError
+
+import api_brains
+import cloud_agents
+import secret_store
+from cloud_brain import Unavailable
+
+
+class Stream(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+
+def sse(*chunks: dict) -> bytes:
+    return b"".join(b"data: " + json.dumps(chunk).encode() + b"\n\n" for chunk in chunks) + b"data: [DONE]\n\n"
+
+
+class FormatTests(unittest.TestCase):
+    def test_claude_history_becomes_openai_messages(self) -> None:
+        history = [
+            {"role": "user", "content": "weather in Hanoi?"},
+            {"role": "assistant", "content": [SimpleNamespace(type="text", text="Checking."),
+                                              SimpleNamespace(type="tool_use", id="t1", name="weather", input={"city": "Hanoi"})]},
+            {"role": "user", "content": [{"type": "tool_result", "tool_use_id": "t1", "content": "31°C, sunny"}]},
+        ]
+        messages = api_brains.openai_messages([{"type": "text", "text": "You are Nova."}, {"type": "text", "text": "Now: Friday."}], history)
+        self.assertEqual(messages[0], {"role": "system", "content": "You are Nova.\n\nNow: Friday."})
+        self.assertEqual(messages[2]["tool_calls"][0]["function"], {"name": "weather", "arguments": '{"city": "Hanoi"}'})
+        self.assertEqual(messages[3], {"role": "tool", "tool_call_id": "t1", "content": "31°C, sunny"})
+        tool = api_brains.openai_tools([{"name": "weather", "description": "d", "input_schema": {"type": "object"}}])
+        self.assertEqual(tool[0]["function"]["parameters"], {"type": "object"})
+
+    def test_a_streamed_answer_with_a_tool_call(self) -> None:
+        body = sse({"choices": [{"delta": {"content": "Let me "}}]}, {"choices": [{"delta": {"content": "check."}}]},
+                   {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "c1", "function": {"name": "weather", "arguments": '{"ci'}}]}}]},
+                   {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": 'ty": "Hue"}'}}]}, "finish_reason": "tool_calls"}]})
+        sent: list = []
+
+        def opener(request, timeout):
+            sent.append((request.full_url, request.get_header("Authorization"), json.loads(request.data)))
+            return Stream(body)
+        said: list[str] = []
+        brain = api_brains.OpenAIBrain("https://api.example.com/v1", "sk-x", "model-a", "Example", opener)
+        reply = brain.turn([{"type": "text", "text": "sys"}], [{"role": "user", "content": "hi"}],
+                           [{"name": "weather", "description": "", "input_schema": {"type": "object"}}], said.append)
+        self.assertEqual("".join(said), "Let me check.")
+        self.assertEqual(reply.stop_reason, "tool_use")
+        self.assertEqual([(block.type, getattr(block, "input", None)) for block in reply.content],
+                         [("text", None), ("tool_use", {"city": "Hue"})])
+        url, auth, payload = sent[0]
+        self.assertEqual((url, auth, payload["model"], payload["stream"]), ("https://api.example.com/v1/chat/completions", "Bearer sk-x", "model-a", True))
+
+    def test_problems_are_said_plainly(self) -> None:
+        def refused(request, timeout):
+            raise HTTPError(request.full_url, 401, "no", {}, io.BytesIO(b"{}"))
+        with self.assertRaises(Unavailable) as caught:
+            api_brains.OpenAIBrain("https://x/v1", "bad", "m", "Groq", refused).turn([], [{"role": "user", "content": "x"}], [], print)
+        self.assertIn("Groq rejected the API key", caught.exception.why)
+        models = api_brains.list_models("https://x/v1", "k", lambda request, timeout: Stream(json.dumps(
+            {"data": [{"id": "b"}, {"id": "a"}, {"id": "a"}]}).encode()))
+        self.assertEqual(models, ["a", "b"])
+
+    def test_entries_need_a_model_and_an_address(self) -> None:
+        entry = api_brains.Entry.new("groq", "llama-x")
+        self.assertEqual((entry.base_url, entry.label), ("https://api.groq.com/openai/v1", "Groq · llama-x"))
+        with self.assertRaises(ValueError):
+            api_brains.Entry.new("custom", "m", "localhost:1234")
+        with self.assertRaises(ValueError):
+            api_brains.Entry.new("openai", " ")
+
+
+class SecretTests(unittest.TestCase):
+    def test_keys_are_kept_and_forgotten(self) -> None:
+        with mock.patch.dict(os.environ, {"LOCALAPPDATA": tempfile.mkdtemp()}):
+            secret_store.save("api_key_ab12", "sk-secret")
+            self.assertEqual(secret_store.load("api_key_ab12"), "sk-secret")
+            secret_store.forget("api_key_ab12")
+            self.assertIsNone(secret_store.load("api_key_ab12"))
+            with self.assertRaises(ValueError):
+                secret_store.save("../escape", "x")
+
+
+class CloudAgentTests(unittest.TestCase):
+    def test_an_agent_answers_through_its_command_line(self) -> None:
+        seen: dict = {}
+
+        def run(arguments, **options):
+            seen.update(arguments=arguments, options=options)
+            return subprocess.CompletedProcess(arguments, 0, "Hà Nội is the capital.\n", "")
+        item = cloud_agents.agent("gemini")
+        said: list[str] = []
+        with mock.patch.object(cloud_agents, "find", lambda agent: "/usr/bin/gemini"):
+            answer = cloud_agents.CliBrain(item, run).turn("You are Nova.", "capital of Vietnam?", [], None, said.append)
+        self.assertEqual((answer, said), ("Hà Nội is the capital.", ["Hà Nội is the capital."]))
+        self.assertEqual(seen["arguments"][:2], ["/usr/bin/gemini", "-p"])
+        self.assertIn("capital of Vietnam?", seen["options"]["input"])  # the request goes in on stdin, not the command line
+
+    def test_signed_out_and_missing_are_explained(self) -> None:
+        item = cloud_agents.agent("codex")
+        run = lambda arguments, **options: subprocess.CompletedProcess(arguments, 1, "", "Error: not logged in")  # noqa: E731
+        with mock.patch.object(cloud_agents, "find", lambda agent: "codex"):
+            with self.assertRaises(Unavailable) as caught:
+                cloud_agents.CliBrain(item, run).turn("s", "p", [], None, print)
+        self.assertIn("Connect account", caught.exception.why)
+        with mock.patch.object(cloud_agents, "find", lambda agent: None):
+            with self.assertRaises(Unavailable):
+                cloud_agents.CliBrain(item, run).turn("s", "p", [], None, print)
+        self.assertTrue(cloud_agents.agent("claude-code").full)
+        self.assertEqual(cloud_agents.agent("nonsense").key, "claude-code")
+
+
+class AgentLoopTests(unittest.TestCase):
+    def test_nova_runs_a_tool_for_an_openai_format_brain(self) -> None:
+        from agent import Agent
+        from memory import Memory
+        rounds = [sse({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "c1", "function": {
+                       "name": "calculate", "arguments": '{"expression": "6*7"}'}}]}, "finish_reason": "tool_calls"}]}),
+                  sse({"choices": [{"delta": {"content": "It's 42."}, "finish_reason": "stop"}]})]
+        payloads: list = []
+
+        def opener(request, timeout):
+            payloads.append(json.loads(request.data))
+            return Stream(rounds.pop(0))
+        agent = Agent(memory=Memory(os.path.join(tempfile.mkdtemp(), "m.sqlite3")))
+        agent.cloud = api_brains.OpenAIBrain("https://x/v1", "k", "m", "Example", opener)
+        answer = agent._ask_claude("what's 6 times 7", lambda name, details: True, None)
+        self.assertEqual(answer, "It's 42.")
+        tool_message = payloads[1]["messages"][-1]
+        self.assertEqual((tool_message["role"], tool_message["tool_call_id"]), ("tool", "c1"))
+        self.assertIn("42", tool_message["content"])
+
+
+if __name__ == "__main__":
+    unittest.main()
