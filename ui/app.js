@@ -8,6 +8,7 @@ import { createRea } from "./rea.js";
 import { createShannon } from "./shannon.js";
 import { createSkills } from "./skills.js";
 import { h } from "./lab.js";
+import { createAdvance } from "./advance.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -75,6 +76,7 @@ function showRoute(route) {
 // Full-screen views: opening one closes the others.
 function labOpened(name, open) {
   $(`[data-act=${name}]`).classList.toggle("on", open);
+  if (!open && solo === name) window.close();
   if (!open) return;
   for (const other of [world, routeView, library, rea, shannon, skills]) if (other && other !== labs[name] && other.isOpen()) other.close();
 }
@@ -84,6 +86,25 @@ const rea = labs.rea = createRea($("#rea"), { act: (...args) => act(...args), on
 const shannon = labs.shannon = createShannon($("#shannon"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("shannon", open) });
 const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
   ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
+// A Nova screen opened as its own app window from Advance mode (…#token=…&app=rea): only that screen, and closing it
+// closes the window.
+const soloApp = new URLSearchParams(location.hash.slice(1)).get("app");
+const solo = labs[soloApp] ? soloApp : "";
+if (solo) { document.body.classList.add("solo"); document.title = `Nova · ${solo[0].toUpperCase()}${solo.slice(1)}`; }
+const advance = createAdvance($("#advance-board"), { act: (...args) => act(...args), toast: (...args) => toast(...args),
+  openLibrary: (target) => (target ? library.command({ command: "show", target }) : library.open()),
+  openSkills: () => skills.open(),
+  ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
+function renderAdvance() {
+  const on = Boolean((state.settings || {}).advance) && !solo;
+  document.body.classList.toggle("advance", on);
+  // The Now playing widget takes the floating music card's place on the board.
+  document.body.classList.toggle("music-widget", on && ((state.settings || {}).advance_widgets || []).includes("music"));
+  $("[data-act=advance]").classList.toggle("on", on);
+  if (on && !advance.isOpen()) advance.open();
+  else if (!on && advance.isOpen()) advance.close();
+  advance.render(state);
+}
 let online = false;
 let offlineTimer = 0;
 let openPane = null;
@@ -142,6 +163,7 @@ function handle(event) {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`); // not again on reload
         act("creative");
       }
+      if (solo && !labs[solo].isOpen()) labs[solo].open();
       if (new URLSearchParams(location.hash.slice(1)).get("open") === "library") {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`);
         library.open();
@@ -156,6 +178,7 @@ function handle(event) {
       render();
       break;
     case "chat": addChat(event.item, true); break;
+    case "advance_apps": advance.setApps(event.apps); break;
     case "level": core.setLevel(event.level); showLevel(event.level); break;
     case "toast": toast(event.text, event.tone, event.action); break;
     case "review": showReview(event.title, event.warning, event.text); break;
@@ -279,6 +302,7 @@ function render() {
   renderClaude();
   renderFreeCloud();
   renderAccent();
+  renderAdvance();
   renderCore();
   renderTasks();
   renderSkills();
@@ -575,7 +599,8 @@ function renderCore() {
 }
 
 function renderAccent() {
-  const accent = ACCENTS[(state.settings || {}).accent] ? state.settings.accent : "gold";
+  const settings = state.settings || {};
+  const accent = settings.advance && !solo ? "crimson" : ACCENTS[settings.accent] ? settings.accent : "gold";
   document.documentElement.dataset.accent = accent;
   core.setAccent(ACCENTS[accent]);
   mindmap.setAccent(ACCENTS[accent]);
@@ -1483,6 +1508,7 @@ $("#drawer-close").onclick = () => setPane(openPane);
 $("[data-act=camera]").onclick = () => act("creative");
 $("[data-act=screen]").onclick = screenMenu;
 $("[data-act=map]").onclick = () => openMap(!mapOpen);
+$("[data-act=advance]").onclick = () => act("advance", { on: !(state.settings || {}).advance });
 $("[data-act=library]").onclick = () => (library.isOpen() ? library.close() : library.open());
 $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.open());
 $("[data-act=route]").onclick = () => (routeView.isOpen() ? routeView.close() : routeView.open());

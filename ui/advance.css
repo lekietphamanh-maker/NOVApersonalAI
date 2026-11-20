@@ -1,0 +1,81 @@
+/* Advance mode: red, the orb on the left, the board on the right. */
+body.advance .stage { grid-template-columns: minmax(280px, 32%) minmax(0, 1fr); grid-template-rows: 1fr auto; justify-items: stretch; }
+body.advance #core { grid-column: 1; grid-row: 1; }
+body.advance .captions { grid-column: 1; grid-row: 2; width: auto; padding: 0 18px 22px 26px; text-align: left; }
+body.advance .readouts { display: none; }
+body.advance .backdrop {
+  background:
+    radial-gradient(700px 620px at 16% 46%, rgba(var(--accent-rgb), 0.12), transparent 62%),
+    radial-gradient(1400px 500px at 60% 115%, rgba(var(--accent-rgb), 0.07), transparent 60%),
+    var(--bg); }
+body.advance.mapping .advance-board { display: none; }
+body.advance.music-widget .music { display: none; }
+.advance-toggle.on { background: rgba(var(--accent-rgb), 0.18); border-color: var(--accent); color: var(--text); }
+
+.advance-board { grid-column: 2; grid-row: 1 / span 2; min-width: 0; overflow-y: auto; padding: 14px 22px 22px 6px;
+  display: flex; flex-direction: column; gap: 16px; animation: adv-in 0.5s var(--ease); scrollbar-width: thin; }
+.advance-board[hidden] { display: none; }
+@keyframes adv-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+
+.adv-section > header { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; }
+.adv-section h3 { margin: 0; font: 700 13px/1 var(--display); letter-spacing: 0.28em; text-transform: uppercase; color: var(--accent); }
+.adv-note { font: 400 10.5px/1.2 var(--mono); color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.adv-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(180px, 210px); gap: 10px; overflow-x: auto;
+  padding: 2px 2px 10px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.adv-strip.widgets { grid-auto-columns: minmax(190px, 230px); }
+.adv-empty { margin: 0; color: var(--muted); font: 400 12px/1.4 var(--sans); }
+
+.adv-card, .adv-widget { scroll-snap-align: start; display: flex; flex-direction: column; gap: 5px; min-height: 96px; padding: 11px 12px;
+  text-align: left; color: var(--text); font: inherit; background: var(--glass); border: 1px solid var(--line);
+  border-left: 2px solid rgba(var(--accent-rgb), 0.55); backdrop-filter: blur(8px); }
+button.adv-card { cursor: pointer; transition: border-color 0.2s, transform 0.2s var(--ease), background 0.2s; }
+button.adv-card:hover, button.adv-card:focus-visible { border-color: rgba(var(--accent-rgb), 0.7); background: rgba(var(--accent-rgb), 0.08); transform: translateY(-2px); }
+.adv-card b, .adv-widget b { font: 600 14px/1.25 var(--sans); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.adv-card small, .adv-widget small { font: 400 11.5px/1.4 var(--sans); color: var(--dim); overflow: hidden; display: -webkit-box;
+  -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+.adv-card small.dim, .adv-widget .dim { color: var(--muted); }
+.adv-kicker { font: 600 9px/1.2 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
+.adv-card.topic { border-left-color: var(--accent); }
+.adv-card.status-done { opacity: 0.7; }
+
+.adv-card.skill.ready .adv-kicker::before, .adv-card.skill.setup .adv-kicker::before, .adv-card.skill.cloud .adv-kicker::before,
+.adv-card.skill.off .adv-kicker::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }
+.adv-card.skill.ready .adv-kicker::before { background: var(--ok); }
+.adv-card.skill.setup .adv-kicker::before { background: var(--warn); }
+.adv-card.skill.cloud .adv-kicker::before { background: #6fb7ff; }
+.adv-card.skill.off .adv-kicker::before { background: var(--muted); }
+
+.adv-widget header { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.adv-widget ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 3px; font: 400 12px/1.35 var(--sans); }
+.adv-widget li { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adv-big { font: 600 30px/1 var(--display) !important; letter-spacing: 0.04em; color: var(--text); }
+.adv-edit { display: flex; gap: 2px; }
+.adv-edit button { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); background: transparent; color: var(--dim); cursor: pointer; font-size: 11px; }
+.adv-edit button:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.adv-edit button:disabled { opacity: 0.3; cursor: default; }
+.adv-widget.add { justify-content: center; border-style: dashed; }
+.adv-widget select { background: transparent; color: var(--text); border: 1px solid var(--line); padding: 6px; font: inherit; }
+.adv-widget select option { background: var(--bg); }
+
+.adv-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: auto; padding-top: 4px; }
+.adv-card.app.running { border-left-color: var(--ok); }
+.adv-card.app.own .adv-kicker { color: var(--accent); }
+
+.adv-add { position: relative; }
+.adv-add summary { list-style: none; cursor: pointer; }
+.adv-add summary::-webkit-details-marker { display: none; }
+.adv-add form { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; display: flex; flex-direction: column; gap: 6px; width: 300px;
+  padding: 12px; background: var(--glass); border: 1px solid var(--line-strong); backdrop-filter: blur(12px); }
+.adv-add input { background: rgba(0, 0, 0, 0.3); color: var(--text); border: 1px solid var(--line); padding: 7px 8px; font: inherit; }
+
+@media (max-width: 900px) {
+  body.advance .stage { grid-template-columns: 1fr; grid-template-rows: 34vh auto 1fr; }
+  body.advance .captions { grid-row: 2; }
+  .advance-board { grid-column: 1; grid-row: 3; padding: 6px 16px 16px; }
+}
+@media (prefers-reduced-motion: reduce) { .advance-board { animation: none; } button.adv-card:hover { transform: none; } }
+
+/* A Nova screen opened as its own app window (Advance → Separate apps): only that screen. */
+body.solo .topbar, body.solo .readouts, body.solo .stage, body.solo .statusbar, body.solo .music, body.solo .drawer { display: none !important; }
+body.solo .world { inset: 0; }

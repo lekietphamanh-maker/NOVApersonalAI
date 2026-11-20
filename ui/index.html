@@ -10,6 +10,7 @@
 <link rel="stylesheet" href="library.css">
 <link rel="stylesheet" href="world.css">
 <link rel="stylesheet" href="lab.css">
+<link rel="stylesheet" href="advance.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -36,6 +37,7 @@
     <button class="box" data-act="rea" title="Rea: how an app is built, as a blueprint">Rea</button>
     <button class="box" data-act="shannon" title="Shannon: break into your own app before someone else does">Shannon</button>
     <span class="toolbar-gap" aria-hidden="true"></span>
+    <button class="box advance-toggle" data-act="advance" title="Advance mode: the red board with your Library, skills, widgets and apps">Advance</button>
     <button class="box" data-pane="settings">Settings</button>
   </nav>
 </header>
@@ -100,6 +102,32 @@
       <button class="box small" id="step-next" title="Count this step as done">Next step</button>
       <button class="box small" id="step-stop">Stop guide</button>
     </div>
+  </section>
+  <section id="advance-board" class="advance-board" hidden aria-label="Advance board">
+    <section class="adv-section">
+      <header><h3>Library</h3><span class="adv-note">Topics and projects</span><button class="box small" id="adv-library-all" type="button">Open Library</button></header>
+      <div class="adv-strip" id="adv-library"></div>
+    </section>
+    <section class="adv-section">
+      <header><h3>What Nova can do</h3><span class="adv-note" id="adv-skills-count"></span><button class="box small" id="adv-skills-all" type="button">All skills</button></header>
+      <div class="adv-strip" id="adv-skills"></div>
+    </section>
+    <section class="adv-section">
+      <header><h3>Widgets</h3><span class="adv-note">Add, remove and reorder with Edit</span><button class="box small" id="adv-widgets-edit" type="button">Edit</button></header>
+      <div class="adv-strip widgets" id="adv-widgets"></div>
+    </section>
+    <section class="adv-section">
+      <header><h3>Separate apps</h3><span class="adv-note">Run on their own, beside Nova</span>
+        <details class="adv-add"><summary class="box small">+ Your app</summary>
+          <form id="adv-app-form" autocomplete="off">
+            <input name="name" maxlength="40" placeholder="Name" required>
+            <input name="target" maxlength="400" placeholder="https://… or C:\path\to\app.exe" required>
+            <button class="box small on" type="submit">Add</button>
+          </form>
+        </details>
+      </header>
+      <div class="adv-strip" id="adv-apps"></div>
+    </section>
   </section>
 </main>
 

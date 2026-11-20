@@ -100,6 +100,10 @@ CATALOG: tuple[Entry, ...] = (
           ("check the SEO of my portfolio site",), ("seo_check",)),
     Entry("Talk", "Dictation", "Hold Ctrl+Win (Control+Command on a Mac), speak, let go: your words are typed where the "
           "cursor is, in any app (OpenWhispr's idea).", needs="mic", where="SETTINGS → Hotkeys"),
+    Entry("Apps", "Advance mode", "A red HUD: the orb on the left; your Library, what Nova can do, your widgets (add, "
+          "remove, reorder) and separate apps on the right. Rea and Shannon open in their own windows; OpenProject runs "
+          "in Docker; AppFlowy, Cap, VoiceStudio and your own apps open from there.", ("advance mode on", "exit advance mode"),
+          where="ADVANCE in the top bar"),
     Entry("Apps", "OBS", "Record, stream (asks first) and switch scenes through OBS's own remote control.",
           ("start recording", "switch to the gaming scene"), ("obs",), "", "OBS → Tools → WebSocket Server Settings"),
     Entry("Apps", "VS Code", "Opens your projects and files, at a line.", ("open my portfolio in VS Code",), ("vscode",),

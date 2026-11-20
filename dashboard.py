@@ -92,6 +92,8 @@ import auto_tune
 import api_brains
 import cloud_agents
 import secret_store
+import separate_apps
+from advance_mode import AdvanceMode
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -250,7 +252,7 @@ def _qr_data_url(url: str) -> str:
     return "data:image/svg+xml;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-class AlfredApp:
+class AlfredApp(AdvanceMode):
     def __init__(self, root: tk.Tk, startup: dict[str, Any] | None = None) -> None:
         startup = startup or {}
         self.root = root
@@ -332,6 +334,8 @@ class AlfredApp:
         self.recorder = screen_record.Recorder(_data_dir())
         self.agent.recorder = self.recorder
         self.agent.make_image = self._make_image
+        self.docker_apps = separate_apps.Docker()
+        self.agent.advance = self._set_advance
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self.agent.web = self.web
         self.agent.claude = claude_expert.available()
@@ -467,7 +471,7 @@ class AlfredApp:
                          "screen_vision": bool(self.settings.get("screen_vision", True)),
                          "keep_running": self.settings.get("keep_running", True),
                          "mini_orb": self.settings.get("mini_orb", True),
-                         "node_path": self.settings.get("node_path", "")},
+                         "node_path": self.settings.get("node_path", ""), **self._advance_settings()},
             "brief": None,
             "brief_loading": False,
             "notes": self._notes_state(),
@@ -720,6 +724,9 @@ class AlfredApp:
     def _set_busy(self, busy: bool) -> None:
         self._update(busy=busy)
 
+    def _data_folder(self) -> Path:
+        return _data_dir()
+
     def _save_setting(self, key: str, value: Any) -> None:
         self.settings[key] = value
         try:
@@ -745,6 +752,7 @@ class AlfredApp:
                "creative", "notes_save", "notes_load", "notes_new", "notes_delete", "map_expand", "read_screen", "audio_devices", "audio_save", "test_mic", "test_speaker",
                "test_voice", "install_whisper", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
                "open_url", "status_refresh", "cancel_timer", "forget_fact",
+               "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
                "walkthrough_next", "walkthrough_stop", "heart", "library", "library_topic", "library_save",
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",

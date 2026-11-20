@@ -48,6 +48,7 @@ class AppStartsTests(unittest.TestCase):
                 fixed = app._run_action("shannon_fix", {"id": job["id"], "index": 0, "fixed": True})
                 self.assertTrue(fixed["job"]["findings"][0]["fixed"])  # solved: the spot calms to green and stays so
                 self.assertFalse(app._run_action("shannon_fix", {"id": job["id"], "index": 5, "fixed": True})["ok"])
+                self._advance_mode(app)
                 app._run_action("lab_view", {"view": "shannon", "open": True})
                 sent: list = []
                 with mock.patch.object(app.ui, "emit", sent.append), \
@@ -63,6 +64,22 @@ class AppStartsTests(unittest.TestCase):
                     except Exception:
                         pass
             sys.modules.pop("dashboard", None)
+
+
+    def _advance_mode(self, app) -> None:
+        app._run_action("advance", {"on": True})
+        self.assertTrue(app.state["settings"]["advance"])
+        board = app._run_action("advance_board", {})
+        self.assertEqual({"library", "skills", "counts", "widgets", "apps"} <= board.keys(), True)
+        self.assertEqual([item["id"] for item in board["apps"][:3]], ["rea", "shannon", "openproject"])
+        app._run_action("advance_widgets", {"widgets": ["pc", "clock", "nonsense", "pc"]})
+        self.assertEqual(app.state["settings"]["advance_widgets"], ["pc", "clock"])
+        added = app._run_action("app_add", {"name": "My site", "target": "https://klee.dev"})
+        self.assertEqual(added["apps"][-1]["name"], "My site")
+        self.assertFalse(app._run_action("app_add", {"name": "Bad", "target": "not a thing"})["ok"])
+        removed = app._run_action("app_remove", {"id": added["apps"][-1]["id"]})
+        self.assertNotIn("My site", [item["name"] for item in removed["apps"]])
+        self.assertEqual(app.agent.advance(False), "Advance mode off.")
 
 
 if __name__ == "__main__":

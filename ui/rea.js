@@ -89,13 +89,14 @@ export function createRea(root, { act, onOpenChange }) {
     const part = parts()[selected];
     if (!part) {
       const summary = (job?.summary || "").split("\n").filter(Boolean).slice(0, 4);
-      card.replaceChildren(
+      card.replaceChildren(...[  // replaceChildren would write a null as the text "null"
         h("h4", {}, job ? "Overview" : "Rea"),
         ...(summary.length ? summary.map((line) => h("p", {}, line.replace(/^#+\s*/, ""))) : [h("p", { class: "muted small" },
           job?.status === "running" ? "The parts appear around the core when Rea is done." :
           "Rea works through Claude Code on your plan. Only analyse software you're allowed to.")]),
         parts().length ? h("p", { class: "muted small" }, "Click a part, swipe, or use ← → to go round.") : null,
-        job?.report ? h("button", { class: "box small on", type: "button", onclick: () => act("rea_report", { id: job.id }) }, "Open full report") : null);
+        job?.report ? h("button", { class: "box small on", type: "button", onclick: () => act("rea_report", { id: job.id }) }, "Open full report") : null,
+      ].filter(Boolean));
       return;
     }
     const name = (id) => parts().find((item) => item.id === id)?.name || id;

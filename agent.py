@@ -261,6 +261,7 @@ class Agent:
         self.cloud_tools: Callable[[str, str, dict[str, Any], str], str | None] | None = None  # see cloud_tools.py
         self.optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer.py, set by the dashboard
         self.recorder: Any = None                                      # screen_record.Recorder
+        self.advance: Callable[[bool], str] | None = None              # Advance mode on/off (the HUD's red board)
         self.make_image: Callable[[str], str] | None = None            # api_brains.make_image on an OpenAI API brain
         self.keep_alive = "30m"
         self.memory = memory or Memory()
@@ -649,6 +650,10 @@ class Agent:
                 answer = instant_commands.open_app(quick.arguments["app"])
             except OSError:
                 return None
+        elif quick.tool == "advance":
+            if self.advance is None:
+                return None
+            answer = self.advance(bool(quick.arguments["on"]))
         elif quick.tool in ("set_timer", "cancel_timer") and self.timers is None:
             return None
         else:

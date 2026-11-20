@@ -110,6 +110,11 @@ def match(prompt: str) -> Instant | None:
     if re.fullmatch(r"(?:what(?:'s| is) (?:the date|today'?s date|the date today)|what day is (?:it|today)"
                     r"|what(?:'s| is) today)", text):
         return Instant("date")
+    advance = re.fullmatch(r"(?:(?:turn|switch) (?P<a>on|off) )?(?:the )?advanced? mode(?: (?P<b>on|off))?"
+                           r"|(?P<c>open|start|enter|exit|leave|close|stop) (?:the )?advanced? mode", text)
+    if advance:
+        word = advance["a"] or advance["b"] or advance["c"] or "on"
+        return Instant("advance", {"on": word in ("on", "open", "start", "enter")})
     opened = re.fullmatch(r"(?:open|launch|start|run)(?: up)? (?:the |my )?(?P<app>[a-z][a-z .]{1,30}?)(?: app)?", text)
     if opened and opened["app"].strip() in APPS:
         return Instant("open", {"app": opened["app"].strip()})

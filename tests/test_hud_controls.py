@@ -438,7 +438,7 @@ class EveryButtonReachesNovaTests(unittest.TestCase):
         import re
         ui = Path(__file__).resolve().parent.parent / "ui"
         asked = set()
-        for script in ("app.js", "library.js", "world.js"):
+        for script in ("app.js", "library.js", "world.js", "advance.js"):
             asked |= set(re.findall(r"""\bact\(\s*["']([a-z_]+)["']""", (ui / script).read_text(encoding="utf-8")))
         self.assertIn("world", asked)
         self.assertEqual(sorted(asked - dashboard.AlfredApp.ACTIONS), [])
