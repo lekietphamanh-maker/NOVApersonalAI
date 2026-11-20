@@ -109,6 +109,9 @@ ACCENT_RGB = {"gold": (255, 176, 64), "cyan": (59, 228, 255), "crimson": (255, 5
               "mint": (76, 245, 181)}
 FREE_CLOUD_DEFAULT = "gpt-oss:120b-cloud"  # the free online brain: an open model on Ollama Cloud
 # While the Library is on screen the gestures move it: ✋ swipe, ✊ / 👍 hold to open, 👎 back, ✌ close.
+# With Rea's orbit view on screen, webcam gestures move it instead: swipe to the next part, 👍/👎 zoom, ✊ open, ✌ close.
+REA_GESTURES = {"next": "next", "previous": "previous", "volume_up": "zoom_in", "volume_down": "zoom_out",
+                "play_pause": "open", "creative": "close"}
 LIBRARY_GESTURES = {"next": "next", "previous": "previous", "play_pause": "open", "volume_up": "open",
                     "volume_down": "back", "creative": "close"}
 # Autopilot: the owner said "just do what I ask", so these never ask. Still asked, because they send the owner's
@@ -356,6 +359,7 @@ class AlfredApp:
         self.cpu_meter = pc_monitor.CpuMeter()
         self.library_open = False  # the Library is on screen: short commands and gestures move it
         self.library_gesture = ("", 0.0)  # the last gesture that moved it, so a held one acts once
+        self.gesture_screen = ""  # a full screen that takes the webcam gestures while it's open ("rea")
         self.heart = HeartRateMonitor(on_reading=lambda reading: self.events.put(("heart", reading)),
                                       on_status=lambda text: self.events.put(("heart_status", text)))
         self.slide: dict[str, Any] | None = None  # what was slid onto the TV
@@ -664,6 +668,7 @@ class AlfredApp:
 
     def _snapshot(self) -> dict[str, Any]:
         self.library_open = False  # a page that (re)loads starts with the Library closed
+        self.gesture_screen = ""
         with self.lock:
             notices, self.notices = self.notices, []
             return {"state": copy.deepcopy(self.state), "chat": list(self.chat_items), "notices": notices}
@@ -738,8 +743,9 @@ class AlfredApp:
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
-               "obs_password", "rea_view", "rea_start", "rea_open", "rea_report",
-               "tune_now", "auto_tune", "cloud_fallback", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report"}
+               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report",
+               "tune_now", "auto_tune", "cloud_fallback", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
+               "shannon_fix"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -3055,6 +3061,14 @@ class AlfredApp:
             raise ValueError("The report file isn't there any more.")
         app_window.open_path(path)
 
+    def _act_lab_view(self, args: dict[str, Any]) -> None:
+        """A full screen that takes webcam gestures while it's open (Rea's orbit view)."""
+        view = str(args.get("view") or "")
+        if args.get("open"):
+            self.gesture_screen = view
+        elif self.gesture_screen == view:
+            self.gesture_screen = ""
+
     def _act_rea_view(self, _args: dict[str, Any]) -> dict[str, Any]:
         def check() -> None:
             problem = self.reverse.problem() if self.settings.get("reverse_on") else ""
@@ -3115,6 +3129,16 @@ class AlfredApp:
 
     def _act_shannon_open(self, args: dict[str, Any]) -> dict[str, Any]:
         return {"ok": True, "job": self._lab_job(args, "shannon")}
+
+    def _act_shannon_fix(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The owner solved a weak spot (or reopens it): kept with the check, so the shield remembers."""
+        job = self._lab_job(args, "shannon")
+        cards = [dict(card) for card in job.get("findings") or []]
+        index = int(args.get("index", -1))
+        if not 0 <= index < len(cards):
+            raise ValueError("That weak spot isn't in this check.")
+        cards[index]["fixed"] = bool(args.get("fixed"))
+        return {"ok": True, "job": self.lab_jobs.update(job["id"], findings=cards)}
 
     def _act_shannon_report(self, args: dict[str, Any]) -> None:
         self._open_file(str(self._lab_job(args, "shannon").get("report") or ""))
@@ -3405,6 +3429,12 @@ class AlfredApp:
     def _run_gesture(self, action: str) -> None:
         if action.startswith("custom:"):
             self._run_own_gesture(action.split(":", 1)[1])
+            return
+        if self.gesture_screen in ("rea", "shannon") and self.ui.clients and action in REA_GESTURES:
+            now, (last, when) = time.monotonic(), self.library_gesture
+            self.library_gesture = (action, now)
+            if action != last or now - when > 0.6:  # a held 👍/👎 repeats every 0.2 s: it acts once
+                self.ui.emit({"type": f"{self.gesture_screen}_command", "command": REA_GESTURES[action]})
             return
         if self.library_open and self.ui.clients and action in LIBRARY_GESTURES:
             now, (last, when) = time.monotonic(), self.library_gesture

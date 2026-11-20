@@ -44,6 +44,16 @@ class AppStartsTests(unittest.TestCase):
                     self.assertTrue(app._run_action(action, {}).get("ok"), action)
                 board = app._run_action("skills_board", {})
                 self.assertGreater(len(board["entries"]), 30)
+                job = app.lab_jobs.add("shannon", title="shop", findings=[{"severity": "high", "title": "IDOR"}])
+                fixed = app._run_action("shannon_fix", {"id": job["id"], "index": 0, "fixed": True})
+                self.assertTrue(fixed["job"]["findings"][0]["fixed"])  # solved: the spot calms to green and stays so
+                self.assertFalse(app._run_action("shannon_fix", {"id": job["id"], "index": 5, "fixed": True})["ok"])
+                app._run_action("lab_view", {"view": "shannon", "open": True})
+                sent: list = []
+                with mock.patch.object(app.ui, "emit", sent.append), \
+                        mock.patch.object(type(app.ui), "clients", new_callable=mock.PropertyMock, return_value=1):
+                    app._run_gesture("next")  # a swipe moves the shield, not the music
+                self.assertEqual(sent, [{"type": "shannon_command", "command": "next"}])
             finally:
                 app.closing = True
                 app.ui.stop()

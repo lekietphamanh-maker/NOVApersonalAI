@@ -173,9 +173,11 @@ function handle(event) {
     case "rea_job": rea.job(event.job); break;
     case "rea_step": rea.step(event); break;
     case "rea_ready": rea.ready(event); break;
+    case "rea_command": rea.command(event.command); break;
     case "shannon_job": shannon.job(event.job); break;
     case "shannon_line": shannon.line(event); break;
     case "shannon_ready": shannon.ready(event); break;
+    case "shannon_command": shannon.command(event.command); break;
   }
 }
 
@@ -1770,6 +1772,8 @@ document.addEventListener("keydown", (event) => {
     return;
   }
   if (library.isOpen() && openPane === null && library.handleKey(event)) { event.preventDefault(); return; }
+  if (rea.isOpen() && openPane === null && !typing && rea.handleKey(event)) { event.preventDefault(); return; }
+  if (shannon.isOpen() && openPane === null && !typing && shannon.handleKey(event)) { event.preventDefault(); return; }
   if (mapOpen && !typing && mindmap.handleKey(event)) { event.preventDefault(); return; }
   if (event.key === "Escape") {
     if (!$("#creative-layer").hidden) closeCreative();

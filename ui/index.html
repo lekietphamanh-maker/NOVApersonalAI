@@ -191,12 +191,18 @@
     </form>
     <button class="box small" id="rea-close" type="button" title="Esc">Close</button>
   </header>
-  <div class="world-body">
-    <div class="world-stage lab-stage" id="rea-stage"></div>
-    <aside class="world-side lab-side" id="rea-side" aria-live="polite"></aside>
+  <div class="rea-stage">
+    <canvas id="rea-canvas" aria-label="The analysed app as a glowing core with its parts orbiting it. Drag to turn, scroll to zoom, click a part; the panel on the right has the same details."></canvas>
+    <div class="rea-title" id="rea-title"></div>
+    <div class="rea-metrics" id="rea-metrics"></div>
+    <aside class="rea-card" id="rea-card" aria-live="polite"></aside>
+    <div class="rea-bottom">
+      <div class="rea-stages" id="rea-stages" aria-label="Stages"></div>
+      <ol class="rea-timeline" id="rea-timeline" aria-label="What Rea did, newest last"></ol>
+    </div>
   </div>
   <div class="lab-bottom"><p class="lab-problem" id="rea-problem" role="status" hidden></p><nav class="lab-strip" id="rea-strip" aria-label="Past reports"></nav></div>
-  <p class="lib-hint">Claude Code on your plan with REA &nbsp;·&nbsp; only software you're allowed to analyse &nbsp;·&nbsp; reports in your Library &nbsp;·&nbsp; Esc</p>
+  <p class="lib-hint">drag: turn · scroll or pinch: zoom · click a part · ← →: next part · swipe, 👍 👎, ✊ with webcam gestures · Esc</p>
 </section>
 
 <section id="shannon" class="world lab lab-shannon" hidden aria-label="Shannon">
@@ -211,12 +217,18 @@
     <button class="box small danger" id="shannon-stop" type="button" hidden>Stop</button>
     <button class="box small" id="shannon-close" type="button" title="Esc">Close</button>
   </header>
-  <div class="world-body">
-    <div class="world-stage lab-stage shannon-board" id="shannon-board"></div>
-    <aside class="world-side lab-side" id="shannon-side" aria-live="polite"></aside>
+  <div class="shannon-stage">
+    <canvas id="shannon-canvas" aria-label="Your app as a shield; Shannon's proven holes are the marked spots on it. Drag to turn, scroll to zoom, click a spot; the list and the panel have the same details."></canvas>
+    <p class="shannon-banner" id="shannon-banner" role="status"></p>
+    <ol class="shannon-spots" id="shannon-spots" aria-label="Weak spots, worst first"></ol>
+    <aside class="rea-card" id="shannon-side" aria-live="polite"></aside>
+    <div class="rea-bottom">
+      <div class="rea-stages" id="shannon-stages" aria-label="Stages"></div>
+      <p class="shannon-log" id="shannon-log"></p>
+    </div>
   </div>
   <div class="lab-bottom"><p class="lab-problem" id="shannon-problem" role="status" hidden></p><nav class="lab-strip" id="shannon-strip" aria-label="Past checks"></nav></div>
-  <p class="lib-hint">your own apps on this PC or home network only &nbsp;·&nbsp; WSL + Docker, Claude API key (costs credit) &nbsp;·&nbsp; reports in your Library &nbsp;·&nbsp; Esc</p>
+  <p class="lib-hint">your own apps only · red: look first · ✊ or Mark fixed when solved · drag: turn · scroll: zoom · ← → · Esc</p>
 </section>
 
 <section id="world" class="world" hidden aria-label="World">

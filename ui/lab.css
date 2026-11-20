@@ -128,3 +128,77 @@
   font: 400 11.5px/1.3 var(--sans); text-align: left; cursor: pointer; }
 .skill-say:hover, .skill-say:focus-visible { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.14); outline: none; }
 .skill-card .box { justify-self: start; }
+
+/* Rea: the orbit view. The core and the parts are drawn on the canvas; what to know sits around it. */
+.lab-rea .rea-stage { position: relative; min-height: 0; overflow: hidden;
+  background: radial-gradient(640px 420px at 50% 46%, rgba(40, 90, 200, 0.18), transparent 70%); }
+#rea-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+#rea-canvas:active { cursor: grabbing; }
+.rea-title { position: absolute; left: 22px; top: 16px; display: grid; gap: 4px; max-width: 34%; pointer-events: none; }
+.rea-title b { color: #fff; font: 600 26px/1.05 var(--display); letter-spacing: 0.04em; text-transform: uppercase;
+  text-shadow: 0 0 18px rgba(var(--accent-rgb), 0.45); overflow-wrap: anywhere; }
+.rea-title small { color: var(--muted); font: 400 11px/1.4 var(--mono); overflow-wrap: anywhere; }
+.rea-live { color: var(--muted); font: 600 10px/1 var(--mono); letter-spacing: 0.22em; }
+.rea-live.on { color: var(--accent); animation: shannon-pulse 1.1s ease-in-out infinite alternate; }
+.rea-metrics { position: absolute; right: 360px; top: 16px; display: flex; gap: 26px; pointer-events: none; }
+.rea-metrics div { display: grid; gap: 4px; text-align: right; }
+.rea-metrics small { color: var(--muted); font: 600 9px/1 var(--mono); letter-spacing: 0.22em; text-transform: uppercase; }
+.rea-metrics b { color: #fff; font: 600 24px/1 var(--mono); text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.5); }
+.rea-card { position: absolute; right: 16px; top: 16px; bottom: 112px; width: 320px; display: flex; flex-direction: column;
+  gap: 8px; overflow-y: auto; padding: 14px 16px; border: 1px solid rgba(var(--accent-rgb), 0.28);
+  background: rgba(3, 8, 18, 0.78); backdrop-filter: blur(6px); }
+.rea-card h4 { margin: 0; color: #fff; font: 600 15px/1.3 var(--mono); }
+.rea-card h5 { margin: 6px 0 0; color: var(--accent); font: 600 10px/1 var(--mono); letter-spacing: 0.2em; text-transform: uppercase; }
+.rea-card p { margin: 0; color: var(--dim); font-size: 13px; line-height: 1.45; }
+.rea-card .box, .rea-card .lab-tag { align-self: flex-start; }
+.rea-bottom { position: absolute; left: 16px; right: 352px; bottom: 12px; display: grid; gap: 8px; pointer-events: none; }
+.rea-stages { display: flex; gap: 34px; justify-content: center; }
+.rea-stages span { position: relative; padding-bottom: 6px; color: var(--muted); font: 600 10.5px/1 var(--mono);
+  letter-spacing: 0.24em; text-transform: uppercase; }
+.rea-stages span::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--line-strong); }
+.rea-stages span.lit { color: #fff; }
+.rea-stages span.lit::after { background: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.8); }
+.rea-stages span.now::after { animation: shannon-pulse 0.9s ease-in-out infinite alternate; }
+.rea-timeline { display: flex; gap: 0; margin: 0; padding: 22px 0 0; list-style: none; overflow: hidden;
+  background: linear-gradient(transparent 17px, rgba(var(--accent-rgb), 0.5) 17px, rgba(var(--accent-rgb), 0.5) 18px, transparent 18px); }
+.rea-timeline li { position: relative; flex: 1 1 0; min-width: 0; padding: 4px 8px 0 12px; color: var(--muted);
+  font: 400 10.5px/1.35 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rea-timeline li i { position: absolute; left: 4px; top: -9px; width: 7px; height: 7px; transform: rotate(45deg);
+  background: rgba(var(--accent-rgb), 0.6); }
+.rea-timeline li.now { color: #fff; }
+.rea-timeline li.now i { background: var(--accent); box-shadow: 0 0 10px var(--accent); }
+@media (max-width: 1000px) {
+  .rea-metrics { right: 16px; top: auto; bottom: 120px; }
+  .rea-card { top: auto; height: 34%; width: auto; left: 16px; bottom: 150px; }
+  .rea-bottom { right: 16px; }
+  .rea-title { max-width: 70%; }
+}
+
+/* Shannon: the shield with its weak spots, the list on the left, the chosen spot on the right. */
+.lab-shannon .shannon-stage { position: relative; min-height: 0; overflow: hidden;
+  background: radial-gradient(620px 440px at 50% 46%, rgba(90, 40, 140, 0.22), transparent 70%); }
+#shannon-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; touch-action: none; }
+.shannon-banner { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); margin: 0; padding: 7px 18px;
+  border: 2px solid rgba(255, 210, 90, 0.75); border-radius: 6px; background: rgba(30, 22, 6, 0.78); color: #ffd76a;
+  font: 700 18px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; white-space: nowrap; }
+.shannon-banner.alert { border-color: rgba(255, 64, 88, 0.85); color: #ff8a9a; box-shadow: 0 0 24px rgba(255, 45, 85, 0.35); }
+.shannon-banner.clear { border-color: rgba(92, 242, 176, 0.8); color: #8ff5c8; }
+.shannon-spots { position: absolute; left: 16px; top: 16px; bottom: 112px; width: 250px; margin: 0; padding: 0; list-style: none;
+  display: flex; flex-direction: column; gap: 6px; overflow-y: auto; }
+.shannon-spots button { display: grid; grid-template-columns: 10px 1fr; column-gap: 8px; width: 100%; padding: 7px 9px; text-align: left;
+  border: 1px solid var(--line-strong); background: rgba(10, 6, 12, 0.78); color: var(--text); cursor: pointer;
+  font: 400 12px/1.3 var(--sans); }
+.shannon-spots button i { grid-row: span 2; width: 10px; height: 10px; margin-top: 3px; transform: rotate(30deg);
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); background: var(--spot); box-shadow: 0 0 8px var(--spot); }
+.shannon-spots button small { color: var(--spot); font: 600 9.5px/1.4 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; }
+.shannon-spots button.critical { --spot: #ff2d55; } .shannon-spots button.high { --spot: #ff5a3c; }
+.shannon-spots button.medium { --spot: #ffb547; } .shannon-spots button.low { --spot: #f0dc5a; }
+.shannon-spots button.fixed { --spot: #5cf2b0; opacity: 0.75; }
+.shannon-spots button.critical i, .shannon-spots button.high i { animation: shannon-pulse 0.9s ease-in-out infinite alternate; }
+.shannon-spots button.on, .shannon-spots button:hover, .shannon-spots button:focus-visible { border-color: var(--spot); outline: none; }
+.shannon-log { margin: 0; color: var(--muted); font: 400 11px/1.4 var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
+.lab-shannon .rea-bottom { left: 280px; }
+@media (max-width: 1000px) {
+  .shannon-spots { width: auto; right: 16px; bottom: auto; max-height: 26%; top: 60px; }
+  .lab-shannon .rea-bottom { left: 16px; }
+}

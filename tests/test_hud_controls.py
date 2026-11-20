@@ -36,7 +36,7 @@ class LibraryControlTests(unittest.TestCase):
         shelf = Library(vault)
         shelf.save("Drone app", topic="Robotics")
         self.pressed: list[str] = []
-        self.app = types.SimpleNamespace(library_open=True, ui=FakeUi(), library_gesture=("", 0.0),
+        self.app = types.SimpleNamespace(library_open=True, ui=FakeUi(), library_gesture=("", 0.0), gesture_screen="",
                                          _library=lambda: shelf, _set_voice_state=lambda *_args: None,
                                          _toast=lambda *_args: None, creative=types.SimpleNamespace(open_window=lambda: None))
         original = dashboard.media_keys.press
