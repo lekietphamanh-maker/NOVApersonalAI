@@ -15,7 +15,8 @@ on:
         required: true
 
 concurrency:
-  group: build-${{ github.ref }}
+  # Per event: a push only replaces an older push build, never a release that's being published.
+  group: build-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 jobs:
