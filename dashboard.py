@@ -93,7 +93,10 @@ import api_brains
 import cloud_agents
 import secret_store
 import separate_apps
+import setup_everything
 from advance_mode import AdvanceMode
+import setup_actions
+from setup_actions import SetupActions
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -252,7 +255,7 @@ def _qr_data_url(url: str) -> str:
     return "data:image/svg+xml;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
-class AlfredApp(AdvanceMode):
+class AlfredApp(AdvanceMode, SetupActions):
     def __init__(self, root: tk.Tk, startup: dict[str, Any] | None = None) -> None:
         startup = startup or {}
         self.root = root
@@ -335,6 +338,7 @@ class AlfredApp(AdvanceMode):
         self.agent.recorder = self.recorder
         self.agent.make_image = self._make_image
         self.docker_apps = separate_apps.Docker()
+        self.setup = setup_everything.Setup(self._setup_report)
         self.agent.advance = self._set_advance
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self.agent.web = self.web
@@ -462,6 +466,7 @@ class AlfredApp(AdvanceMode):
                      "total": 0, "at": "06:00"},
             "hotkeys": self._hotkey_state(),
             "music": None,
+            "setup": self.setup.state(),
             "settings": {"accent": self.settings.get("accent", "gold"), "interests": self.settings.get("interests", []),
                          "brief_region": self.settings.get("brief_region", "US"), "model": self.settings.get("model", "auto"),
                          "news_outlets": daily_brief.saved_outlets(self.settings.get("news_outlets")),
@@ -522,6 +527,8 @@ class AlfredApp(AdvanceMode):
         self.root.after(20_000, self._news_tick)  # the news desk's daily run (06:00, or the first minute after)
         self.root.after(30_000, self._skills_tick)  # skills on a schedule (a PC that was off catches up the same day)
         self.root.after(5_000, self._reminders_tick)  # reminders, also the ones missed while the PC was off
+        if open_window and not USB:
+            self.root.after(setup_actions.FIRST_RUN_DELAY_MS, self._setup_first_run)
         try:
             self.skills.ensure_defaults()
         except OSError:
@@ -752,7 +759,7 @@ class AlfredApp(AdvanceMode):
                "creative", "notes_save", "notes_load", "notes_new", "notes_delete", "map_expand", "read_screen", "audio_devices", "audio_save", "test_mic", "test_speaker",
                "test_voice", "install_whisper", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
                "open_url", "status_refresh", "cancel_timer", "forget_fact",
-               "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
+               "setup_everything", "setup_stop", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
                "walkthrough_next", "walkthrough_stop", "heart", "library", "library_topic", "library_save",
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
@@ -2821,24 +2828,30 @@ class AlfredApp(AdvanceMode):
 
     # ---------- auto-tune: the strongest model this PC runs smoothly, set up for it ----------
 
-    def _tune(self) -> None:
-        """Runs on a worker thread; reports through events ("tune_progress", then "tuned" or "tune_failed")."""
+    def _tune(self, report: Callable[[str], None] | None = None) -> str:
+        """Runs on a worker thread; reports through events ("tune_progress", then "tuned" or "tune_failed").
+        Returns "" when it tuned, else why not (Set up everything shows it)."""
         if self.tuning_now:
-            return
+            return "Nova is tuning already"
         self.tuning_now = True
         base = self.agent.base_url
         try:
             models = Path(os.environ.get("OLLAMA_MODELS") or Path.home() / ".ollama")
             free_gb = shutil.disk_usage(models if models.exists() else Path.home()).free / 1024 ** 3
-            progress = lambda text: self.events.put(("tune_progress", text))  # noqa: E731
+            def progress(text: str) -> None:
+                self.events.put(("tune_progress", text))
+                if report is not None:
+                    report(text)
             result = auto_tune.tune(
                 auto_tune.Ollama(base), self.hardware or detect_hardware(), VERSION,
                 pull=lambda name: pull_model(base, name, progress), disk_free_gb=free_gb,
                 restart=lambda settings: (auto_tune.apply_settings(settings), auto_tune.restart_ollama(base))[1],
                 progress=progress)
             self.events.put(("tuned", result.as_dict()))
+            return ""
         except Exception as exc:
             self.events.put(("tune_failed", str(exc)))
+            return str(exc)
         finally:
             self.tuning_now = False
 

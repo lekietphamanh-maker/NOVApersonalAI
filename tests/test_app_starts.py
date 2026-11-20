@@ -49,6 +49,11 @@ class AppStartsTests(unittest.TestCase):
                 self.assertTrue(fixed["job"]["findings"][0]["fixed"])  # solved: the spot calms to green and stays so
                 self.assertFalse(app._run_action("shannon_fix", {"id": job["id"], "index": 5, "fixed": True})["ok"])
                 self._advance_mode(app)
+                steps = [step.id for step in app._setup_steps()]
+                for wanted in ("ollama", "model", "meaning", "voice", "vision", "ffmpeg", "node", "agent-claude-code", "agent-gemini"):
+                    self.assertIn(wanted, steps)
+                self.assertNotIn("ollama", [step.id for step in app._setup_steps(usb=True)])
+                self.assertEqual(app.state["setup"]["steps"], [])
                 app._run_action("lab_view", {"view": "shannon", "open": True})
                 sent: list = []
                 with mock.patch.object(app.ui, "emit", sent.append), \

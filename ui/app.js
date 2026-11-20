@@ -451,7 +451,28 @@ function renderFacts() {
   }));
 }
 
+const SETUP_MARK = { done: "✓", running: "◌", failed: "✕", skipped: "–", stopped: "–", waiting: "○" };
+function renderSetup() {
+  const setup = state.setup || { steps: [], manual: [] };
+  const list = $("#setup-list");
+  const signature = JSON.stringify(setup);
+  if (list.dataset.signature === signature) return;
+  list.dataset.signature = signature;
+  $("#setup-everything").textContent = setup.running ? "Stop" : setup.steps.length ? "Run again" : "Set up everything";
+  const finished = setup.steps.filter((step) => step.status === "done").length;
+  $("#setup-status").textContent = setup.running ? `${setup.current || "Starting"}… (${finished} of ${setup.steps.length} ready)`
+    : setup.steps.length ? `${finished} of ${setup.steps.length} ready. Can't be automatic: ${setup.manual.map((item) => item.name).join(", ")}.`
+      : "Nova downloads and turns on what every feature needs, by herself.";
+  list.hidden = !setup.steps.length;
+  list.replaceChildren(...setup.steps.map((step) => h("li", { class: step.status === "done" ? "done" : step.status === "failed" ? "todo failed" : "" },
+    h("span", { class: "mark" }, SETUP_MARK[step.status] || "·"),
+    h("div", {}, h("b", {}, step.name), h("span", { class: "about" }, step.note || [step.why, step.size_mb ? `${step.size_mb >= 1024 ? (step.size_mb / 1024).toFixed(1) + " GB" : step.size_mb + " MB"}` : ""].filter(Boolean).join(" · "))))),
+    ...(setup.running ? [] : setup.manual.map((item) => h("li", {}, h("span", { class: "mark" }, "!"), h("div", {}, h("b", {}, item.name), h("span", { class: "about" }, item.why))))));
+}
+$("#setup-everything").onclick = () => act((state.setup || {}).running ? "setup_stop" : "setup_everything");
+
 function renderDownloads() {
+  renderSetup();
   const switches = state.switches || {}, heart = state.heart || {}, pcs = state.pcs || {};
   $("#need-iphone-state").textContent = switches.phone ? "PHONE ON" : "";
   $("#need-fitness-state").textContent = heart.on ? "CONNECTED" : "";
