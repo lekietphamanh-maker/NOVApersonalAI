@@ -1,0 +1,67 @@
+/* Building mode: the 3D bench on a screen of its own, the Blueprint beside it. No projector: the bench keeps its own lit
+   paper look (circuit/bench.css) inside the dark HUD frame. */
+.build { --accent-rgb: 255, 176, 64; position: fixed; inset: var(--top-h) 0 var(--bar-h) 0; z-index: 6; display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto; background: var(--bg); animation: fade-in 0.35s var(--ease); }
+.build[hidden] { display: none; }
+body.solo .build { inset: 0; }
+
+.build-bar { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; padding: 12px 22px;
+  border-bottom: 1px solid var(--line); background: rgba(4, 6, 8, 0.6); backdrop-filter: blur(10px); position: relative; z-index: 3; }
+.build-title { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.build-title b { font: 700 13px/1 var(--display); letter-spacing: 0.3em; color: var(--accent); }
+.build-mark { width: 12px; height: 12px; border: 1.5px solid var(--accent); transform: rotate(45deg); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.6); }
+.build-title .field { width: min(280px, 40vw); }
+.build-dirty { font: 600 10px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--warn); }
+.build-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.build-open { position: relative; }
+.build-open summary { list-style: none; cursor: pointer; }
+.build-open summary::-webkit-details-marker { display: none; }
+.build-saved { position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; width: 280px; max-height: 50vh; overflow-y: auto; margin: 0; padding: 6px;
+  list-style: none; background: var(--glass); border: 1px solid var(--line-strong); backdrop-filter: blur(12px); }
+.build-saved li { display: flex; align-items: center; gap: 4px; }
+.build-saved li > button:first-child { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 7px 8px; text-align: left;
+  background: transparent; border: 1px solid transparent; color: var(--text); cursor: pointer; font: inherit; }
+.build-saved li > button:first-child:hover { border-color: var(--line-strong); background: rgba(var(--accent-rgb), 0.06); }
+.build-saved small { color: var(--muted); font: 400 10.5px var(--mono); }
+.build-x { width: 22px; height: 22px; padding: 0; border: 0; background: transparent; color: inherit; opacity: 0.5; cursor: pointer; }
+.build-x:hover { opacity: 1; color: var(--danger); }
+
+.build-main { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 14px; padding: 14px 22px; min-height: 0; }
+.build-bench { position: relative; min-height: 0; min-width: 0; border: 1px solid var(--line-strong); border-radius: 6px; overflow: hidden; background: #0b0f14; }
+.build-bench .rl { min-height: 0; }
+.build .rl-full { display: none; }
+.build-note { margin: 0; padding: 24px; font: 400 13px/1.5 var(--sans); color: var(--dim); }
+
+.build-plan { min-height: 0; overflow-y: auto; padding: 14px 16px; background: var(--glass); border: 1px solid var(--line-strong); border-radius: 6px;
+  font: 400 13px/1.5 var(--sans); color: var(--text); }
+.build-plan h3 { margin: 0 0 8px; font: 700 14px/1.2 var(--display); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+.build-plan h4 { margin: 16px 0 6px; font: 600 10px var(--mono); letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.build-hint { margin: 0; color: var(--dim); }
+.build-hint[hidden] { display: none; }
+.build-bom, .build-steps { margin: 0; padding: 0; list-style: none; }
+.build-bom li { display: grid; grid-template-columns: 34px 1fr; gap: 2px 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.build-bom li b { font: 600 12px var(--mono); color: var(--accent); }
+.build-bom li small { grid-column: 2; color: var(--muted); font-size: 11.5px; }
+.build-bom li.extra b { color: var(--dim); }
+.build-steps { counter-reset: step; }
+.build-steps li { counter-increment: step; position: relative; padding: 6px 0 6px 30px; }
+.build-steps li::before { content: counter(step); position: absolute; left: 0; top: 6px; width: 20px; height: 20px; display: grid; place-items: center;
+  font: 600 11px var(--mono); color: var(--bg); background: var(--accent); border-radius: 50%; }
+.build-notes { margin: 14px 0 0; padding: 8px 10px; border-left: 3px solid var(--accent); background: rgba(var(--accent-rgb), 0.07); }
+.build-notes:empty { display: none; }
+
+.build-ask { display: flex; gap: 8px; padding: 10px 22px; border-top: 1px solid var(--line); background: rgba(4, 6, 8, 0.7); position: relative; z-index: 3; }
+.build-ask .field { flex: 1; }
+.build-reply { margin: 0 22px 10px; max-height: 24vh; overflow-y: auto; padding: 10px 14px; background: var(--glass);
+  border: 1px solid rgba(var(--accent-rgb), 0.5); border-left: 3px solid var(--accent); font: 400 13.5px/1.55 var(--sans); white-space: pre-wrap; }
+.build-reply[hidden] { display: none; }
+.build-reply::before { content: "NOVA"; display: block; margin-bottom: 4px; font: 600 9px var(--mono); letter-spacing: 0.2em; color: var(--accent); }
+
+.build-dialog { position: absolute; inset: 0; z-index: 8; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); }
+.build-dialog[hidden] { display: none; }
+.build-dialog > div { padding: 20px 22px; min-width: min(380px, 90vw); background: var(--glass); border: 1px solid var(--line-strong); backdrop-filter: blur(14px); }
+.build-dialog p { margin: 0 0 16px; font: 500 15px/1.4 var(--sans); }
+.build-choices { display: flex; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 1000px) { .build-main { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 34%); } }
+@media (max-width: 700px) { .build-bar, .build-ask { padding: 10px 16px; } .build-main { padding: 10px 16px; } .build-reply { margin: 0 16px 10px; } }

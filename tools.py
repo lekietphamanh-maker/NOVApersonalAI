@@ -301,6 +301,22 @@ WORKPLACE_TOOL = _tool(
     "something on the board, highlight the key words and add a note, then say the gist out loud.",
     {"action": {"type": "string", "enum": ["read", "highlight", "add_note", "point", "look"]}, "item": _TEXT,
      "text": _TEXT, "note": _TEXT, "question": _TEXT}, ["action"])
+BUILDING_TOOL = _tool(
+    "building", "Work on the owner's Building mode bench (a 3D electronics workbench they wire up and run) while it's "
+    "open. Its state and the library of boards and parts come with the question. action: read (the bench again), pins "
+    "(the exact pin names of a board or part: give `part`), blueprint (build a circuit for what the owner describes). "
+    "blueprint: give a short `title`; `board` (one board id from the library); `parts` (each {type: a part id, ref: a "
+    "short name such as led or led2}); `wires` (each {a, b} as ref.PIN, the board's ref being its id, e.g. uno.D13 to "
+    "led.SIG; add a ground wire for every part; color optional: red for power, black for ground); `bom` (what else "
+    "they must buy: resistors, jumper wires, a USB cable, each {item, qty, note}; the bench's own parts are listed by "
+    "themselves); `steps` (the build in order, short); `notes` (one tip). It starts the bench fresh unless keep is true. "
+    "The bench draws it and checks the wiring: if the answer says ERROR, fix the wiring and call blueprint again. Use "
+    "only ids and pin names from the library or from pins; never invent one.",
+    {"action": {"type": "string", "enum": ["read", "pins", "blueprint"]}, "part": _TEXT, "title": _TEXT, "board": _TEXT,
+     "parts": {"type": "array", "items": {"type": "object", "properties": {"type": _TEXT, "ref": _TEXT}, "required": ["type"]}},
+     "wires": {"type": "array", "items": {"type": "object", "properties": {"a": _TEXT, "b": _TEXT, "color": _TEXT}, "required": ["a", "b"]}},
+     "bom": {"type": "array", "items": {"type": "object", "properties": {"item": _TEXT, "qty": {"type": "integer"}, "note": _TEXT}, "required": ["item"]}},
+     "steps": {"type": "array", "items": _TEXT}, "notes": _TEXT, "keep": {"type": "boolean"}}, ["action"])
 ARCHMANCER_TOOL = _tool(
     "archmancer", "Look up agent-system architecture knowledge from Archmancer: how to design, build, debug or review "
     "agent systems (AI loops, tools, model calls, context, trust, evaluation, delivery). action: list (all skills), "
@@ -310,7 +326,7 @@ ARCHMANCER_TOOL = _tool(
      "skill": _TEXT, "reference": _TEXT}, ["action"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
                ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
-               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, ARCHMANCER_TOOL]
+               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, BUILDING_TOOL, ARCHMANCER_TOOL]
 
 
 
@@ -879,6 +895,8 @@ register([SCREEN_RECORD_TOOL], _run_screen_record)
 register([SEO_TOOL], _run_seo)
 register([WORKPLACE_TOOL], lambda _name, arguments, context: context.workplace(str(arguments.get("action") or "read"), arguments)
          if context.workplace is not None else "The Workplace isn't open.")
+register([BUILDING_TOOL], lambda _name, arguments, context: context.building(str(arguments.get("action") or "read"), arguments)
+         if context.building is not None else "Building mode isn't open.")
 register([IMAGE_TOOL], _run_image)
 register([OPTIMIZE_PROMPT_TOOL], lambda _name, arguments, context: context.optimize(
     str(arguments["prompt"])[:8000], str(arguments.get("kind") or "user"), arguments.get("test") is not False)

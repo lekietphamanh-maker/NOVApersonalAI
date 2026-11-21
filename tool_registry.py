@@ -49,6 +49,7 @@ class ToolContext:
     recorder: Any = None  # screen_record.Recorder
     make_image: Callable[[str], str] | None = None  # api_brains.make_image on the owner's OpenAI API brain
     workplace: Callable[[str, dict[str, Any]], str] | None = None  # the open Workplace board (workplace.WorkplaceBoard.act)
+    building: Callable[[str, dict[str, Any]], str] | None = None  # the open Building mode bench (building.BuildingBench.act)
     galaxy: Callable[[], str] | None = None
 
 

@@ -110,6 +110,12 @@ CATALOG: tuple[Entry, ...] = (
                                                                           "highlight what matters in these notes",
                                                                           "what's in this picture?"),
           ("workplace",), where="WORKPLACE in the top bar"),
+    Entry("Make", "Building mode", "A 3D electronics bench on a screen of its own: place a board (Arduino, ESP32, Pico, Blue Pill, "
+          "Raspberry Pi 4) and parts, wire them pin to pin and press Run. Describe what you want and Nova builds it: she picks the "
+          "board and parts, wires them, the bench checks the wiring (short circuits, 5 V into a 3.3 V pin), and the parts list "
+          "and build steps appear beside it. Projects are saved by name.",
+          ("building mode", "build me a blinking LED on an Uno", "a servo that follows a knob on an ESP32", "is my circuit wired right?"),
+          ("building",), where="BUILD in the top bar"),
     Entry("Apps", "Advance mode", "A red HUD: the orb on the left; your Library, what Nova can do, your widgets (add, "
           "remove, reorder) and separate apps on the right. Rea and Shannon open in their own windows; OpenProject runs "
           "in Docker; AppFlowy, Cap, VoiceStudio and your own apps open from there.", ("advance mode on", "exit advance mode"),

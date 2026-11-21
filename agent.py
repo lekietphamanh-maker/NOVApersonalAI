@@ -262,6 +262,8 @@ class Agent:
         self.optimize: Callable[[str, str, bool], str] | None = None  # prompt_optimizer.py, set by the dashboard
         self.recorder: Any = None                                      # screen_record.Recorder
         self.open_workplace: Callable[[bool], str] | None = None       # the Workplace board on/off
+        self.open_building: Callable[[bool], str] | None = None        # Building mode (the 3D bench) on/off
+        self.building: Callable[[str, dict[str, Any]], str] | None = None  # the open Building mode bench
         self.advance: Callable[[bool], str] | None = None              # Advance mode on/off (the HUD's red board)
         self.workplace: Callable[[str, dict[str, Any]], str] | None = None  # the open Workplace board
         self.galaxy: Callable[[], str] | None = None
@@ -481,7 +483,7 @@ class Agent:
                     "drive_search": self.drive, "drive_recent": self.drive, "drive_read": self.drive,
                     "reverse_engineer": self.reverse, "discover": self.discover, "world": self.world,
                     "route": self.route, "wikipedia": self.wikipedia, "search_my_notes": self.notes_search,
-                    "workplace": self.workplace}
+                    "workplace": self.workplace, "building": self.building}
         offered = [tool for tool in tools if optional.get(tool["function"]["name"], True)]
         if self.only_tools is not None:  # a skill that names its tools gets only those
             offered = [tool for tool in offered if tool["function"]["name"] in self.only_tools]
@@ -524,7 +526,7 @@ class Agent:
                             wikipedia=self.wikipedia,
                             notes_search=self.notes_search if self.private_topics != "personal" else None,
                             obs_password=self.obs_password, recorder=self.recorder, make_image=self.make_image,
-                            workplace=self.workplace, galaxy=self.galaxy)
+                            workplace=self.workplace, building=self.building, galaxy=self.galaxy)
 
     def _claude_history(self) -> list[dict[str, Any]]:
         """The recent conversation as Claude may see it: what was said, never a personal turn, a tool result or a screen."""
@@ -655,8 +657,8 @@ class Agent:
                 answer = instant_commands.open_app(quick.arguments["app"])
             except OSError:
                 return None
-        elif quick.tool in ("advance", "workplace"):
-            switch = self.advance if quick.tool == "advance" else self.open_workplace
+        elif quick.tool in ("advance", "workplace", "building"):
+            switch = {"advance": self.advance, "workplace": self.open_workplace, "building": self.open_building}[quick.tool]
             if switch is None:
                 return None
             answer = switch(bool(quick.arguments["on"]))
@@ -709,7 +711,7 @@ class Agent:
                             wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password,
                             cloud=self.cloud_tools if self._may_use_cloud(prompt) else None, optimize=self.optimize,
                             recorder=self.recorder, make_image=self.make_image, workplace=self.workplace,
-                            galaxy=self.galaxy)
+                            building=self.building, galaxy=self.galaxy)
 
     def _may_use_cloud(self, prompt: str) -> bool:
         """A tool that can't run here may go to Claude, unless this turn or the privacy setting keeps things here."""

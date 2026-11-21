@@ -1,3 +1,12 @@
+## New in v2.14.0
+
+- **Building mode** (the new **BUILD** button, or say "building mode"): a 3D electronics bench on a screen of its own, from your Robotics Lab. Pick a board (Arduino Uno, Nano or Mega, ESP32, NodeMCU, Raspberry Pi Pico, STM32 Blue Pill, Raspberry Pi 4) and parts (LED, RGB LED, button, knob, buzzer, servo, motor and driver, battery, distance sensor, OLED, DHT11, light sensor, level shifter), click a pin and then another to run a wire, and press **Run**. **Missions** walk you through real builds; **Free build** lets you wire anything. The bench checks the wiring itself: a short circuit, 5 V into a 3.3 V pin, TX wired to TX, two boards that don't share a ground.
+  - **Blueprint**: describe what you want, typed or out loud ("build me a blinking LED on an Uno", "a servo that follows a knob on an ESP32"). Nova picks the board and parts, wires them on the bench, and the **Blueprint** panel fills with the parts list (what's on the bench plus what else to buy: resistors, jumper wires, a USB cable) and the build steps. The bench checks her wiring and tells her what it finds, so she fixes a short circuit herself. A plan is checked against the bench's real list of boards, parts and pin names first, so nothing is invented.
+  - **Nova reads it**: ask "is my circuit wired right?" and she reads the parts, the wires and the bench's checks, says what's wrong and how to fix it. She can't move wires on a bench you built: you do.
+  - **Projects**: **Save**, **Open** and **New** by name; closing Building mode keeps the bench as it was. Delete, R (rotate) and Esc work inside a bench you've clicked without leaving the screen.
+  - **Everything stays on this PC**: the 3D bench is part of Nova (three.js included) and makes no network requests.
+- **Fixed**: the Workplace's projector beams could stop animating for good if its first frame arrived a moment early.
+
 ## New in v2.11.0
 
 - **Archmancer knowledge base**: "search archmancer for prompt injection", "how should I design an agent loop for my app", "what does archmancer say about tool authorization". Nova can search and read 42 agent-system architecture docs from lehoanganhtai13/archmancer (Apache-2.0), covering agent loops, tools, models, context management, trust and privacy, evaluation, and delivery. Everything stays on your PC. Useful when you're designing, building or debugging an AI agent system. On the Skills board under Knowledge.

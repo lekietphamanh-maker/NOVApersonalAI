@@ -119,6 +119,10 @@ def match(prompt: str) -> Instant | None:
                          r"|(?P<c>close|exit|leave|stop|end) (?:the |my )?(?:workplace|work ?space)(?: mode)?", text)
     if board:
         return Instant("workplace", {"on": not board["c"]})
+    bench = re.fullmatch(r"(?:(?P<a>open|start|enter|show)(?: me)? )?(?:the |my )?(?:building|build|builder|circuit|electronics) (?:mode|bench)"
+                         r"|(?P<c>close|exit|leave|stop|end) (?:the |my )?(?:building|build|builder|circuit|electronics) (?:mode|bench)", text)
+    if bench:
+        return Instant("building", {"on": not bench["c"]})
     opened = re.fullmatch(r"(?:open|launch|start|run)(?: up)? (?:the |my )?(?P<app>[a-z][a-z .]{1,30}?)(?: app)?", text)
     if opened and opened["app"].strip() in APPS:
         return Instant("open", {"app": opened["app"].strip()})

@@ -1,0 +1,2510 @@
+{
+ "v": 1,
+ "boards": {
+  "uno": {
+   "name": "Arduino Uno R3",
+   "logic": 5,
+   "tagline": "Where almost everyone starts",
+   "pins": [
+    {
+     "name": "SCL",
+     "kind": "com"
+    },
+    {
+     "name": "SDA",
+     "kind": "com"
+    },
+    {
+     "name": "AREF",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "D13",
+     "kind": "dig"
+    },
+    {
+     "name": "D12",
+     "kind": "dig"
+    },
+    {
+     "name": "D11",
+     "kind": "dig"
+    },
+    {
+     "name": "D10",
+     "kind": "dig"
+    },
+    {
+     "name": "D9",
+     "kind": "dig"
+    },
+    {
+     "name": "D8",
+     "kind": "dig"
+    },
+    {
+     "name": "D7",
+     "kind": "dig"
+    },
+    {
+     "name": "D6",
+     "kind": "dig"
+    },
+    {
+     "name": "D5",
+     "kind": "dig"
+    },
+    {
+     "name": "D4",
+     "kind": "dig"
+    },
+    {
+     "name": "D3",
+     "kind": "dig"
+    },
+    {
+     "name": "D2",
+     "kind": "dig"
+    },
+    {
+     "name": "D1 / TX",
+     "kind": "com"
+    },
+    {
+     "name": "D0 / RX",
+     "kind": "com"
+    },
+    {
+     "name": "NC",
+     "kind": "nc"
+    },
+    {
+     "name": "IOREF",
+     "kind": "pwr"
+    },
+    {
+     "name": "RESET",
+     "kind": "ctl"
+    },
+    {
+     "name": "3.3V",
+     "kind": "pwr"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "Vin",
+     "kind": "pwr"
+    },
+    {
+     "name": "A0",
+     "kind": "ana"
+    },
+    {
+     "name": "A1",
+     "kind": "ana"
+    },
+    {
+     "name": "A2",
+     "kind": "ana"
+    },
+    {
+     "name": "A3",
+     "kind": "ana"
+    },
+    {
+     "name": "A4",
+     "kind": "ana"
+    },
+    {
+     "name": "A5",
+     "kind": "ana"
+    },
+    {
+     "name": "ICSP MISO",
+     "kind": "com"
+    },
+    {
+     "name": "ICSP 5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "ICSP SCK",
+     "kind": "com"
+    },
+    {
+     "name": "ICSP MOSI",
+     "kind": "com"
+    },
+    {
+     "name": "ICSP RESET",
+     "kind": "ctl"
+    },
+    {
+     "name": "ICSP GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "nano": {
+   "name": "Arduino Nano",
+   "logic": 5,
+   "tagline": "An Uno the size of a thumb",
+   "pins": [
+    {
+     "name": "D12",
+     "kind": "dig"
+    },
+    {
+     "name": "D13",
+     "kind": "dig"
+    },
+    {
+     "name": "D11",
+     "kind": "dig"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "D10",
+     "kind": "dig"
+    },
+    {
+     "name": "REF",
+     "kind": "ctl"
+    },
+    {
+     "name": "D9",
+     "kind": "dig"
+    },
+    {
+     "name": "A0",
+     "kind": "ana"
+    },
+    {
+     "name": "D8",
+     "kind": "dig"
+    },
+    {
+     "name": "A1",
+     "kind": "ana"
+    },
+    {
+     "name": "D7",
+     "kind": "dig"
+    },
+    {
+     "name": "A2",
+     "kind": "ana"
+    },
+    {
+     "name": "D6",
+     "kind": "dig"
+    },
+    {
+     "name": "A3",
+     "kind": "ana"
+    },
+    {
+     "name": "D5",
+     "kind": "dig"
+    },
+    {
+     "name": "A4",
+     "kind": "ana"
+    },
+    {
+     "name": "D4",
+     "kind": "dig"
+    },
+    {
+     "name": "A5",
+     "kind": "ana"
+    },
+    {
+     "name": "D3",
+     "kind": "dig"
+    },
+    {
+     "name": "A6",
+     "kind": "ana"
+    },
+    {
+     "name": "D2",
+     "kind": "dig"
+    },
+    {
+     "name": "A7",
+     "kind": "ana"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "RST",
+     "kind": "ctl"
+    },
+    {
+     "name": "RST",
+     "kind": "ctl"
+    },
+    {
+     "name": "RX0",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "TX1",
+     "kind": "com"
+    },
+    {
+     "name": "VIN",
+     "kind": "pwr"
+    },
+    {
+     "name": "MISO",
+     "kind": "com"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "SCK",
+     "kind": "com"
+    },
+    {
+     "name": "MOSI",
+     "kind": "com"
+    },
+    {
+     "name": "RST",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "mega": {
+   "name": "Arduino Mega 2560 R3",
+   "logic": 5,
+   "tagline": "When the Uno runs out of pins",
+   "pins": [
+    {
+     "name": "SCL",
+     "kind": "com"
+    },
+    {
+     "name": "SDA",
+     "kind": "com"
+    },
+    {
+     "name": "AREF",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "D13",
+     "kind": "dig"
+    },
+    {
+     "name": "D12",
+     "kind": "dig"
+    },
+    {
+     "name": "D11",
+     "kind": "dig"
+    },
+    {
+     "name": "D10",
+     "kind": "dig"
+    },
+    {
+     "name": "D9",
+     "kind": "dig"
+    },
+    {
+     "name": "D8",
+     "kind": "dig"
+    },
+    {
+     "name": "D7",
+     "kind": "dig"
+    },
+    {
+     "name": "D6",
+     "kind": "dig"
+    },
+    {
+     "name": "D5",
+     "kind": "dig"
+    },
+    {
+     "name": "D4",
+     "kind": "dig"
+    },
+    {
+     "name": "D3",
+     "kind": "dig"
+    },
+    {
+     "name": "D2",
+     "kind": "dig"
+    },
+    {
+     "name": "D1 / TX0",
+     "kind": "com"
+    },
+    {
+     "name": "D0 / RX0",
+     "kind": "com"
+    },
+    {
+     "name": "D14 / TX3",
+     "kind": "com"
+    },
+    {
+     "name": "D15 / RX3",
+     "kind": "com"
+    },
+    {
+     "name": "D16 / TX2",
+     "kind": "com"
+    },
+    {
+     "name": "D17 / RX2",
+     "kind": "com"
+    },
+    {
+     "name": "D18 / TX1",
+     "kind": "com"
+    },
+    {
+     "name": "D19 / RX1",
+     "kind": "com"
+    },
+    {
+     "name": "D20 / SDA",
+     "kind": "com"
+    },
+    {
+     "name": "D21 / SCL",
+     "kind": "com"
+    },
+    {
+     "name": "NC",
+     "kind": "nc"
+    },
+    {
+     "name": "IOREF",
+     "kind": "pwr"
+    },
+    {
+     "name": "RESET",
+     "kind": "ctl"
+    },
+    {
+     "name": "3.3V",
+     "kind": "pwr"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "Vin",
+     "kind": "pwr"
+    },
+    {
+     "name": "A0",
+     "kind": "ana"
+    },
+    {
+     "name": "A1",
+     "kind": "ana"
+    },
+    {
+     "name": "A2",
+     "kind": "ana"
+    },
+    {
+     "name": "A3",
+     "kind": "ana"
+    },
+    {
+     "name": "A4",
+     "kind": "ana"
+    },
+    {
+     "name": "A5",
+     "kind": "ana"
+    },
+    {
+     "name": "A6",
+     "kind": "ana"
+    },
+    {
+     "name": "A7",
+     "kind": "ana"
+    },
+    {
+     "name": "A8",
+     "kind": "ana"
+    },
+    {
+     "name": "A9",
+     "kind": "ana"
+    },
+    {
+     "name": "A10",
+     "kind": "ana"
+    },
+    {
+     "name": "A11",
+     "kind": "ana"
+    },
+    {
+     "name": "A12",
+     "kind": "ana"
+    },
+    {
+     "name": "A13",
+     "kind": "ana"
+    },
+    {
+     "name": "A14",
+     "kind": "ana"
+    },
+    {
+     "name": "A15",
+     "kind": "ana"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "D52",
+     "kind": "com"
+    },
+    {
+     "name": "D53",
+     "kind": "com"
+    },
+    {
+     "name": "D50",
+     "kind": "com"
+    },
+    {
+     "name": "D51",
+     "kind": "com"
+    },
+    {
+     "name": "D48",
+     "kind": "dig"
+    },
+    {
+     "name": "D49",
+     "kind": "dig"
+    },
+    {
+     "name": "D46",
+     "kind": "dig"
+    },
+    {
+     "name": "D47",
+     "kind": "dig"
+    },
+    {
+     "name": "D44",
+     "kind": "dig"
+    },
+    {
+     "name": "D45",
+     "kind": "dig"
+    },
+    {
+     "name": "D42",
+     "kind": "dig"
+    },
+    {
+     "name": "D43",
+     "kind": "dig"
+    },
+    {
+     "name": "D40",
+     "kind": "dig"
+    },
+    {
+     "name": "D41",
+     "kind": "dig"
+    },
+    {
+     "name": "D38",
+     "kind": "dig"
+    },
+    {
+     "name": "D39",
+     "kind": "dig"
+    },
+    {
+     "name": "D36",
+     "kind": "dig"
+    },
+    {
+     "name": "D37",
+     "kind": "dig"
+    },
+    {
+     "name": "D34",
+     "kind": "dig"
+    },
+    {
+     "name": "D35",
+     "kind": "dig"
+    },
+    {
+     "name": "D32",
+     "kind": "dig"
+    },
+    {
+     "name": "D33",
+     "kind": "dig"
+    },
+    {
+     "name": "D30",
+     "kind": "dig"
+    },
+    {
+     "name": "D31",
+     "kind": "dig"
+    },
+    {
+     "name": "D28",
+     "kind": "dig"
+    },
+    {
+     "name": "D29",
+     "kind": "dig"
+    },
+    {
+     "name": "D26",
+     "kind": "dig"
+    },
+    {
+     "name": "D27",
+     "kind": "dig"
+    },
+    {
+     "name": "D24",
+     "kind": "dig"
+    },
+    {
+     "name": "D25",
+     "kind": "dig"
+    },
+    {
+     "name": "D22",
+     "kind": "dig"
+    },
+    {
+     "name": "D23",
+     "kind": "dig"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "MISO",
+     "kind": "com"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "SCK",
+     "kind": "com"
+    },
+    {
+     "name": "MOSI",
+     "kind": "com"
+    },
+    {
+     "name": "RESET",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "esp32": {
+   "name": "ESP32 DevKit V1",
+   "logic": 3.3,
+   "tagline": "Wi-Fi and Bluetooth for pocket money",
+   "pins": [
+    {
+     "name": "EN",
+     "kind": "ctl"
+    },
+    {
+     "name": "VP",
+     "kind": "ana"
+    },
+    {
+     "name": "VN",
+     "kind": "ana"
+    },
+    {
+     "name": "D34",
+     "kind": "ana"
+    },
+    {
+     "name": "D35",
+     "kind": "ana"
+    },
+    {
+     "name": "D32",
+     "kind": "ana"
+    },
+    {
+     "name": "D33",
+     "kind": "ana"
+    },
+    {
+     "name": "D25",
+     "kind": "ana"
+    },
+    {
+     "name": "D26",
+     "kind": "ana"
+    },
+    {
+     "name": "D27",
+     "kind": "dig"
+    },
+    {
+     "name": "D14",
+     "kind": "dig"
+    },
+    {
+     "name": "D12",
+     "kind": "dig"
+    },
+    {
+     "name": "D13",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "VIN",
+     "kind": "pwr"
+    },
+    {
+     "name": "D23",
+     "kind": "com"
+    },
+    {
+     "name": "D22",
+     "kind": "com"
+    },
+    {
+     "name": "TX0",
+     "kind": "com"
+    },
+    {
+     "name": "RX0",
+     "kind": "com"
+    },
+    {
+     "name": "D21",
+     "kind": "com"
+    },
+    {
+     "name": "D19",
+     "kind": "com"
+    },
+    {
+     "name": "D18",
+     "kind": "com"
+    },
+    {
+     "name": "D5",
+     "kind": "dig"
+    },
+    {
+     "name": "TX2",
+     "kind": "com"
+    },
+    {
+     "name": "RX2",
+     "kind": "com"
+    },
+    {
+     "name": "D4",
+     "kind": "dig"
+    },
+    {
+     "name": "D2",
+     "kind": "dig"
+    },
+    {
+     "name": "D15",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    }
+   ]
+  },
+  "nodemcu": {
+   "name": "NodeMCU (ESP8266)",
+   "logic": 3.3,
+   "tagline": "Wi-Fi for a few dollars",
+   "pins": [
+    {
+     "name": "A0 · ADC0",
+     "kind": "ana"
+    },
+    {
+     "name": "RSV",
+     "kind": "nc"
+    },
+    {
+     "name": "RSV",
+     "kind": "nc"
+    },
+    {
+     "name": "SD3 · GPIO10",
+     "kind": "nc"
+    },
+    {
+     "name": "SD2 · GPIO9",
+     "kind": "nc"
+    },
+    {
+     "name": "SD1 · GPIO8",
+     "kind": "nc"
+    },
+    {
+     "name": "CMD · GPIO11",
+     "kind": "nc"
+    },
+    {
+     "name": "SD0 · GPIO7",
+     "kind": "nc"
+    },
+    {
+     "name": "CLK · GPIO6",
+     "kind": "nc"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "EN",
+     "kind": "ctl"
+    },
+    {
+     "name": "RST",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "Vin",
+     "kind": "pwr"
+    },
+    {
+     "name": "D0 · GPIO16",
+     "kind": "dig"
+    },
+    {
+     "name": "D1 · GPIO5",
+     "kind": "dig"
+    },
+    {
+     "name": "D2 · GPIO4",
+     "kind": "dig"
+    },
+    {
+     "name": "D3 · GPIO0",
+     "kind": "ctl"
+    },
+    {
+     "name": "D4 · GPIO2",
+     "kind": "dig"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "D5 · GPIO14",
+     "kind": "dig"
+    },
+    {
+     "name": "D6 · GPIO12",
+     "kind": "dig"
+    },
+    {
+     "name": "D7 · GPIO13",
+     "kind": "dig"
+    },
+    {
+     "name": "D8 · GPIO15",
+     "kind": "ctl"
+    },
+    {
+     "name": "RX · GPIO3",
+     "kind": "com"
+    },
+    {
+     "name": "TX · GPIO1",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    }
+   ]
+  },
+  "pico": {
+   "name": "Raspberry Pi Pico",
+   "logic": 3.3,
+   "tagline": "Two cores for four dollars",
+   "pins": [
+    {
+     "name": "GP0",
+     "kind": "dig"
+    },
+    {
+     "name": "GP1",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP2",
+     "kind": "dig"
+    },
+    {
+     "name": "GP3",
+     "kind": "dig"
+    },
+    {
+     "name": "GP4",
+     "kind": "dig"
+    },
+    {
+     "name": "GP5",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP6",
+     "kind": "dig"
+    },
+    {
+     "name": "GP7",
+     "kind": "dig"
+    },
+    {
+     "name": "GP8",
+     "kind": "dig"
+    },
+    {
+     "name": "GP9",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP10",
+     "kind": "dig"
+    },
+    {
+     "name": "GP11",
+     "kind": "dig"
+    },
+    {
+     "name": "GP12",
+     "kind": "dig"
+    },
+    {
+     "name": "GP13",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP14",
+     "kind": "dig"
+    },
+    {
+     "name": "GP15",
+     "kind": "dig"
+    },
+    {
+     "name": "VBUS",
+     "kind": "pwr"
+    },
+    {
+     "name": "VSYS",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "3V3_EN",
+     "kind": "ctl"
+    },
+    {
+     "name": "3V3(OUT)",
+     "kind": "pwr"
+    },
+    {
+     "name": "ADC_VREF",
+     "kind": "ana"
+    },
+    {
+     "name": "GP28",
+     "kind": "ana"
+    },
+    {
+     "name": "AGND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP27",
+     "kind": "ana"
+    },
+    {
+     "name": "GP26",
+     "kind": "ana"
+    },
+    {
+     "name": "RUN",
+     "kind": "ctl"
+    },
+    {
+     "name": "GP22",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP21",
+     "kind": "dig"
+    },
+    {
+     "name": "GP20",
+     "kind": "dig"
+    },
+    {
+     "name": "GP19",
+     "kind": "dig"
+    },
+    {
+     "name": "GP18",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GP17",
+     "kind": "dig"
+    },
+    {
+     "name": "GP16",
+     "kind": "dig"
+    },
+    {
+     "name": "SWCLK",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "SWDIO",
+     "kind": "ctl"
+    }
+   ]
+  },
+  "bluepill": {
+   "name": "STM32 Blue Pill",
+   "logic": 3.3,
+   "tagline": "32-bit power for pocket money",
+   "pins": [
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "PB12",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "PB13",
+     "kind": "com"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "PB14",
+     "kind": "com"
+    },
+    {
+     "name": "NRST",
+     "kind": "ctl"
+    },
+    {
+     "name": "PB15",
+     "kind": "com"
+    },
+    {
+     "name": "PB11",
+     "kind": "com"
+    },
+    {
+     "name": "PA8",
+     "kind": "dig"
+    },
+    {
+     "name": "PB10",
+     "kind": "com"
+    },
+    {
+     "name": "PA9",
+     "kind": "com"
+    },
+    {
+     "name": "PB1",
+     "kind": "ana"
+    },
+    {
+     "name": "PA10",
+     "kind": "com"
+    },
+    {
+     "name": "PB0",
+     "kind": "ana"
+    },
+    {
+     "name": "PA11",
+     "kind": "com"
+    },
+    {
+     "name": "PA7",
+     "kind": "ana"
+    },
+    {
+     "name": "PA12",
+     "kind": "com"
+    },
+    {
+     "name": "PA6",
+     "kind": "ana"
+    },
+    {
+     "name": "PA15",
+     "kind": "dig"
+    },
+    {
+     "name": "PA5",
+     "kind": "ana"
+    },
+    {
+     "name": "PB3",
+     "kind": "dig"
+    },
+    {
+     "name": "PA4",
+     "kind": "ana"
+    },
+    {
+     "name": "PB4",
+     "kind": "dig"
+    },
+    {
+     "name": "PA3",
+     "kind": "ana"
+    },
+    {
+     "name": "PB5",
+     "kind": "dig"
+    },
+    {
+     "name": "PA2",
+     "kind": "ana"
+    },
+    {
+     "name": "PB6",
+     "kind": "com"
+    },
+    {
+     "name": "PA1",
+     "kind": "ana"
+    },
+    {
+     "name": "PB7",
+     "kind": "com"
+    },
+    {
+     "name": "PA0",
+     "kind": "ana"
+    },
+    {
+     "name": "PB8",
+     "kind": "dig"
+    },
+    {
+     "name": "PC15",
+     "kind": "dig"
+    },
+    {
+     "name": "PB9",
+     "kind": "dig"
+    },
+    {
+     "name": "PC14",
+     "kind": "dig"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "PC13",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "VBAT",
+     "kind": "pwr"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "SWDIO",
+     "kind": "ctl"
+    },
+    {
+     "name": "SWCLK",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "BOOT0",
+     "kind": "ctl"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "BOOT1",
+     "kind": "ctl"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    }
+   ]
+  },
+  "rpi4": {
+   "name": "Raspberry Pi 4 Model B",
+   "logic": 3.3,
+   "tagline": "A real computer, credit-card sized",
+   "pins": [
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "GPIO2",
+     "kind": "com"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "GPIO3",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO4",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO14",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO15",
+     "kind": "com"
+    },
+    {
+     "name": "GPIO17",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO18",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO27",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO22",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO23",
+     "kind": "dig"
+    },
+    {
+     "name": "3V3",
+     "kind": "pwr"
+    },
+    {
+     "name": "GPIO24",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO10",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO9",
+     "kind": "com"
+    },
+    {
+     "name": "GPIO25",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO11",
+     "kind": "com"
+    },
+    {
+     "name": "GPIO8",
+     "kind": "com"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO7",
+     "kind": "com"
+    },
+    {
+     "name": "ID_SD",
+     "kind": "ctl"
+    },
+    {
+     "name": "ID_SC",
+     "kind": "ctl"
+    },
+    {
+     "name": "GPIO5",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO6",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO12",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO13",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO19",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO16",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO26",
+     "kind": "dig"
+    },
+    {
+     "name": "GPIO20",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "GPIO21",
+     "kind": "dig"
+    },
+    {
+     "name": "TR01",
+     "kind": "pwr"
+    },
+    {
+     "name": "TR00",
+     "kind": "pwr"
+    },
+    {
+     "name": "TR03",
+     "kind": "pwr"
+    },
+    {
+     "name": "TR02",
+     "kind": "pwr"
+    },
+    {
+     "name": "GLOBAL_EN",
+     "kind": "ctl"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "RUN",
+     "kind": "ctl"
+    }
+   ]
+  }
+ },
+ "modules": {
+  "led": {
+   "name": "5 mm LED module",
+   "category": "Outputs",
+   "blurb": "Lights up when its pin goes HIGH.",
+   "pins": [
+    {
+     "name": "SIG",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "rgb": {
+   "name": "RGB LED module",
+   "category": "Outputs",
+   "blurb": "Three LEDs in one lens: mixes any colour.",
+   "pins": [
+    {
+     "name": "R",
+     "kind": "dig"
+    },
+    {
+     "name": "G",
+     "kind": "dig"
+    },
+    {
+     "name": "B",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "button": {
+   "name": "Push-button module",
+   "category": "Inputs",
+   "blurb": "Press it: OUT goes HIGH.",
+   "pins": [
+    {
+     "name": "VCC",
+     "kind": "pwr"
+    },
+    {
+     "name": "OUT",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "pot": {
+   "name": "Potentiometer module (10 kΩ)",
+   "category": "Inputs",
+   "blurb": "A knob that outputs 0 V … VCC.",
+   "pins": [
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "OUT",
+     "kind": "ana"
+    },
+    {
+     "name": "VCC",
+     "kind": "pwr"
+    }
+   ]
+  },
+  "buzzer": {
+   "name": "Piezo buzzer module",
+   "category": "Outputs",
+   "blurb": "Beeps and plays simple melodies.",
+   "pins": [
+    {
+     "name": "SIG",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "servo": {
+   "name": "SG90 micro servo",
+   "category": "Actuators",
+   "blurb": "Turns its arm to an exact angle.",
+   "pins": [
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "SIG",
+     "kind": "dig"
+    }
+   ]
+  },
+  "motor": {
+   "name": "TT gear motor + wheel",
+   "category": "Actuators",
+   "blurb": "Geared DC motor that drives a wheel.",
+   "pins": [
+    {
+     "name": "M+",
+     "kind": "dig"
+    },
+    {
+     "name": "M-",
+     "kind": "dig"
+    }
+   ]
+  },
+  "motor-driver": {
+   "name": "L298N motor driver",
+   "category": "Actuators",
+   "blurb": "H-bridge: lets a board drive two motors.",
+   "pins": [
+    {
+     "name": "12V",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "5V",
+     "kind": "pwr"
+    },
+    {
+     "name": "OUT1",
+     "kind": "dig"
+    },
+    {
+     "name": "OUT2",
+     "kind": "dig"
+    },
+    {
+     "name": "OUT3",
+     "kind": "dig"
+    },
+    {
+     "name": "OUT4",
+     "kind": "dig"
+    },
+    {
+     "name": "ENA",
+     "kind": "ctl"
+    },
+    {
+     "name": "IN1",
+     "kind": "dig"
+    },
+    {
+     "name": "IN2",
+     "kind": "dig"
+    },
+    {
+     "name": "IN3",
+     "kind": "dig"
+    },
+    {
+     "name": "IN4",
+     "kind": "dig"
+    },
+    {
+     "name": "ENB",
+     "kind": "ctl"
+    }
+   ]
+  },
+  "battery": {
+   "name": "4 × AA battery holder",
+   "category": "Power",
+   "blurb": "Portable 6 V supply for motors.",
+   "pins": [
+    {
+     "name": "+",
+     "kind": "pwr"
+    },
+    {
+     "name": "-",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "ultrasonic": {
+   "name": "HC-SR04 ultrasonic sensor",
+   "category": "Sensors",
+   "blurb": "Measures distance with sound echoes.",
+   "pins": [
+    {
+     "name": "VCC",
+     "kind": "pwr"
+    },
+    {
+     "name": "Trig",
+     "kind": "dig"
+    },
+    {
+     "name": "Echo",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "oled": {
+   "name": "OLED display 0.96\" (SSD1306)",
+   "category": "Outputs",
+   "blurb": "Tiny 128 × 64 pixel I²C screen.",
+   "pins": [
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "VCC",
+     "kind": "pwr"
+    },
+    {
+     "name": "SCL",
+     "kind": "com"
+    },
+    {
+     "name": "SDA",
+     "kind": "com"
+    }
+   ]
+  },
+  "dht11": {
+   "name": "DHT11 temperature & humidity sensor",
+   "category": "Sensors",
+   "blurb": "Reads air temperature and humidity.",
+   "pins": [
+    {
+     "name": "VCC",
+     "kind": "pwr"
+    },
+    {
+     "name": "DATA",
+     "kind": "dig"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    }
+   ]
+  },
+  "ldr": {
+   "name": "Photoresistor (LDR) module",
+   "category": "Sensors",
+   "blurb": "Senses how bright the light is.",
+   "pins": [
+    {
+     "name": "AO",
+     "kind": "ana"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "VCC",
+     "kind": "pwr"
+    }
+   ]
+  },
+  "level-shifter": {
+   "name": "Logic level converter (4-channel)",
+   "category": "Interface",
+   "blurb": "Lets 5 V and 3.3 V parts talk.",
+   "pins": [
+    {
+     "name": "HV1",
+     "kind": "dig"
+    },
+    {
+     "name": "HV2",
+     "kind": "dig"
+    },
+    {
+     "name": "HV",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "HV3",
+     "kind": "dig"
+    },
+    {
+     "name": "HV4",
+     "kind": "dig"
+    },
+    {
+     "name": "LV1",
+     "kind": "dig"
+    },
+    {
+     "name": "LV2",
+     "kind": "dig"
+    },
+    {
+     "name": "LV",
+     "kind": "pwr"
+    },
+    {
+     "name": "GND",
+     "kind": "gnd"
+    },
+    {
+     "name": "LV3",
+     "kind": "dig"
+    },
+    {
+     "name": "LV4",
+     "kind": "dig"
+    }
+   ]
+  }
+ },
+ "examples": [
+  {
+   "id": "blink",
+   "title": "Hello, LED",
+   "goal": "Make an LED blink with an Arduino Uno.",
+   "level": "Beginner",
+   "parts": [
+    {
+     "type": "board:uno",
+     "ref": "uno"
+    },
+    {
+     "type": "mod:led",
+     "ref": "led"
+    }
+   ],
+   "wires": [
+    {
+     "a": "uno.D13",
+     "b": "led.SIG",
+     "color": "yellow"
+    },
+    {
+     "a": "uno.GND",
+     "b": "led.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "button-led",
+   "title": "Push to light",
+   "goal": "Hold a button and an Arduino Nano switches an LED on.",
+   "level": "Beginner",
+   "parts": [
+    {
+     "type": "board:nano",
+     "ref": "nano"
+    },
+    {
+     "type": "mod:button",
+     "ref": "btn"
+    },
+    {
+     "type": "mod:led",
+     "ref": "led"
+    }
+   ],
+   "wires": [
+    {
+     "a": "nano.5V",
+     "b": "btn.VCC",
+     "color": "red"
+    },
+    {
+     "a": "nano.GND",
+     "b": "btn.GND",
+     "color": "black"
+    },
+    {
+     "a": "btn.OUT",
+     "b": "nano.D2",
+     "color": "yellow"
+    },
+    {
+     "a": "nano.D9",
+     "b": "led.SIG",
+     "color": "green"
+    },
+    {
+     "a": "nano.GND",
+     "b": "led.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "dimmer",
+   "title": "Knob dimmer",
+   "goal": "Turn a knob to set how bright an LED glows.",
+   "level": "Beginner",
+   "parts": [
+    {
+     "type": "board:uno",
+     "ref": "uno"
+    },
+    {
+     "type": "mod:pot",
+     "ref": "pot"
+    },
+    {
+     "type": "mod:led",
+     "ref": "led"
+    }
+   ],
+   "wires": [
+    {
+     "a": "uno.5V",
+     "b": "pot.VCC",
+     "color": "red"
+    },
+    {
+     "a": "uno.GND",
+     "b": "pot.GND",
+     "color": "black"
+    },
+    {
+     "a": "pot.OUT",
+     "b": "uno.A0",
+     "color": "yellow"
+    },
+    {
+     "a": "uno.D9",
+     "b": "led.SIG",
+     "color": "green"
+    },
+    {
+     "a": "uno.GND",
+     "b": "led.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "servo-knob",
+   "title": "Servo follows the knob",
+   "goal": "Steer a servo arm by turning a potentiometer.",
+   "level": "Beginner",
+   "parts": [
+    {
+     "type": "board:uno",
+     "ref": "uno"
+    },
+    {
+     "type": "mod:pot",
+     "ref": "pot"
+    },
+    {
+     "type": "mod:servo",
+     "ref": "servo"
+    }
+   ],
+   "wires": [
+    {
+     "a": "uno.5V",
+     "b": "servo.5V",
+     "color": "red"
+    },
+    {
+     "a": "uno.GND",
+     "b": "servo.GND",
+     "color": "black"
+    },
+    {
+     "a": "uno.D9",
+     "b": "servo.SIG",
+     "color": "orange"
+    },
+    {
+     "a": "uno.5V",
+     "b": "pot.VCC",
+     "color": "red"
+    },
+    {
+     "a": "uno.GND",
+     "b": "pot.GND",
+     "color": "black"
+    },
+    {
+     "a": "pot.OUT",
+     "b": "uno.A0",
+     "color": "yellow"
+    }
+   ]
+  },
+  {
+   "id": "parking-sensor",
+   "title": "Parking sensor",
+   "goal": "Beep faster and faster as an object gets closer.",
+   "level": "Intermediate",
+   "parts": [
+    {
+     "type": "board:uno",
+     "ref": "uno"
+    },
+    {
+     "type": "mod:ultrasonic",
+     "ref": "sonar"
+    },
+    {
+     "type": "mod:buzzer",
+     "ref": "buzzer"
+    }
+   ],
+   "wires": [
+    {
+     "a": "uno.5V",
+     "b": "sonar.VCC",
+     "color": "red"
+    },
+    {
+     "a": "uno.GND",
+     "b": "sonar.GND",
+     "color": "black"
+    },
+    {
+     "a": "uno.D9",
+     "b": "sonar.Trig",
+     "color": "yellow"
+    },
+    {
+     "a": "sonar.Echo",
+     "b": "uno.D10",
+     "color": "green"
+    },
+    {
+     "a": "uno.D8",
+     "b": "buzzer.SIG",
+     "color": "blue"
+    },
+    {
+     "a": "uno.GND",
+     "b": "buzzer.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "light-meter",
+   "title": "Night light on 3.3 V",
+   "goal": "Measure light with an STM32 Blue Pill and switch a lamp on when it gets dark.",
+   "level": "Intermediate",
+   "parts": [
+    {
+     "type": "board:bluepill",
+     "ref": "pill"
+    },
+    {
+     "type": "mod:ldr",
+     "ref": "ldr"
+    },
+    {
+     "type": "mod:led",
+     "ref": "led"
+    }
+   ],
+   "wires": [
+    {
+     "a": "pill.3V3",
+     "b": "ldr.VCC",
+     "color": "red"
+    },
+    {
+     "a": "pill.GND",
+     "b": "ldr.GND",
+     "color": "black"
+    },
+    {
+     "a": "ldr.AO",
+     "b": "pill.PA0",
+     "color": "yellow"
+    },
+    {
+     "a": "pill.PB9",
+     "b": "led.SIG",
+     "color": "green"
+    },
+    {
+     "a": "pill.GND",
+     "b": "led.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "uart-link",
+   "title": "Two boards talking",
+   "goal": "Press a button on an Uno and light an LED on a Nano — over a serial link.",
+   "level": "Intermediate",
+   "parts": [
+    {
+     "type": "board:uno",
+     "ref": "uno"
+    },
+    {
+     "type": "mod:button",
+     "ref": "btn"
+    },
+    {
+     "type": "board:nano",
+     "ref": "nano"
+    },
+    {
+     "type": "mod:led",
+     "ref": "led"
+    }
+   ],
+   "wires": [
+    {
+     "a": "uno.5V",
+     "b": "btn.VCC",
+     "color": "red"
+    },
+    {
+     "a": "uno.GND",
+     "b": "btn.GND",
+     "color": "black"
+    },
+    {
+     "a": "btn.OUT",
+     "b": "uno.D2",
+     "color": "yellow"
+    },
+    {
+     "a": "nano.D9",
+     "b": "led.SIG",
+     "color": "green"
+    },
+    {
+     "a": "nano.GND",
+     "b": "led.GND",
+     "color": "black"
+    },
+    {
+     "a": "uno.GND",
+     "b": "nano.GND",
+     "color": "black"
+    },
+    {
+     "a": "uno.D1 / TX",
+     "b": "nano.RX0",
+     "color": "orange"
+    },
+    {
+     "a": "nano.TX1",
+     "b": "uno.D0 / RX",
+     "color": "blue"
+    }
+   ]
+  },
+  {
+   "id": "level-shift",
+   "title": "5 V meets 3.3 V",
+   "goal": "Let a 5 V Uno command a 3.3 V ESP32 safely, through a level shifter.",
+   "level": "Intermediate",
+   "parts": [
+    {
+     "type": "board:uno",
+     "ref": "uno"
+    },
+    {
+     "type": "mod:level-shifter",
+     "ref": "shifter"
+    },
+    {
+     "type": "board:esp32",
+     "ref": "esp"
+    },
+    {
+     "type": "mod:led",
+     "ref": "led"
+    }
+   ],
+   "wires": [
+    {
+     "a": "uno.5V",
+     "b": "shifter.HV",
+     "color": "red"
+    },
+    {
+     "a": "esp.3V3",
+     "b": "shifter.LV",
+     "color": "red"
+    },
+    {
+     "a": "uno.GND",
+     "b": "shifter.GND",
+     "color": "black"
+    },
+    {
+     "a": "esp.GND",
+     "b": "shifter.GND",
+     "color": "black"
+    },
+    {
+     "a": "uno.D1 / TX",
+     "b": "shifter.HV1",
+     "color": "yellow"
+    },
+    {
+     "a": "shifter.LV1",
+     "b": "esp.RX2",
+     "color": "yellow"
+    },
+    {
+     "a": "esp.TX2",
+     "b": "shifter.LV2",
+     "color": "green"
+    },
+    {
+     "a": "shifter.HV2",
+     "b": "uno.D0 / RX",
+     "color": "green"
+    },
+    {
+     "a": "esp.D4",
+     "b": "led.SIG",
+     "color": "blue"
+    },
+    {
+     "a": "esp.GND",
+     "b": "led.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "i2c-display",
+   "title": "Pico weather screen",
+   "goal": "Show live temperature and humidity on an OLED with a Raspberry Pi Pico.",
+   "level": "Intermediate",
+   "parts": [
+    {
+     "type": "board:pico",
+     "ref": "pico"
+    },
+    {
+     "type": "mod:oled",
+     "ref": "oled"
+    },
+    {
+     "type": "mod:dht11",
+     "ref": "dht"
+    }
+   ],
+   "wires": [
+    {
+     "a": "pico.3V3(OUT)",
+     "b": "oled.VCC",
+     "color": "red"
+    },
+    {
+     "a": "pico.GND",
+     "b": "oled.GND",
+     "color": "black"
+    },
+    {
+     "a": "pico.GP4",
+     "b": "oled.SDA",
+     "color": "blue"
+    },
+    {
+     "a": "pico.GP5",
+     "b": "oled.SCL",
+     "color": "yellow"
+    },
+    {
+     "a": "pico.3V3(OUT)",
+     "b": "dht.VCC",
+     "color": "red"
+    },
+    {
+     "a": "pico.GND",
+     "b": "dht.GND",
+     "color": "black"
+    },
+    {
+     "a": "dht.DATA",
+     "b": "pico.GP15",
+     "color": "green"
+    }
+   ]
+  },
+  {
+   "id": "wifi-node",
+   "title": "Wi-Fi weather node",
+   "goal": "Build an IoT node: a NodeMCU reads the climate, shows it as a colour and \"posts\" it over Wi-Fi.",
+   "level": "Advanced",
+   "parts": [
+    {
+     "type": "board:nodemcu",
+     "ref": "node"
+    },
+    {
+     "type": "mod:dht11",
+     "ref": "dht"
+    },
+    {
+     "type": "mod:rgb",
+     "ref": "rgb"
+    }
+   ],
+   "wires": [
+    {
+     "a": "node.3V3",
+     "b": "dht.VCC",
+     "color": "red"
+    },
+    {
+     "a": "node.GND",
+     "b": "dht.GND",
+     "color": "black"
+    },
+    {
+     "a": "dht.DATA",
+     "b": "node.D2 · GPIO4",
+     "color": "yellow"
+    },
+    {
+     "a": "node.D5 · GPIO14",
+     "b": "rgb.R",
+     "color": "orange"
+    },
+    {
+     "a": "node.D6 · GPIO12",
+     "b": "rgb.G",
+     "color": "green"
+    },
+    {
+     "a": "node.D7 · GPIO13",
+     "b": "rgb.B",
+     "color": "blue"
+    },
+    {
+     "a": "node.GND",
+     "b": "rgb.GND",
+     "color": "black"
+    }
+   ]
+  },
+  {
+   "id": "robot-brain",
+   "title": "Robot: brain and muscle",
+   "goal": "A Raspberry Pi 4 sends drive commands to an Arduino Mega, which runs two motors through an L298N.",
+   "level": "Advanced",
+   "parts": [
+    {
+     "type": "board:mega",
+     "ref": "mega"
+    },
+    {
+     "type": "board:rpi4",
+     "ref": "pi"
+    },
+    {
+     "type": "mod:battery",
+     "ref": "battery"
+    },
+    {
+     "type": "mod:motor-driver",
+     "ref": "driver"
+    },
+    {
+     "type": "mod:motor",
+     "ref": "motorL"
+    },
+    {
+     "type": "mod:motor",
+     "ref": "motorR"
+    }
+   ],
+   "wires": [
+    {
+     "a": "battery.+",
+     "b": "driver.12V",
+     "color": "red"
+    },
+    {
+     "a": "battery.-",
+     "b": "driver.GND",
+     "color": "black"
+    },
+    {
+     "a": "mega.GND",
+     "b": "driver.GND",
+     "color": "black"
+    },
+    {
+     "a": "mega.5V",
+     "b": "driver.5V",
+     "color": "red"
+    },
+    {
+     "a": "mega.D10",
+     "b": "driver.ENA",
+     "color": "green"
+    },
+    {
+     "a": "mega.D9",
+     "b": "driver.IN1",
+     "color": "yellow"
+    },
+    {
+     "a": "mega.D8",
+     "b": "driver.IN2",
+     "color": "orange"
+    },
+    {
+     "a": "mega.D7",
+     "b": "driver.IN3",
+     "color": "blue"
+    },
+    {
+     "a": "mega.D6",
+     "b": "driver.IN4",
+     "color": "purple"
+    },
+    {
+     "a": "mega.D5",
+     "b": "driver.ENB",
+     "color": "white"
+    },
+    {
+     "a": "driver.OUT1",
+     "b": "motorL.M+",
+     "color": "orange"
+    },
+    {
+     "a": "driver.OUT2",
+     "b": "motorL.M-",
+     "color": "blue"
+    },
+    {
+     "a": "driver.OUT3",
+     "b": "motorR.M+",
+     "color": "orange"
+    },
+    {
+     "a": "driver.OUT4",
+     "b": "motorR.M-",
+     "color": "blue"
+    },
+    {
+     "a": "pi.GND",
+     "b": "mega.GND",
+     "color": "black"
+    },
+    {
+     "a": "pi.GPIO14",
+     "b": "mega.D19 / RX1",
+     "color": "yellow"
+    }
+   ]
+  }
+ ]
+}

@@ -98,7 +98,7 @@ export function createProjector(canvas, { targets }) {
     context.clearRect(0, 0, width, height);
     const busy = mood === "think" || mood === "speak" || mood === "listen";
     const breathe = reduced ? 1 : 0.88 + 0.12 * Math.sin(time * (busy ? 0.008 : 0.0025)) + level * 0.4;
-    const power = Math.min(1, (time - poweredAt) / POWER_UP_MS) * breathe;
+    const power = Math.max(0, Math.min(1, (time - poweredAt) / POWER_UP_MS)) * breathe;  // the first frame's timestamp can precede poweredAt
     const o = origin(width, height);
     context.globalCompositeOperation = "lighter";
     cone(o, power, time, height);
