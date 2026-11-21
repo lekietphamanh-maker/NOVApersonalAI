@@ -10,6 +10,7 @@ import { createSkills } from "./skills.js";
 import { h } from "./lab.js";
 import { createAdvance } from "./advance.js";
 import { createWorkplace } from "./workplace.js";
+import { createGalaxy } from "./galaxy.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -79,7 +80,7 @@ function labOpened(name, open) {
   $(`[data-act=${name}]`).classList.toggle("on", open);
   if (!open && solo === name) window.close();
   if (!open) return;
-  for (const other of [world, routeView, library, rea, shannon, skills, workplace]) if (other && other !== labs[name] && other.isOpen()) other.close();
+  for (const other of [world, routeView, library, rea, shannon, galaxy, skills, workplace]) if (other && other !== labs[name] && other.isOpen()) other.close();
 }
 const labs = {};
 function closeLabs() { for (const lab of Object.values(labs)) if (lab.isOpen()) lab.close(); }
@@ -87,6 +88,7 @@ const rea = labs.rea = createRea($("#rea"), { act: (...args) => act(...args), on
 const shannon = labs.shannon = createShannon($("#shannon"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("shannon", open) });
 const workplace = labs.workplace = createWorkplace($("#workplace"), { act: (...args) => act(...args), toast: (...args) => toast(...args),
   onOpenChange: (open) => labOpened("workplace", open) });
+const galaxy = labs.galaxy = createGalaxy($("#galaxy"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("galaxy", open) });
 const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
   ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
 // A Nova screen opened as its own app window from Advance mode (…#token=…&app=rea): only that screen, and closing it
@@ -210,6 +212,7 @@ function handle(event) {
     case "shannon_line": shannon.line(event); break;
     case "shannon_ready": shannon.ready(event); break;
     case "shannon_command": shannon.command(event.command); break;
+    case "galaxy_data": galaxy.loadData(event.graph); break;
   }
 }
 

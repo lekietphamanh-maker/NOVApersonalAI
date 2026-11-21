@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="lab.css">
 <link rel="stylesheet" href="advance.css">
 <link rel="stylesheet" href="workplace.css">
+<link rel="stylesheet" href="galaxy.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
@@ -34,6 +35,7 @@
     <button class="box" data-act="library" title="Your projects, repos and ideas by topic">Library</button>
     <button class="box" data-act="world" title="What's happening on Earth: quakes, storms, fires, news">World</button>
     <button class="box" data-act="route" title="The fastest way from A to B, with stops">Route</button>
+    <button class="box" data-act="galaxy" title="Knowledge Galaxy: everything Nova knows, as a 3D star map">Galaxy</button>
     <button class="box" data-act="skills" title="Every skill Nova has, and whether it's ready">Skills</button>
     <button class="box" data-act="rea" title="Rea: how an app is built, as a blueprint">Rea</button>
     <button class="box" data-act="shannon" title="Shannon: break into your own app before someone else does">Shannon</button>
@@ -291,6 +293,22 @@
   </div>
   <div class="lab-bottom"><p class="lab-problem" id="shannon-problem" role="status" hidden></p><nav class="lab-strip" id="shannon-strip" aria-label="Past checks"></nav></div>
   <p class="lib-hint">your own apps only · red: look first · ✊ or Mark fixed when solved · drag: turn · scroll: zoom · ← → · Esc</p>
+</section>
+
+<section id="galaxy" class="galaxy" aria-label="Knowledge Galaxy">
+  <canvas></canvas>
+  <div class="galaxy-hud">
+    <div class="galaxy-title">KNOWLEDGE GALAXY<small></small></div>
+    <div class="galaxy-search"><input type="search" placeholder="Search knowledge…" aria-label="Search knowledge"></div>
+    <button class="galaxy-close">Close</button>
+    <div class="galaxy-legend">
+      <span><i class="wiki"></i>Topic</span>
+      <span><i class="fact"></i>Memory</span>
+      <span><i class="skill"></i>Skill</span>
+      <span><i class="source"></i>Source</span>
+    </div>
+    <div class="galaxy-info"><h3></h3><div class="kind"></div><p></p></div>
+  </div>
 </section>
 
 <section id="world" class="world" hidden aria-label="World">

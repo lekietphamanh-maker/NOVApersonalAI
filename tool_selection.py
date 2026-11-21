@@ -27,6 +27,7 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("second_brain", "library", "search_my_notes"), r"second brain|notes?|wiki|learn(ed|t)?|watched|read about|obsidian|vault|library|i wrote|i saved|i kept|"
                                   r"projects?|ideas?|repos?"),
     (("mind_map", "add_to_map"), r"map|brainstorm|visuali[sz]e|ideas?"),
+    (("knowledge_galaxy",), r"galaxy|star ?map|knowledge (map|graph|view)|everything (you|i|nova) know|show (me |my )?knowledge"),
     (("optimize_prompt",), r"prompt"),
     (("screen_record",), r"record|recording|screen ?cap|capture (my|the) screen"),
     (("seo_check",), r"\bseo\b|search engine|google rank|meta (tag|description)|site audit"),

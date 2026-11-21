@@ -76,6 +76,7 @@ from news_intel.config import NewsConfig, data_dir as news_data_dir
 from news_intel.store import Store as NewsStore
 from brain_router import spoken_answer, spoken_place
 import agent as agent_module
+import knowledge_galaxy
 from agent import SCREEN_STEP_TOOLS, Agent, OllamaError, _http_json
 from screen_assist import risky_step
 from creative_mode import CreativeServer
@@ -365,6 +366,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
         self.agent.timers = self.timers
         self.agent.notes = _MapTools(self)
         self.agent.library = _LibraryTools(self)
+        self.agent.galaxy = self._open_galaxy
         self.news_store: NewsStore | None = None  # the news desk's database, opened when first needed
         self.world_monitor = world_monitor.WorldMonitor(news=self._world_news)
         self.router = routes.Router(_data_dir() / "routes", near=self._route_city)
@@ -776,7 +778,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
                "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report",
                "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
                "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
-               "shannon_fix"}
+               "shannon_fix", "galaxy_data"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -3321,6 +3323,16 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
     def _act_shannon_report(self, args: dict[str, Any]) -> None:
         self._open_file(str(self._lab_job(args, "shannon").get("report") or ""))
 
+    def _act_galaxy_data(self, _args: dict[str, Any]) -> None:
+        vault_folder = self.vault.folder if self.vault else None
+        facts = self.memory.list_facts(limit=40)
+        graph = knowledge_galaxy.build_graph(vault_folder=vault_folder, facts=facts)
+        self.ui.emit({"type": "galaxy_data", "graph": graph})
+
+    def _open_galaxy(self) -> str:
+        self.events.put(("galaxy_open", ()))
+        return "The Knowledge Galaxy is on the user's screen. Say one short sentence about it."
+
     def _act_node_path(self, args: dict[str, Any]) -> dict[str, Any] | None:
         """The owner points Nova at node.exe (or its folder), for a Node.js that isn't installed the usual way."""
         text = str(args.get("path") or "").strip()
@@ -3945,6 +3957,10 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
             if not self.ui.clients:
                 self._open_window()
             self.ui.emit({"type": "open_pane", "pane": "notes"})
+        elif event_type == "galaxy_open":
+            if not self.ui.clients:
+                self._open_window()
+            self._act_galaxy_data({})
         elif event_type == "open_window":
             self._open_window(payload)
         elif event_type == "quit":

@@ -66,6 +66,10 @@ CATALOG: tuple[Entry, ...] = (
           ("news", "local_news", "daily_brief", "weather", "set_location"), "news", "BRIEF → News desk"),
     Entry("Knowledge", "World", "A live globe: earthquakes, storms, fires and news by country.",
           ("what's happening in Japan this week",), ("world",)),
+    Entry("Knowledge", "Knowledge Galaxy", "A 3D star map of everything Nova knows: wiki topics, memory facts, "
+          "skills and sources orbiting as stars you can search and explore.",
+          ("show me the galaxy", "open the star map", "what does Nova know"),
+          ("knowledge_galaxy",), where="GALAXY in the top bar"),
     Entry("Knowledge", "Calculator", "Exact arithmetic, on this PC.", ("what's 18% of 2.4 million",), ("calculate",)),
     Entry("Google", "Gmail", "Reads and drafts mail (never sends).", ("any new emails", "draft a reply to Minh"),
           ("list_unread_mail", "read_mail", "draft_mail"), "google", "SETTINGS → Connections → Connect Google"),

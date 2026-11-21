@@ -151,6 +151,11 @@ LIBRARY_TOOL = _tool(
     {"action": {"type": "string", "enum": ["open", "add", "update", "needs", "topic"]}, "title": _TEXT, "text": _TEXT,
      "topic": _TEXT, "status": {"type": "string", "enum": ["idea", "building", "shipped", "paused"]}, "repo": _TEXT,
      "next": _TEXT, "note": _TEXT}, ["action"])
+GALAXY_TOOL = _tool(
+    "knowledge_galaxy", "Open the Knowledge Galaxy: a 3D star map of everything Nova knows. Wiki topics are stars, "
+    "memory facts are sparks, skills are blue nodes. The owner can orbit, zoom and search. Use it when they ask to "
+    "see what Nova knows, show knowledge, open the galaxy or the star map.",
+    {}, [])
 # Nova's news database (news_intel): collected every morning, summarized and scored. Not personal: both brains get it.
 NEWS_CATEGORIES = ["world", "politics", "business", "finance", "technology", "ai", "science", "health", "entertainment",
                    "sports", "environment", "education", "general"]
@@ -785,6 +790,7 @@ register([_named(GENERAL_TOOLS, "web")], lambda _name, arguments, context: execu
          if context.web is not None else "Nova's browser needs Microsoft Edge on this PC.")
 register([SKILLS_TOOL], lambda _name, arguments, context: execute_skills_tool(arguments, context.approve, context.skills)
          if context.skills is not None else "Skills need the second brain's vault.")
+register([GALAXY_TOOL], lambda _name, _arguments, context: context.galaxy() if context.galaxy is not None else "The Knowledge Galaxy is not available here.")
 register([BUILD_TOOL], _run_build)
 register([REVERSE_TOOL], _run_reverse)
 register([WORLD_TOOL], _run_world)
