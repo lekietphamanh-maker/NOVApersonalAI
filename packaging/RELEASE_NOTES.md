@@ -1,3 +1,7 @@
+## New in v2.11.0
+
+- **Archmancer knowledge base**: "search archmancer for prompt injection", "how should I design an agent loop for my app", "what does archmancer say about tool authorization". Nova can search and read 42 agent-system architecture docs from lehoanganhtai13/archmancer (Apache-2.0), covering agent loops, tools, models, context management, trust and privacy, evaluation, and delivery. Everything stays on your PC. Useful when you're designing, building or debugging an AI agent system. On the Skills board under Knowledge.
+
 ## New in v2.10.0
 
 - **Workplace** (the new WORKPLACE button, or say "workplace mode"): a blue holo-desk for working on things with Nova beside you. Her orb waits in the middle. Tap it and it drops to the bottom as a projector pad, and everything on the board appears as a see-through hologram. Each item gets its own beam of light, with light running up it, and the beams follow the items as you drag them. The pad glows brighter while Nova thinks or talks.
