@@ -91,7 +91,7 @@ const workplace = labs.workplace = createWorkplace($("#workplace"), { act: (...a
 const galaxy = labs.galaxy = createGalaxy($("#galaxy"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("galaxy", open) });
 const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
   ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
-// A Nova screen opened as its own app window from Advance mode (…#token=…&app=rea): only that screen, and closing it
+// A Nova screen opened as its own app window from Advance mode (...#token=...&app=rea): only that screen, and closing it
 // closes the window.
 const soloApp = new URLSearchParams(location.hash.slice(1)).get("app");
 const solo = labs[soloApp] ? soloApp : "";
@@ -349,7 +349,7 @@ function renderReadouts() {
     auto: "AUTO · EVERYDAY, ON THIS PC", "hard question": "AUTO · HARD QUESTION" };
   $("#ro-model").textContent = /^(Claude|Ollama Cloud)/.test(brain.label || "")
     ? `${brain.label} · ${why[brain.why] || "ONLINE"}`.toUpperCase()
-    : model.name ? `${model.name}${model.placement ? " · " + model.placement : ""}${brain.why && brain.why !== "off" ? ` · ${why[brain.why] || brain.why}` : ""}` : "…";
+    : model.name ? `${model.name}${model.placement ? " · " + model.placement : ""}${brain.why && brain.why !== "off" ? ` · ${why[brain.why] || brain.why}` : ""}` : "...";
   $("#ro-latency").textContent = state.latency_ms ? `${(state.latency_ms / 1000).toFixed(1)} S` : "—";
   const timing = state.timing || {};
   $("#ro-latency").title = timing.summary ? `Last answer: ${timing.summary}` : "";
@@ -362,7 +362,7 @@ function renderReadouts() {
   const place = state.place;
   $("#location-info").textContent = place
     ? `Weather and local news for ${place.label}${place.source === "device" ? ` (this PC's location${place.how ? `, from ${place.how}` : ""}; checked again every hour)` : ""}.`
-    : "Not set. Nova uses it for the weather and local news (“Hey Nova, what's the weather?”).";
+    : "Not set. Nova uses it for the weather and local news ("Hey Nova, what's the weather?").";
   $("#location-forget").hidden = !place;
   renderMusic();
   const keys = state.hotkeys || {};
@@ -400,7 +400,7 @@ function renderReadouts() {
       + (pcs.wiki ? ` ${pcs.wiki === pcs.pc ? "This PC" : pcs.wiki} writes the wiki.` : "")
     : "Off. Use Nova on a second PC (a laptop) with the same memory and second brain: the two PCs keep one folder in sync, directly, with no cloud.");
   $("#facts-where").textContent = pcs.on ? "Shared with your other PC." : "Kept on this PC only.";
-  $("#ro-heart").textContent = heart.bpm ? `${heart.bpm} BPM${heart.rmssd ? ` · HRV ${heart.rmssd} MS` : ""}` : "WAITING…";
+  $("#ro-heart").textContent = heart.bpm ? `${heart.bpm} BPM${heart.rmssd ? ` · HRV ${heart.rmssd} MS` : ""}` : "WAITING...";
   $("#heart-toggle").textContent = heart.on ? "Disconnect heart rate" : "Connect heart rate";
   $("#heart-toggle").classList.toggle("on", !heart.on);
   $("#heart-status").textContent = heart.on ? heart.status || "" : "";
@@ -472,7 +472,7 @@ function renderSetup() {
   list.dataset.signature = signature;
   $("#setup-everything").textContent = setup.running ? "Stop" : setup.steps.length ? "Run again" : "Set up everything";
   const finished = setup.steps.filter((step) => step.status === "done").length;
-  $("#setup-status").textContent = setup.running ? `${setup.current || "Starting"}… (${finished} of ${setup.steps.length} ready)`
+  $("#setup-status").textContent = setup.running ? `${setup.current || "Starting"}... (${finished} of ${setup.steps.length} ready)`
     : setup.steps.length ? `${finished} of ${setup.steps.length} ready. Can't be automatic: ${setup.manual.map((item) => item.name).join(", ")}.`
       : "Nova downloads and turns on what every feature needs, by herself.";
   list.hidden = !setup.steps.length;
@@ -529,11 +529,11 @@ function renderNewsDesk() {
   $("#news-toggle").classList.toggle("on", !news.on);
   $("#news-run").hidden = !news.on;
   $("#news-run").disabled = Boolean(news.running);
-  $("#news-run").textContent = news.running ? "Collecting…" : "Collect now";
+  $("#news-run").textContent = news.running ? "Collecting..." : "Collect now";
   $("#news-key-forget").hidden = !news.key;
   $("#news-key").placeholder = news.key ? "GNews key saved on this PC (paste a new one to replace it)" : "GNews API key (free at gnews.io, optional)";
   $("#news-info").textContent = !news.on
-    ? "Off. Every morning at 06:00 Nova can collect the news from GNews, GDELT and news sites, have the AI on this PC summarize and score each article, and keep it in a searchable database, so “what happened today?” gets answers with sources."
+    ? "Off. Every morning at 06:00 Nova can collect the news from GNews, GDELT and news sites, have the AI on this PC summarize and score each article, and keep it in a searchable database, so "what happened today?" gets answers with sources."
     : `On: every day at ${news.at || "06:00"} (or as soon as Nova runs, if the PC was off). ${news.total || 0} articles saved.`
       + (last ? ` Last run ${String(last.finished_at || last.started_at).slice(0, 16).replace("T", " ")} UTC: ${last.added} new, ${last.processed} read by the AI${last.failed ? `, ${last.failed} unreadable` : ""}.` : " Not run yet.")
       + (news.key ? "" : " Without a GNews key it uses GDELT and the news sites' feeds.");
@@ -596,8 +596,8 @@ function renderGestures() {
   $("#gesture-phrase").hidden = select.value !== "ask";
   const recording = Boolean(gestures.recording);
   $("#gesture-add").disabled = recording;
-  $("#gesture-add").textContent = $("#gesture-pose").value !== "record" ? "Save" : recording ? "Recording… hold it" : "Record · hold your pose 3 s";
-  $("#gesture-status").textContent = recording ? "RECORDING · HOLD YOUR POSE IN FRONT OF THE WEBCAM…" : "";
+  $("#gesture-add").textContent = $("#gesture-pose").value !== "record" ? "Save" : recording ? "Recording... hold it" : "Record · hold your pose 3 s";
+  $("#gesture-status").textContent = recording ? "RECORDING · HOLD YOUR POSE IN FRONT OF THE WEBCAM..." : "";
   $("#gesture-status").className = `status-line ${recording ? "ok" : ""}`;
   const list = $("#gesture-list");
   const custom = gestures.custom || [];
@@ -606,7 +606,7 @@ function renderGestures() {
   list.replaceChildren(...(custom.length ? custom : [{ id: "", name: "None yet: name one, pick what it does, then hold the pose while Nova records it." }]).map((item) => {
     const row = document.createElement("li");
     const how = item.pose ? POSES[item.pose] || item.pose : `🖐 own pose`;
-    const does = (actions[item.action] || item.action || "") + (item.action === "ask" && item.phrase ? `: “${item.phrase}”` : "");
+    const does = (actions[item.action] || item.action || "") + (item.action === "ask" && item.phrase ? `: "${item.phrase}"` : "");
     row.append(Object.assign(document.createElement("span"), { textContent: item.id ? `${item.name} · ${how} → ${does}` : item.name }));
     if (item.id) {
       const remove = Object.assign(document.createElement("button"), { textContent: "✕" });
@@ -693,7 +693,7 @@ function providerChanged() {
   if (!chosen) return;
   $("#api-base").value = chosen.base_url;
   $("#api-base").hidden = chosen.kind === "anthropic";
-  $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-…)" : `API key${chosen.key === "custom" ? " (if the server needs one)" : ""}`;
+  $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-...)" : `API key${chosen.key === "custom" ? " (if the server needs one)" : ""}`;
   $("#api-hint").textContent = chosen.hint ? `Key from: ${chosen.hint}` : "";
   $("#api-models").replaceChildren(...(chosen.kind === "anthropic" ? Object.keys(state.claude?.models || {}) : []).map((id) => new Option(id, id)));
 }
@@ -705,15 +705,15 @@ function renderTelegram() {
   $("#telegram-toggle").classList.toggle("on", !telegram.on);
   $("#telegram-unpair").hidden = !telegram.owner;
   $("#telegram-token-forget").hidden = !telegram.token;
-  $("#telegram-token").placeholder = telegram.token ? "Token saved. Paste a new one to switch bots." : "Bot token from @BotFather (123456789:AA…)";
+  $("#telegram-token").placeholder = telegram.token ? "Token saved. Paste a new one to switch bots." : "Bot token from @BotFather (123456789:AA...)";
   $("#telegram-code-row").hidden = !telegram.code;
   $("#telegram-code").textContent = telegram.code || "";
   $("#need-telegram-state").textContent = telegram.on && telegram.owner ? "on" : "";
   const relayBrain = $("#telegram-relay-brain").value;
   $("#telegram-relay-key").hidden = !(relayBrain === "ollama" || (relayBrain === "claude" && !telegram.claude_key));
-  $("#telegram-relay-key").placeholder = relayBrain === "ollama" ? "ollama.com API key (ollama.com → Settings → Keys)" : "Anthropic API key (sk-ant-…)";
+  $("#telegram-relay-key").placeholder = relayBrain === "ollama" ? "ollama.com API key (ollama.com → Settings → Keys)" : "Anthropic API key (sk-ant-...)";
   $("#telegram-relay-remove").hidden = !telegram.relay;
-  $("#telegram-relay-setup").textContent = telegram.relay_busy ? "Working…" : telegram.relay ? "Set up again" : "Set up relay";
+  $("#telegram-relay-setup").textContent = telegram.relay_busy ? "Working..." : telegram.relay ? "Set up again" : "Set up relay";
   $("#telegram-relay-setup").disabled = Boolean(telegram.relay_busy) || !telegram.token;
   $("#telegram-relay-info").textContent = !telegram.token ? "Save your bot token above first."
     : telegram.relay ? `Relay on: with the PC off, ${telegram.relay === "claude" ? "Claude Haiku" : telegram.relay === "ollama" ? "Ollama Cloud" : "Nova"} answers on Telegram and reminders still come. To change it, set it up again.`
@@ -745,10 +745,10 @@ function renderAnswering() {
   }
   $("#answering-info").textContent = answering.usb ? "The USB Edition stays fully offline: the AI on this PC answers everything."
     : answering.brain === "local" ? "The AI on this PC answers everything: private, and it works offline."
-    : answering.brain === "auto" ? `The AI on this PC answers everyday questions; hard ones (code, research, analysis, long or multi-part questions) go to ${claude.via === "plan" ? (cloudAgent ? cloudAgent.label : "your Cloud brain") : apiEntry ? apiEntry.label : "Ollama Cloud"} while this PC is online. Passwords and mail: Nova asks first. Say “ask Claude …” to send any question, “privately …” to keep it here.`
+    : answering.brain === "auto" ? `The AI on this PC answers everyday questions; hard ones (code, research, analysis, long or multi-part questions) go to ${claude.via === "plan" ? (cloudAgent ? cloudAgent.label : "your Cloud brain") : apiEntry ? apiEntry.label : "Ollama Cloud"} while this PC is online. Passwords and mail: Nova asks first. Say "ask Claude ..." to send any question, "privately ..." to keep it here.`
     : `${name} answers while this PC is online; offline, the AI on this PC does. `
       + (answering.private === "personal" ? "Anything personal (mail, notes, what Nova remembers, where you are, your screen, health, money, family) stays on this PC."
-        : "Weather, news and everyday questions go to it. Passwords and mail: Nova asks you out loud first (“yes” sends it, “no” keeps it here). Start with “privately” to keep any question here.");
+        : "Weather, news and everyday questions go to it. Passwords and mail: Nova asks you out loud first ("yes" sends it, "no" keeps it here). Start with "privately" to keep any question here.");
 }
 
 function renderFreeCloud() {
@@ -759,7 +759,7 @@ function renderFreeCloud() {
   const when = claude.on && claude.key ? "when Claude can't answer" : "whenever this PC is online";
   $("#free-cloud-info").textContent = free.usb ? "The USB Edition stays fully offline."
     : !free.on ? "Free with an Ollama account: a much larger open model on Ollama's servers. Ollama limits free use per session and per week. Choose Ollama Cloud above to use it."
-    : `${free.model} answers ${when}. Status: ${free.status || "checking…"}.`
+    : `${free.model} answers ${when}. Status: ${free.status || "checking..."}.`
       + (free.status && free.status !== "ready" && /sign in/.test(free.status) ? " Sign in once with your Ollama account (free at ollama.com)." : "");
 }
 
@@ -767,11 +767,11 @@ function renderModel() {
   const model = state.model || {};
   const chip = $("#model-chip");
   const placement = model.placement || "";
-  chip.textContent = model.name ? `${model.name}${placement ? " · " + placement : ""}` : "MODEL …";
+  chip.textContent = model.name ? `${model.name}${placement ? " · " + placement : ""}` : "MODEL ...";
   chip.className = `chip ${model.ollama === "offline" ? "off" : /GPU/.test(placement) ? "gpu" : /CPU/.test(placement) ? "cpu" : ""}`;
   $("#model-info").textContent = model.name
     ? `Using ${model.name}. Best for this PC: ${model.recommended || model.name}${model.reason ? ` (${model.reason})` : ""}.`
-    : "Checking Ollama…";
+    : "Checking Ollama...";
   const select = $("#model-select");
   const options = [["auto", `Auto — pick for this PC${model.recommended ? ` (${model.recommended})` : ""}`],
     ...(model.installed || []).map((name) => [name, name])];
@@ -786,15 +786,15 @@ function renderModel() {
   if (offer) {
     $("#model-offer-text").textContent = `${offer.stronger ? `This PC can run a stronger model, ${offer.name}` : `${offer.name} would be faster on this PC`} (${offer.reason}). Download about ${offer.size_gb} GB?`;
     $("#model-offer-button").disabled = Boolean(model.downloading);
-    $("#model-offer-button").textContent = model.downloading ? "Downloading…" : `Download ${offer.name}`;
+    $("#model-offer-button").textContent = model.downloading ? "Downloading..." : `Download ${offer.name}`;
   }
   $("#vision-info").textContent = model.vision
     ? `Vision: ${model.vision}. In creative mode Nova can name anything you show the camera.`
     : "Vision: none. Creative mode names 80 everyday kinds of objects; a vision model (about 3 GB, runs on this PC) can name anything.";
   $("#vision-button").hidden = Boolean(model.vision);
   $("#vision-button").disabled = Boolean(model.vision_downloading);
-  $("#vision-button").textContent = model.vision_downloading ? "Downloading…" : "Download vision model · 3.2 GB";
-  facts($("#model-facts"), [["Ollama", model.ollama || "…"], ["Placement", placement || "—"], ["Context", model.context || "—"]]);
+  $("#vision-button").textContent = model.vision_downloading ? "Downloading..." : "Download vision model · 3.2 GB";
+  facts($("#model-facts"), [["Ollama", model.ollama || "..."], ["Placement", placement || "—"], ["Context", model.context || "—"]]);
   const installed = model.installed || [];
   for (const id of ["#version-base", "#compare-a", "#compare-b"]) {
     const select = $(id);
@@ -853,7 +853,7 @@ function renderReminders() {
   list.dataset.signature = signature;
   list.replaceChildren(...(items.length ? items : [null]).map((item) => {
     const row = document.createElement("li");
-    if (!item) { row.textContent = "None ahead. Say “remind me at 5 pm to call mom”."; return row; }
+    if (!item) { row.textContent = "None ahead. Say "remind me at 5 pm to call mom"."; return row; }
     row.className = "option-row";
     const cancel = Object.assign(document.createElement("button"), { className: "box small", textContent: "✕", title: "Cancel this reminder" });
     cancel.onclick = () => act("reminder_cancel", { id: item.id });
@@ -870,13 +870,13 @@ function renderSkills() {
   list.dataset.signature = signature;
   list.replaceChildren(...(skills.list.length ? skills.list : [null]).map((skill) => {
     const item = document.createElement("li");
-    if (!skill) { item.textContent = "No skills yet: ask Nova to make one, e.g. “make a skill that sums up my week every Friday”."; return item; }
+    if (!skill) { item.textContent = "No skills yet: ask Nova to make one, e.g. "make a skill that sums up my week every Friday"."; return item; }
     const words = document.createElement("span");
     const when = skill.schedule === "manual" ? "when you ask" : skill.schedule;
     const where = skill.brain === "claude-code" ? " · Claude Code" : "";
     words.append(Object.assign(document.createElement("b"), { textContent: skill.title }), document.createElement("br"),
       Object.assign(document.createElement("span"), { className: "muted small",
-        textContent: `“${skill.says[0] || skill.title}” · ${when}${where}${skill.last ? ` · last ${skill.last}` : ""}` }));
+        textContent: `"${skill.says[0] || skill.title}" · ${when}${where}${skill.last ? ` · last ${skill.last}` : ""}` }));
     const run = Object.assign(document.createElement("button"), { className: "box small", textContent: "Run" });
     run.onclick = () => act("skill_run", { name: skill.name });
     item.className = "option-row";
@@ -933,7 +933,7 @@ function renderDiscover() {
   $("#discover-token-forget").hidden = !discover.token;
   $("#reverse-toggle").textContent = discover.reverse_on ? "Turn off" : "Turn on";
   $("#reverse-info").textContent = discover.reverse_on
-    ? "On: say “reverse engineer <app, site, file or project> and tell me how <part> works”. It runs REA (rea-agents 6.9.0) through Claude Code in the background; the report goes to outputs/ and your Library under Reverse engineering." + (discover.reverse_problem ? ` Not ready: ${discover.reverse_problem}.` : "")
+    ? "On: say "reverse engineer <app, site, file or project> and tell me how <part> works". It runs REA (rea-agents 6.9.0) through Claude Code in the background; the report goes to outputs/ and your Library under Reverse engineering." + (discover.reverse_problem ? ` Not ready: ${discover.reverse_problem}.` : "")
     : "Off. REA works out how apps, sites and binaries are built, through Claude Code. Needs Claude Code and Node.js 22.23 or newer. Only for software you're allowed to analyse.";
 }
 
@@ -960,8 +960,8 @@ function renderConnections() {
   $("#drive-connect").hidden = !switches.gmail || Boolean(switches.drive);
   $("#connections-info").textContent = [switches.phone ? "Nova Lite is on." : "Nova Lite is off.",
     switches.gmail ? "Gmail: drafts only, never sends." : "",
-    switches.calendar ? "Google Calendar: “what's on today?”, “add dentist Friday at 3”." : switches.gmail ? "Click Add Google Calendar and allow Calendar too." : "",
-    switches.drive ? "Google Drive (read-only): “find my budget in Drive”, “read file 1”." : switches.gmail ? "Click Add Google Drive and allow Drive too." : ""].join(" ");
+    switches.calendar ? "Google Calendar: "what's on today?", "add dentist Friday at 3"." : switches.gmail ? "Click Add Google Calendar and allow Calendar too." : "",
+    switches.drive ? "Google Drive (read-only): "find my budget in Drive", "read file 1"." : switches.gmail ? "Click Add Google Drive and allow Drive too." : ""].join(" ");
   $("#need-google-state").textContent = switches.gmail ? (switches.calendar && switches.drive ? "connected" : "reconnect for more") : "";
   $("#need-google-connect").hidden = Boolean(switches.gmail) || switches.gmail === null || switches.gmail === undefined;
 }
@@ -979,7 +979,7 @@ function renderTuning() {
   if (!tuning) return;
   const result = tuning.result;
   const where = (share) => (share >= 0.97 ? "all on the graphics card" : share > 0 ? `${Math.round(share * 100)}% on the graphics card` : "on the processor");
-  $("#tune-info").textContent = tuning.running ? `Tuning… ${tuning.step || ""}`
+  $("#tune-info").textContent = tuning.running ? `Tuning... ${tuning.step || ""}`
     : result ? `${result.model}, ${where(result.on_gpu)}, ${Math.round(result.tokens_per_second)} tokens a second, `
       + `first words in ${result.first_token_seconds.toFixed(1)} s, ${Math.round(result.num_ctx / 1024)}K context. `
       + `Tuned for ${result.version} on ${result.tuned_at.replace("T", " ")}.${result.notes?.length ? ` ${result.notes.join("; ")}.` : ""}`
@@ -1010,7 +1010,7 @@ function renderKnowledge() {
   }));
   const notes = knowledge.notes || {};
   $("#notes-info").textContent = notes.status || (notes.count
-    ? `${notes.count} notes from ${notes.vault} are searchable by meaning. Ask “what did I write about …?”.`
+    ? `${notes.count} notes from ${notes.vault} are searchable by meaning. Ask "what did I write about ...?".`
     : `Index your vault (${notes.vault}) once: Nova downloads a small meaning model (about 270 MB) and reads your notes on this PC. Nothing leaves it.`);
   $("#notes-index").disabled = Boolean(notes.busy);
   $("#notes-index").textContent = notes.count ? "Update the index" : "Index my notes";
@@ -1103,7 +1103,7 @@ function renderNotes() {
   if (!notes) return;
   mindmap.setExpanding(notes.expanding);
   $("#map-ask").disabled = notes.expanding !== null && notes.expanding !== undefined;
-  $("#map-ask").textContent = $("#map-ask").disabled ? "✦ Thinking…" : "✦ Ask Nova";
+  $("#map-ask").textContent = $("#map-ask").disabled ? "✦ Thinking..." : "✦ Ask Nova";
   const data = { title: notes.title, outline: notes.outline, positions: notes.positions || {}, details: notes.details || {},
     styles: notes.styles || {}, links: notes.links || [] };
   const signature = JSON.stringify(data);
@@ -1124,7 +1124,7 @@ function renderNotes() {
   const saved = $("#map-saved");
   if (saved.dataset.signature !== JSON.stringify(notes.maps)) {
     saved.dataset.signature = JSON.stringify(notes.maps);
-    saved.replaceChildren(new Option(notes.maps.length ? "Open a saved map…" : "No saved maps yet", ""),
+    saved.replaceChildren(new Option(notes.maps.length ? "Open a saved map..." : "No saved maps yet", ""),
       ...notes.maps.map((item, index) => new Option(`${item.title} · ${item.saved.slice(0, 10)}`, String(index))));
   }
 }
@@ -1133,7 +1133,7 @@ function renderNotes() {
 function mapChanged(data) {
   if (document.activeElement !== $("#map-title")) $("#map-title").value = data.title;
   if (document.activeElement !== $("#map-outline")) $("#map-outline").value = data.outline;
-  $("#map-saved-state").textContent = "SAVING…";
+  $("#map-saved-state").textContent = "SAVING...";
   clearTimeout(saveTimer);
   saveTimer = setTimeout(saveMapNow, 600);
 }
@@ -1268,7 +1268,7 @@ function renderBrief() {
   $("#brief-toggle").classList.toggle("on", !on);
   $("#brief-refresh").hidden = !on;
   $("#brief-refresh").disabled = Boolean(state.brief_loading);
-  $("#brief-refresh").textContent = state.brief_loading ? "Loading…" : "Refresh now";
+  $("#brief-refresh").textContent = state.brief_loading ? "Loading..." : "Refresh now";
 
   const content = $("#brief-content");
   const brief = state.brief;
@@ -1346,26 +1346,26 @@ const yesNo = (title, text, yes = "Turn on") =>
   modal(title, text, [{ label: "Cancel", value: false, cancel: true }, { label: yes, value: true, primary: true }]);
 
 const CONSENT = {
-  free_cloud: () => ["Use Ollama Cloud as Nova's brain", "While this is chosen and the PC is online, Nova sends your questions to a large open model on Ollama's servers, through Ollama on this PC and your free Ollama account.\n\n• Sent: your question, the recent conversation and what it needs: with the default setting that can be your name, what Nova remembers, your city (for the weather and news) and your notes or library when you ask about them. Web searches go to DuckDuckGo (only the search words).\n• Passwords, codes, bank details and mail: Nova asks you out loud first, every time; “no” keeps them on this PC.\n• Start with “privately” to keep any question here, or choose “Anything personal stays on this PC” in Settings. Offline, everything stays here.\n\nOllama limits free use per session and per week; then the AI on this PC answers. Change it any time."],
-  claude: () => ["Use Claude as Nova's brain", "While Claude is chosen and the PC is online, Nova sends your questions to Claude (Anthropic's AI, on your Claude plan through Claude Code, or with your own API key) and speaks Claude's answer.\n\n• Sent: your question, the recent conversation and what it needs: with the default setting that can be your name, what Nova remembers, your city (for the weather and news) and your notes or library when you ask about them. Web searches go to DuckDuckGo (only the search words); Claude reads the results.\n• Passwords, codes, bank details and mail: Nova asks you out loud first, every time; “no” keeps them on this PC.\n• Start with “privately” to keep any question here, or choose “Anything personal stays on this PC” in Settings. Offline, everything stays here.\n\nOn your Claude plan it counts toward the plan's usage limit (no extra bill); with an API key Anthropic bills per question (about half a cent with Sonnet at medium effort). Change it any time."],
+  free_cloud: () => ["Use Ollama Cloud as Nova's brain", "While this is chosen and the PC is online, Nova sends your questions to a large open model on Ollama's servers, through Ollama on this PC and your free Ollama account.\n\n• Sent: your question, the recent conversation and what it needs: with the default setting that can be your name, what Nova remembers, your city (for the weather and news) and your notes or library when you ask about them. Web searches go to DuckDuckGo (only the search words).\n• Passwords, codes, bank details and mail: Nova asks you out loud first, every time; "no" keeps them on this PC.\n• Start with "privately" to keep any question here, or choose "Anything personal stays on this PC" in Settings. Offline, everything stays here.\n\nOllama limits free use per session and per week; then the AI on this PC answers. Change it any time."],
+  claude: () => ["Use Claude as Nova's brain", "While Claude is chosen and the PC is online, Nova sends your questions to Claude (Anthropic's AI, on your Claude plan through Claude Code, or with your own API key) and speaks Claude's answer.\n\n• Sent: your question, the recent conversation and what it needs: with the default setting that can be your name, what Nova remembers, your city (for the weather and news) and your notes or library when you ask about them. Web searches go to DuckDuckGo (only the search words); Claude reads the results.\n• Passwords, codes, bank details and mail: Nova asks you out loud first, every time; "no" keeps them on this PC.\n• Start with "privately" to keep any question here, or choose "Anything personal stays on this PC" in Settings. Offline, everything stays here.\n\nOn your Claude plan it counts toward the plan's usage limit (no extra bill); with an API key Anthropic bills per question (about half a cent with Sonnet at medium effort). Change it any time."],
   connectors: () => ["Claude with your claude.ai Gmail and Drive", "When Claude answers on your Claude plan, it may also use the Gmail and Google Drive connectors you connected on claude.ai, when you ask about your mail or files.\n\n• Your mail and files are read by Claude (Anthropic) through your own claude.ai account, under its privacy terms.\n• Nova lets it read, search and save drafts only: sending mail and sharing, changing or deleting files are blocked.\n• Connect them first on claude.ai → Settings → Connectors, with the account Claude Code is signed in with.\n\nTurn it off any time."],
   google_mcp: () => ["Nova's Gmail and Drive for your Claude apps", "Nova will serve its Gmail and Google Drive tools on this PC (127.0.0.1, port 47821) for Claude Code and Claude Desktop.\n\n• Only programs on this PC that have the private key can use it; you paste the key into your Claude apps. Don't share it.\n• Those apps can read your unread mail, save drafts (never send) and search and read your Drive files. What they read goes to Claude (Anthropic) under your Claude account.\n• Your Claude app asks you before each tool, so Nova doesn't ask again.\n• New key shuts out every app set up with the old one.\n\nTurn it off any time."],
   knowledge: (detail) => [`Download ${detail.title}?`, `${detail.gb ? `About ${detail.gb} GB` : "Its size is shown once you click Show download sizes"}, from Kiwix's library (the same Wikipedia files offline libraries and Project NOMAD use), into Nova's data folder.\n\nAfter that Nova can look things up in it with the internet off. It downloads in the background; you can keep using Nova, and if it's cut off it carries on from where it stopped.`, "Download"],
-  reverse: () => ["Reverse engineering with REA", "Nova will be able to hand “reverse engineer …” jobs to Claude Code (on your plan) with REA, an open-source reverse engineering toolkit (github.com/morluto/rea, pinned to rea-agents 6.9.0, run with npx).\n\n• Only use it on software, sites and files you're allowed to analyse; respect licenses and terms of service. Nova asks Claude not to patch, crack or bypass anything.\n• REA reads files and can run or drive the target with your Windows permissions.\n• What it finds goes to Claude (your plan), and the report to outputs/ and your Library.\n• It needs Claude Code and Node.js 22.23 or newer.\n\nTurn it off any time."],
+  reverse: () => ["Reverse engineering with REA", "Nova will be able to hand "reverse engineer ..." jobs to Claude Code (on your plan) with REA, an open-source reverse engineering toolkit (github.com/morluto/rea, pinned to rea-agents 6.9.0, run with npx).\n\n• Only use it on software, sites and files you're allowed to analyse; respect licenses and terms of service. Nova asks Claude not to patch, crack or bypass anything.\n• REA reads files and can run or drive the target with your Windows permissions.\n• What it finds goes to Claude (your plan), and the report to outputs/ and your Library.\n• It needs Claude Code and Node.js 22.23 or newer.\n\nTurn it off any time."],
   shannon: () => ["Shannon attacks your app for real", "Shannon (github.com/KeygraphHQ/shannon, pinned to 3.5.0) is an AI pentester: it reads your project's code, then really tries to break into the running app (injection, XSS, logins, access control, SSRF) and reports only what it could prove, with the fix.\n\n• Only your own apps, running on this PC or your home network. Nova refuses other addresses. Use a test copy: it can change or delete data in the app it attacks.\n• It runs in Docker inside WSL2 and talks to Claude with your Claude API key: your code and the app's answers go to Anthropic, and a full run costs API credit (it can be tens of dollars) and takes an hour or two.\n• The report goes to the project's Security checks folder and your Library.\n\nYou are asked this once.", "I understand, run it"],
   telegram_relay: () => ["Nova on Telegram with the PC off", "Nova will put a small relay on your own Cloudflare account (free). While your PC is off, Telegram sends your messages there instead.\n\n• Kept on your Cloudflare account: your bot token, your Telegram id, your name and what Nova remembers (so she still knows you), the reminders of the next three days (so they still come), the key of the online brain you chose, and the messages sent while the PC was off, until the PC is back and reads them.\n• While the PC is off, the brain you chose (Claude Haiku with your API key, or Ollama Cloud) answers; it can talk and plan, not use the PC. Voice notes and files wait for the PC.\n• When the PC starts, it takes Telegram back and the conversation continues there.\n\nRemove relay takes all of it off your Cloudflare account."],
   telegram: () => ["Nova on Telegram", "Nova will answer your own private Telegram bot from this PC, wherever you are.\n\n• Only you: the first account that sends the pairing code becomes the owner; everyone else is ignored without a reply.\n• Your messages and Nova's answers travel through Telegram's servers (bot chats are not end-to-end encrypted). Don't send passwords there.\n• Voice notes are turned into text on this PC and not kept.\n• Nova can send you your own files when you ask (from Desktop, Documents, Downloads, Pictures, Videos, Music).\n• With Screen assist on, she can also work the PC for you from the chat. When she needs a yes or no, she asks in the chat.\n\nNothing on this PC opens to the internet: Nova asks Telegram for new messages. Turn it off any time."],
-  mic: () => ["Turn the microphone on", "While the mic is on, Nova listens for its name. Say “Hey Nova, …” with your request, or “Hey Nova”, wait for the beep, then speak. After that Nova keeps listening for a minute: no need to say its name again. “Thanks” ends it early.\n\nAudio is analyzed on this PC in memory and never saved. It can sometimes miss its name or wake by mistake. The mic stays on until you switch it off, also after restarting Nova."],
+  mic: () => ["Turn the microphone on", "While the mic is on, Nova listens for its name. Say "Hey Nova, ..." with your request, or "Hey Nova", wait for the beep, then speak. After that Nova keeps listening for a minute: no need to say its name again. "Thanks" ends it early.\n\nAudio is analyzed on this PC in memory and never saved. It can sometimes miss its name or wake by mistake. The mic stays on until you switch it off, also after restarting Nova."],
   gestures: () => ["Turn webcam gestures on", "Nova watches the webcam for hand gestures while it runs:\n\n👍 hold thumbs up: volume up     👎 hold thumbs down: volume down\n✋ swipe an open hand right / left: next / previous song or video\n✊ hold a fist: play / pause     ✌ hold a peace sign: creative mode\nand any gestures of your own (Settings → Gestures).\n\nFrames are analyzed on this PC in memory and never saved or sent. It stays on until you switch it off."],
   phone: () => ["Nova Lite for iPhone", "Nova will accept connections from your phone on this Wi-Fi network. Only a phone that scanned your private QR code can use it.\n\nWindows may ask whether Nova may use the network: allow it on private networks. Use this on your home Wi-Fi, not on public networks."],
   assist: () => ["Screen assist and autopilot", "While it is on (it stays on until you switch it off):\n\n• Each time you ask something, Nova reads the app you were last using (its text and controls from Windows UI Automation, never password fields) and sends it to the model on this PC only. Ask her to review or do your homework or an article and she reads all of it, scrolling by herself.\n• Nova can point, pin notes, scroll, open programs and websites, and click, type and press keys with your real mouse and keyboard, step after step, without asking you each time.\n• She does not ask before any step, money and sending included: you told her to just do what you ask. SCREEN → Ask before risky steps brings that question back.\n• Hold Ctrl+Alt anywhere to talk; release to send. Esc stops Nova at once. SCREEN → Autopilot turns the no-asking off.\n• A page or file can hold text written to trick an AI. Watch the screen while Nova works on something you don't trust.\n\nYou are asked this once."],
-  second_brain: () => ["Turn on your second brain", "While it is on, Nova keeps notes of what you do on this PC in your Obsidian vault:\n\n• Every 15 seconds she reads the text of the window you're using (password fields and text boxes are skipped). If you allow it, she also listens to the videos and reels you watch and writes down what they say (Whisper, on this PC).\n• Every 20 minutes the AI model on this PC sums it up into raw/activity/date.md, then folds it into wiki/ pages, one per topic, linked to each other (Andrej Karpathy's “LLM wiki”). The raw text and sound are kept only in memory and thrown away after each summary.\n• Never read: private or incognito windows, password managers, banking, calls and chats (other people's words), Nova itself, and anything you add to the “Never read” list.\n\nNothing leaves this PC, unless you sync the vault with your own other PC (Your other PC, below). Turn it off here or say “Hey Nova, pause my second brain”."],
-  location: () => ["Use your location", "Nova uses your location for the weather and local news:\n\n• Weather comes from Open-Meteo (free, no account), which gets only your city's coordinates.\n• Local news headlines come from Google News, which gets your city's name.\n• With “Use this PC's location”, Windows' location service finds where this PC is (if it's off: your internet connection's approximate city, from ipinfo.io), and OpenStreetMap turns it into a city name.\n\nYour location is kept only in Nova's settings on this PC. “Forget my location” removes it."],
-  news: () => ["Turn on the news desk", "Every morning at 06:00 (or as soon as Nova runs that day) Nova collects the news:\n\n• GNews (with your free key, if you add one), GDELT and the news sites' own feeds get only ordinary requests for today's headlines: nothing about you.\n• The AI on this PC reads each article and writes a short summary, key facts, names, place and an importance score. It keeps allegations as allegations and leaves out what the article doesn't say.\n• Everything is kept in news.sqlite3 in Nova's data folder, with each article's link, publisher and dates, so Nova answers “what happened today?” with sources.\n\nIt uses the network and the AI on this PC for a few minutes each morning. Turn it off here any time."],
-  brief: () => ["Daily brief", "Once a day Nova fetches:\n• top headlines and news on your interests (Google News)\n• new GitHub repos on your interests (GitHub)\n• the Hacker News front page\n• “On this day” (Wikipedia)\n\nOnly your interest words are sent, as search terms. Nothing else about you leaves this PC. The brief is kept for today only."],
+  second_brain: () => ["Turn on your second brain", "While it is on, Nova keeps notes of what you do on this PC in your Obsidian vault:\n\n• Every 15 seconds she reads the text of the window you're using (password fields and text boxes are skipped). If you allow it, she also listens to the videos and reels you watch and writes down what they say (Whisper, on this PC).\n• Every 20 minutes the AI model on this PC sums it up into raw/activity/date.md, then folds it into wiki/ pages, one per topic, linked to each other (Andrej Karpathy's "LLM wiki"). The raw text and sound are kept only in memory and thrown away after each summary.\n• Never read: private or incognito windows, password managers, banking, calls and chats (other people's words), Nova itself, and anything you add to the "Never read" list.\n\nNothing leaves this PC, unless you sync the vault with your own other PC (Your other PC, below). Turn it off here or say "Hey Nova, pause my second brain"."],
+  location: () => ["Use your location", "Nova uses your location for the weather and local news:\n\n• Weather comes from Open-Meteo (free, no account), which gets only your city's coordinates.\n• Local news headlines come from Google News, which gets your city's name.\n• With "Use this PC's location", Windows' location service finds where this PC is (if it's off: your internet connection's approximate city, from ipinfo.io), and OpenStreetMap turns it into a city name.\n\nYour location is kept only in Nova's settings on this PC. "Forget my location" removes it."],
+  news: () => ["Turn on the news desk", "Every morning at 06:00 (or as soon as Nova runs that day) Nova collects the news:\n\n• GNews (with your free key, if you add one), GDELT and the news sites' own feeds get only ordinary requests for today's headlines: nothing about you.\n• The AI on this PC reads each article and writes a short summary, key facts, names, place and an importance score. It keeps allegations as allegations and leaves out what the article doesn't say.\n• Everything is kept in news.sqlite3 in Nova's data folder, with each article's link, publisher and dates, so Nova answers "what happened today?" with sources.\n\nIt uses the network and the AI on this PC for a few minutes each morning. Turn it off here any time."],
+  brief: () => ["Daily brief", "Once a day Nova fetches:\n• top headlines and news on your interests (Google News)\n• new GitHub repos on your interests (GitHub)\n• the Hacker News front page\n• "On this day" (Wikipedia)\n\nOnly your interest words are sent, as search terms. Nothing else about you leaves this PC. The brief is kept for today only."],
   read_screen: () => ["Read the screen", "Nova will briefly minimize, read the chosen display with Windows accessibility text or local OCR, mask detected password fields, and show you the text to review. Nothing is sent to the model or saved unless you choose to add it to the chat.", "Read it"],
   whisper: (detail) => ["Install Whisper", `Download Whisper speech recognition (about ${detail.mb} MB) from GitHub and Hugging Face into Nova's data folder?\n\nIt understands accents and broken English much better. It runs on this PC; your voice is never uploaded.`, "Download"],
-  voice: (detail) => ["Download voice", `Download the natural voice “${detail.name}” (about ${detail.mb} MB) into Nova's data folder? It runs on this PC.`, "Download"],
+  voice: (detail) => ["Download voice", `Download the natural voice "${detail.name}" (about ${detail.mb} MB) into Nova's data folder? It runs on this PC.`, "Download"],
   vision: (detail) => ["Download a vision model", `Download ${detail.name} (about ${detail.size_gb} GB) with Ollama?\n\nIt lets Nova name anything you show the camera in creative mode, not just 80 everyday kinds. The photo of the object goes only to Ollama on this PC; nothing is uploaded.`, "Download"],
   model: (detail) => ["Download a better model", `Download ${detail.name} (about ${detail.size_gb} GB) with Ollama?\n\n${detail.reason ? `This PC: ${detail.reason}.\n` : ""}It uses the internet and disk space. Nova keeps using the current model until the download finishes.`, "Download"],
 };
@@ -1589,7 +1589,7 @@ $("#map-own-icon").addEventListener("input", (event) => showStyle(mindmap.setSty
 $("#map-new").onclick = () => { mapTitle = ""; act("notes_new"); };
 $("#map-delete").onclick = async () => {
   const title = $("#map-title").value.trim();
-  if (title && await yesNo("Delete this map?", `“${title}” will be removed from this PC.`, "Delete")) act("notes_delete", { title });
+  if (title && await yesNo("Delete this map?", `"${title}" will be removed from this PC.`, "Delete")) act("notes_delete", { title });
 };
 $("#map-saved").onchange = (event) => act("notes_load", { index: Number(event.target.value) });
 const typedMap = () => mindmap.setText($("#map-title").value, $("#map-outline").value);
@@ -1606,7 +1606,7 @@ $("#location-forget").onclick = () => act("location_forget");
 const KEY_NAMES = { Control: "Ctrl", Alt: "Alt", Shift: "Shift", Meta: "Win", " ": "Space", Escape: "Esc" };
 function startHotkeyCapture(which) {
   hotkeyCapture = { which, held: new Set(), most: [] };
-  $(`#hotkey-${which}`).textContent = "Press keys…";
+  $(`#hotkey-${which}`).textContent = "Press keys...";
   $("#hotkey-help").textContent = "Press the new keys together, then let go. Click Change again to cancel.";
 }
 function keyLabel(event) {
@@ -1714,7 +1714,7 @@ $("#tune-auto").onclick = () => act("auto_tune", { on: !state.tuning?.auto });
 $("#version-create").onclick = async () => {
   const result = await act("version_create", { base: $("#version-base").value, name: $("#version-name").value, system: $("#version-system").value,
     temperature: $("#version-temp").value, num_ctx: $("#version-ctx").value });
-  if (result.ok !== false) toast("Making the new version…", "info");
+  if (result.ok !== false) toast("Making the new version...", "info");
 };
 $("#compare-run").onclick = () => act("model_compare", { a: $("#compare-a").value, b: $("#compare-b").value });
 $("#model-unload").onclick = () => act("model_unload");
@@ -1733,7 +1733,7 @@ $$("[data-switch]").forEach((button) => button.addEventListener("click", async (
 $("#speak-toggle").onclick = () => act("speak", { on: !(state.switches || {}).speak });
 $("#ask").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (mapOpen) await flushMapSave(); // "Hey Nova, add … to the map" works on what you see
+  if (mapOpen) await flushMapSave(); // "Hey Nova, add ... to the map" works on what you see
   const input = $("#text");
   const text = input.value.trim();
   if (!text) return;
@@ -1819,23 +1819,23 @@ $("#phone-pair").onclick = async () => {
   const result = (state.switches || {}).phone ? await act("phone_pairing") : await act("phone", { on: true });
   if (result.ok) showPairing(result);
 };
-$(“#gmail-toggle”).onclick = async () => {
-  const result = await act(“gmail”);
+$("#gmail-toggle").onclick = async () => {
+  const result = await act("gmail");
   if (result.need_setup) {
-    const choice = await modal(“Connect Google”, `Nova needs a Google sign-in app (free, one time):\n\n1. Open console.cloud.google.com → new project → enable Gmail API, Calendar API, Drive API → OAuth consent (External, add your Gmail as test user) → create a Desktop app client → download the JSON.\n\n2. Click Pick file below and choose the JSON you just downloaded. Nova saves it and connects straight away.`,
-      [{ label: “Pick file”, value: “pick”, primary: true }, { label: “Full guide”, value: “guide” }, { label: “Cancel”, value: null, cancel: true }]);
-    if (choice === “pick”) {
-      toast(“Pick the Google OAuth JSON you downloaded…”, “info”);
-      const pickResult = await act(“google_pick_client”);
-      if (pickResult.error) toast(pickResult.error, “error”);
-    } else if (choice === “guide”) {
-      const google = document.querySelector(“#need-google”);
-      if (google) { google.open = true; google.scrollIntoView({ behavior: “smooth” }); }
+    const choice = await modal("Connect Google", `Nova needs a Google sign-in app (free, one time):\n\n1. Open console.cloud.google.com → new project → enable Gmail API, Calendar API, Drive API → OAuth consent (External, add your Gmail as test user) → create a Desktop app client → download the JSON.\n\n2. Click Pick file below and choose the JSON you just downloaded. Nova saves it and connects straight away.`,
+      [{ label: "Pick file", value: "pick", primary: true }, { label: "Full guide", value: "guide" }, { label: "Cancel", value: null, cancel: true }]);
+    if (choice === "pick") {
+      toast("Pick the Google OAuth JSON you downloaded...", "info");
+      const pickResult = await act("google_pick_client");
+      if (pickResult.error) toast(pickResult.error, "error");
+    } else if (choice === "guide") {
+      const google = document.querySelector("#need-google");
+      if (google) { google.open = true; google.scrollIntoView({ behavior: "smooth" }); }
     }
   }
 };
 $("#obs-password-save").onclick = () => { act("obs_password", { password: $("#obs-password").value }); $("#obs-password").value = ""; toast("Saved on this PC.", "ok"); };
-$("#knowledge-sizes").onclick = () => { toast("Asking Kiwix's library for the sizes…", "info"); act("knowledge_catalog"); };
+$("#knowledge-sizes").onclick = () => { toast("Asking Kiwix's library for the sizes...", "info"); act("knowledge_catalog"); };
 $("#notes-index").onclick = () => act("notes_index");
 $("#keep-city-save").onclick = () => { toast("Downloading the roads; it can take a few minutes for a big city.", "info"); act("keep_city", { city: $("#keep-city").value }); };
 $("#node-path-save").onclick = () => act("node_path", { path: $("#node-path").value });
