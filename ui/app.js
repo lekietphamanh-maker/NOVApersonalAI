@@ -362,7 +362,7 @@ function renderReadouts() {
   const place = state.place;
   $("#location-info").textContent = place
     ? `Weather and local news for ${place.label}${place.source === "device" ? ` (this PC's location${place.how ? `, from ${place.how}` : ""}; checked again every hour)` : ""}.`
-    : "Not set. Nova uses it for the weather and local news ("Hey Nova, what's the weather?").";
+    : "Not set. Nova uses it for the weather and local news (\"Hey Nova, what's the weather?\").";
   $("#location-forget").hidden = !place;
   renderMusic();
   const keys = state.hotkeys || {};
