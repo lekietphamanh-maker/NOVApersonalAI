@@ -42,6 +42,9 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("web",), r"browse|website|web ?page|site|\.com|\.org|\.net|compare|look up|fill (in|out)|form|buy|price|"
                r"order|book(ing)?"),
     (("fitness_status",), r"heart|pulse|bpm|hrv|fitness|workout|exercise"),
+    (("archmancer",), r"agent (system|loop|architecture|design|framework)|harness|tool (call|boundary|use)|"
+                      r"archmancer|context (window|management)|prompt (cach|inject)|rag|retrieval|evaluation|"
+                      r"orchestrat|delegat|model (boundar|gateway)|trust|privacy"),
     (("ask_claude",), r"claude"),
     (("send_file",), r"send (me )?(the|my|a|that)|telegram"),
     (("make_document",), r"word|document|docx?|excel|spreadsheet|sheet|table|chart|graph|powerpoint|slides?|presentation|"

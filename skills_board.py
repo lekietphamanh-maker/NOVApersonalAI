@@ -114,6 +114,11 @@ CATALOG: tuple[Entry, ...] = (
           ("start recording", "switch to the gaming scene"), ("obs",), "", "OBS → Tools → WebSocket Server Settings"),
     Entry("Apps", "VS Code", "Opens your projects and files, at a line.", ("open my portfolio in VS Code",), ("vscode",),
           "vscode", "Install VS Code (its code command)"),
+    Entry("Knowledge", "Archmancer", "Agent-system architecture knowledge: how to design, build, debug or review "
+          "AI agent systems (loops, tools, models, context, trust, evaluation, delivery). From lehoanganhtai13/archmancer.",
+          ("how should I design an agent loop for my app", "search archmancer for prompt injection",
+           "what does archmancer say about tool authorization"),
+          ("archmancer",)),
     Entry("Places", "Fastest route", "The globe flies to the city, then the search spreads through the streets and the "
           "fastest way lights up; stops in the best order.",
           ("fastest way from District 12 to District 7 via Ben Thanh",), ("route",)),

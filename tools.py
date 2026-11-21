@@ -296,9 +296,16 @@ WORKPLACE_TOOL = _tool(
     "something on the board, highlight the key words and add a note, then say the gist out loud.",
     {"action": {"type": "string", "enum": ["read", "highlight", "add_note", "point", "look"]}, "item": _TEXT,
      "text": _TEXT, "note": _TEXT, "question": _TEXT}, ["action"])
+ARCHMANCER_TOOL = _tool(
+    "archmancer", "Look up agent-system architecture knowledge from Archmancer: how to design, build, debug or review "
+    "agent systems (AI loops, tools, model calls, context, trust, evaluation, delivery). action: list (all skills), "
+    "search (find docs matching query), read (one skill or reference doc). skill: the skill name for read. "
+    "reference: a reference doc name within that skill (optional).",
+    {"action": {"type": "string", "enum": ["list", "search", "read"]}, "query": _TEXT,
+     "skill": _TEXT, "reference": _TEXT}, ["action"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
                ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
-               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL]
+               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, ARCHMANCER_TOOL]
 
 
 
@@ -828,6 +835,14 @@ def _run_code(_name: str, _arguments: dict[str, Any], _context: ToolContext) -> 
 
 register([WIKIPEDIA_TOOL], _run_wikipedia)
 register([RUN_CODE_TOOL], _run_code)
+
+
+def _run_archmancer(_name: str, arguments: dict[str, Any], _context: ToolContext) -> str:
+    import archmancer
+    return archmancer.run(str(arguments.get("action") or "list"), arguments)
+
+
+register([ARCHMANCER_TOOL], _run_archmancer)
 
 
 def _run_screen_record(_name: str, arguments: dict[str, Any], context: ToolContext) -> str:
