@@ -778,7 +778,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
                "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report",
                "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
                "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
-               "shannon_fix", "galaxy_data"}
+               "shannon_fix", "galaxy_data", "update_now", "google_pick_client"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -1084,6 +1084,25 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
                 self.events.put(("warning", f"Gmail sign-in failed: {exc}"))
         threading.Thread(target=connect, daemon=True).start()
         return None
+
+    def _act_google_pick_client(self, _args: dict[str, Any]) -> dict[str, Any]:
+        """Opens a file picker for the Google OAuth client JSON, copies it to the right place, then auto-connects."""
+        from tkinter import filedialog
+        path = filedialog.askopenfilename(
+            title="Pick the Google OAuth client JSON you downloaded",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+        if not path:
+            return {"ok": False, "picked": False}
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+            if "installed" not in data and "web" not in data:
+                return {"ok": False, "error": "That JSON doesn't look like a Google OAuth client file."}
+            dest = gmail_tools.client_path()
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+        return self._act_gmail({}) or {"ok": True}
 
     def _act_creative(self, _args: dict[str, Any]) -> None:
         self.creative.open_window()
@@ -3417,6 +3436,30 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions):
         self._toast("Updating: Nova closes and comes back in about a minute.", "info")
         self.root.after(1500, self._close)
         return None
+
+    def _act_update_now(self, _args: dict[str, Any]) -> None:
+        """One click: check → download → install. Runs on a worker thread like the other update actions."""
+        def work() -> None:
+            self._update_state(busy=True, status="Checking GitHub…")
+            try:
+                release = self.updates.newest()
+                if release is None:
+                    self._update_state(busy=False, status=f"Nova {VERSION} is the newest.")
+                    return
+                if not self.updates.can_install():
+                    self._update_state(busy=False, status=f"Nova {release.version} is out but updates need Nova-Setup.exe.")
+                    return
+                self._update_state(available=release.version, page=release.page)
+                installer = self.updates.download(
+                    release, lambda percent: self._update_state(status=f"Downloading Nova {release.version}… {percent}%"))
+                self.update_ready = installer
+                self._update_state(busy=False, ready=True, status=f"Installing Nova {release.version}…")
+                self.updates.install(installer)
+                self._toast("Updating: Nova closes and comes back in about a minute.", "info")
+                self.root.after(1500, self._close)
+            except self_update.UpdateError as exc:
+                self._update_state(busy=False, status=f"Update: {exc}.")
+        threading.Thread(target=work, name="NovaUpdateNow", daemon=True).start()
 
     def _act_update_rollback(self, _args: dict[str, Any]) -> None:
         """Gets the release before this one (downloaded and verified the same way), for when an update misbehaves."""

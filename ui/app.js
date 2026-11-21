@@ -309,6 +309,7 @@ function render() {
   renderAnswering();
   renderTelegram();
   renderUpdate();
+  renderCapabilities();
   renderDiscover();
   renderClaude();
   renderFreeCloud();
@@ -941,6 +942,8 @@ function renderUpdate() {
   $("#update-card").hidden = Boolean(update.usb);
   if (document.activeElement !== $("#update-auto")) $("#update-auto").checked = update.auto !== false;
   $("#update-install").hidden = !update.ready;
+  $("#update-now").hidden = !update.can_install || update.ready || update.version === "dev";
+  $("#update-now").disabled = Boolean(update.busy);
   $("#update-page").hidden = !update.page;
   $("#update-check").disabled = $("#update-rollback").disabled = Boolean(update.busy) || update.version === "dev";
   $("#update-rollback").hidden = !update.can_install;
@@ -961,6 +964,14 @@ function renderConnections() {
     switches.drive ? "Google Drive (read-only): “find my budget in Drive”, “read file 1”." : switches.gmail ? "Click Add Google Drive and allow Drive too." : ""].join(" ");
   $("#need-google-state").textContent = switches.gmail ? (switches.calendar && switches.drive ? "connected" : "reconnect for more") : "";
   $("#need-google-connect").hidden = Boolean(switches.gmail) || switches.gmail === null || switches.gmail === undefined;
+}
+
+function renderCapabilities() {
+  const switches = state.switches || {};
+  const mark = (id, on) => { const el = document.getElementById(id); if (el) el.closest(".cap-item")?.classList.toggle("connected", Boolean(on)); };
+  mark("cap-gmail", switches.gmail);
+  mark("cap-calendar", switches.calendar);
+  mark("cap-drive", switches.drive);
 }
 
 function renderTuning() {
@@ -1781,6 +1792,7 @@ $("#reverse-toggle").onclick = () => act("reverse_toggle", { on: !(state.discove
 $("#update-auto").onchange = (event) => act("update_auto", { on: event.target.checked });
 $("#update-check").onclick = () => act("update_check");
 $("#update-install").onclick = () => act("update_install");
+$("#update-now").onclick = () => act("update_now");
 $("#update-rollback").onclick = () => act("update_rollback");
 $("#update-page").onclick = () => act("open_url", { url: (state.update || {}).page });
 $("#telegram-relay-setup").onclick = async () => {
@@ -1807,11 +1819,19 @@ $("#phone-pair").onclick = async () => {
   const result = (state.switches || {}).phone ? await act("phone_pairing") : await act("phone", { on: true });
   if (result.ok) showPairing(result);
 };
-$("#gmail-toggle").onclick = async () => {
-  const result = await act("gmail");
+$(“#gmail-toggle”).onclick = async () => {
+  const result = await act(“gmail”);
   if (result.need_setup) {
-    modal("Connect Google", `Gmail, Google Calendar and Google Drive need your own Google sign-in app (free, one time):\n\n1. In Google Cloud Console, create a project and enable the Gmail API, the Google Calendar API and the Google Drive API.\n2. OAuth consent screen: External, and add your own Gmail address as a test user.\n3. Create an OAuth client of type “Desktop app” and download its JSON file.\n4. Save that file as:\n${result.path}\n5. Click Connect again and allow Gmail, Calendar and Drive.\n\nStep by step: Settings → Need to → Google. Nova can list and read unread mail and save drafts you approve (it never sends mail), read and add calendar events, and find and read Drive files (read-only).`,
-      [{ label: "OK", value: null, primary: true, cancel: true }]);
+    const choice = await modal(“Connect Google”, `Nova needs a Google sign-in app (free, one time):\n\n1. Open console.cloud.google.com → new project → enable Gmail API, Calendar API, Drive API → OAuth consent (External, add your Gmail as test user) → create a Desktop app client → download the JSON.\n\n2. Click Pick file below and choose the JSON you just downloaded. Nova saves it and connects straight away.`,
+      [{ label: “Pick file”, value: “pick”, primary: true }, { label: “Full guide”, value: “guide” }, { label: “Cancel”, value: null, cancel: true }]);
+    if (choice === “pick”) {
+      toast(“Pick the Google OAuth JSON you downloaded…”, “info”);
+      const pickResult = await act(“google_pick_client”);
+      if (pickResult.error) toast(pickResult.error, “error”);
+    } else if (choice === “guide”) {
+      const google = document.querySelector(“#need-google”);
+      if (google) { google.open = true; google.scrollIntoView({ behavior: “smooth” }); }
+    }
   }
 };
 $("#obs-password-save").onclick = () => { act("obs_password", { password: $("#obs-password").value }); $("#obs-password").value = ""; toast("Saved on this PC.", "ok"); };

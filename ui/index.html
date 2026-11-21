@@ -438,6 +438,27 @@
   </section>
 
   <section class="pane" id="pane-settings">
+    <div class="card" id="capabilities-card">
+      <h3>What I can do</h3>
+      <div class="caps-grid" id="caps-grid">
+        <div class="cap-item"><span class="cap-icon">🎙</span><b>Voice</b><span class="muted small">Talk to me: hold-to-talk or say "Hey Nova"</span></div>
+        <div class="cap-item"><span class="cap-icon">🧠</span><b>AI brain</b><span class="muted small">Local Ollama, Claude, or any API provider</span></div>
+        <div class="cap-item"><span class="cap-icon">🔍</span><b>Web search</b><span class="muted small">Search the web and summarise results</span></div>
+        <div class="cap-item"><span class="cap-icon">🖥</span><b>Screen assist</b><span class="muted small">See your screen, point, highlight, control apps</span></div>
+        <div class="cap-item"><span class="cap-icon">📧</span><b>Gmail</b><span class="muted small" id="cap-gmail">Read mail, draft replies (never sends)</span></div>
+        <div class="cap-item"><span class="cap-icon">📅</span><b>Calendar</b><span class="muted small" id="cap-calendar">List and add events</span></div>
+        <div class="cap-item"><span class="cap-icon">📂</span><b>Drive</b><span class="muted small" id="cap-drive">Find and read files (read-only)</span></div>
+        <div class="cap-item"><span class="cap-icon">🌍</span><b>World</b><span class="muted small">Live globe with quakes, storms, news</span></div>
+        <div class="cap-item"><span class="cap-icon">🗺</span><b>Routes</b><span class="muted small">Fastest route A to B with stops</span></div>
+        <div class="cap-item"><span class="cap-icon">📚</span><b>Library</b><span class="muted small">Topics, ideas and projects from your notes</span></div>
+        <div class="cap-item"><span class="cap-icon">🛡</span><b>Shannon</b><span class="muted small">Security check on any app or site</span></div>
+        <div class="cap-item"><span class="cap-icon">🔬</span><b>Rea</b><span class="muted small">Reverse engineer how apps are built</span></div>
+        <div class="cap-item"><span class="cap-icon">⏱</span><b>Timers</b><span class="muted small">Set timers, reminders, volume, media</span></div>
+        <div class="cap-item"><span class="cap-icon">🤖</span><b>Autopilot</b><span class="muted small">Drive the mouse and keyboard for you</span></div>
+        <div class="cap-item"><span class="cap-icon">📰</span><b>Daily brief</b><span class="muted small">News, repos, fun facts by interests</span></div>
+        <div class="cap-item"><span class="cap-icon">🎨</span><b>Creative</b><span class="muted small">Webcam mirror, hand tracking, 3D objects</span></div>
+      </div>
+    </div>
     <details class="card downloads" id="downloads">
       <summary><span class="folder" aria-hidden="true"></span>Need to <span id="downloads-count" class="downloads-count"></span></summary>
       <p class="muted small">What to download, and how to set up everything else: Google, Claude, your Claude apps, Telegram, your iPhone, TV, iPad, fitness band and second laptop, updates, Discover and reverse engineering.</p>
@@ -843,6 +864,7 @@
       <label class="check"><input type="checkbox" id="update-auto"> Check for new versions and download them by themselves (you still choose when to restart)</label>
       <div class="row wrap"><button class="box" id="update-check">Check for updates</button>
         <button class="box on" id="update-install" hidden>Restart to update</button>
+        <button class="box accent" id="update-now" hidden>Update now</button>
         <button class="box" id="update-rollback">Install the previous version</button>
         <button class="box" id="update-page" hidden>What's new</button></div>
     </div>
