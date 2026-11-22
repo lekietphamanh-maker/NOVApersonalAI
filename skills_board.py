@@ -5,7 +5,7 @@ Every tool Nova has must belong to an entry (a test checks it), so a new feature
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 
@@ -114,7 +114,8 @@ CATALOG: tuple[Entry, ...] = (
           "Raspberry Pi 4) and parts, wire them pin to pin and press Run. Describe what you want and Nova builds it: she picks the "
           "board and parts, wires them, the bench checks the wiring (short circuits, 5 V into a 3.3 V pin), and the parts list "
           "and build steps appear beside it. Projects are saved by name.",
-          ("building mode", "build me a blinking LED on an Uno", "a servo that follows a knob on an ESP32", "is my circuit wired right?"),
+          ("building mode", "build me a blinking LED on an Uno", "a servo that follows a knob on an ESP32", "is my circuit wired right?",
+           "explain this circuit with Anatomy"),
           ("building",), where="BUILD in the top bar"),
     Entry("Apps", "Advance mode", "A red HUD: the orb on the left; your Library, what Nova can do, your widgets (add, "
           "remove, reorder) and separate apps on the right. Rea and Shannon open in their own windows; OpenProject runs "
@@ -133,10 +134,18 @@ CATALOG: tuple[Entry, ...] = (
           "fastest way lights up; stops in the best order.",
           ("fastest way from District 12 to District 7 via Ben Thanh",), ("route",)),
     Entry("Labs", "Rea: reverse engineering", "How an app or site is built, as a blueprint of its parts (REA through "
-          "Claude Code).", ("reverse engineer notion.so and tell me how its sync works",), ("reverse_engineer",),
+          "Claude Code). After a report, Rea flags what would fit Nova — and with your yes, hands it to Nova to study.",
+          ("reverse engineer notion.so and tell me how its sync works",), ("reverse_engineer",),
           "reverse", "REA screen (asks you to agree the first time)"),
-    Entry("Labs", "Shannon: break into your own app", "An AI pentester that proves real holes in your app, with the fix.",
+    Entry("Labs", "Shannon: break into your own app", "An AI pentester that proves real holes in your app, with the fix. "
+          "Simulate attack (on the same screen) runs a scripted attack on your own app, file or local address, "
+          "triaged by AiSOC — no Docker or API key needed for the simulation.",
           needs="shannon", where="SHANNON screen; needs WSL2, Docker Desktop and an API key"),
+    Entry("Labs", "Trading", "Paper trading only: scan the market for day-trade setups, check the news, time an entry, "
+          "plan the exit, replay the odds, and size the trade to your budget. No order is ever placed without your "
+          "say-so.", ("scan the market for day trades", "what's the news on AAPL?", "is TSLA a good entry today?",
+                      "how much can I risk on one trade?", "what are the odds this setup worked before?"),
+          ("trading",), where="TRADING in the top bar"),
     Entry("Other screens", "TV dashboard", "Shows things on the TV's browser.", ("show the weather on the TV",),
           ("show_on_tv",)),
     Entry("Other screens", "Telegram", "Nova from anywhere by text or voice note; sends you your own files.",

@@ -11,6 +11,8 @@ export const LAYERS = {
   fires: { label: "Wildfires", color: "#ff8a1f" },
   volcanoes: { label: "Volcanoes", color: "#ff5fd2" },
 };
+import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
+
 const RADIANS = Math.PI / 180;
 const IDLE_SPIN = 0.012; // degrees per frame while nobody touches it
 
@@ -49,6 +51,7 @@ export function createWorld(root, { act, onOpenChange }) {
   let map = null, events = [], errors = {}, days = 1, opened = false, newsOn = true;
   const shown = Object.fromEntries(Object.keys(LAYERS).map((layer) => [layer, true]));
   const view = { lon: 20, lat: 20, zoom: 1 };
+  mountWhatCanIDo(root.querySelector(".world-side"), "world", { onPhrase: askPhrase });
   let flight = null, dragging = null, lastTouch = 0, frame = 0, selected = null;
 
   async function loadMap() {

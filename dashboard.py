@@ -89,6 +89,7 @@ import telegram_remote
 import cloud_relay
 import discover as discovery
 import reverse_engineering
+import rea_fit
 import auto_tune
 import api_brains
 import cloud_agents
@@ -102,6 +103,7 @@ from workplace_actions import WorkplaceActions
 import workplace
 from building_actions import BuildingActions
 import building
+import trading
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -332,7 +334,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             node=lambda: reverse_engineering.node_version(choice=str(self.settings.get("node_path") or "")),
             jobs=self.lab_jobs, notify=self._lab_event)
         self.shannon = shannon_runner.Shannon(self.lab_jobs, library=self._filer(shannon_runner.LIBRARY_TOPIC),
-                                              notify=self._lab_event, key=claude_expert.key)
+                                              notify=self._lab_event, key=claude_expert.key,
+                                              outputs=self.skills.outputs)
         self.agent.reverse = self.reverse.start if self.settings.get("reverse_on") else None
         self.agent.discover = self._discover_tool
         self.agent.world = self._world_tool
@@ -350,6 +353,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.agent.open_workplace = self._open_workplace
         self.building_bench = building.BuildingBench(_data_dir() / "builds", lambda event: self.ui.emit(event))
         self.agent.open_building = self._open_building
+        self.trading_desk = trading.TradingDesk()
+        self.agent.trading = self.trading_desk.answer
         self.agent.advance = self._set_advance
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self.agent.web = self.web
@@ -772,17 +777,17 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                "test_voice", "install_whisper", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
                "open_url", "status_refresh", "cancel_timer", "forget_fact",
                "setup_everything", "setup_stop", "workplace_sync", "workplace_save", "workplace_list", "workplace_load",
-               "workplace_delete", "workplace_file", "build_sync", "build_save", "build_list", "build_load", "build_delete", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
+               "workplace_delete", "workplace_file", "build_sync", "build_save", "build_list", "build_load", "build_delete", "build_anatomy", "trading", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
                "walkthrough_next", "walkthrough_stop", "heart", "library", "library_topic", "library_save",
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
-               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report",
+               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report", "rea_fit_add",
                "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
                "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
-               "shannon_fix", "galaxy_data", "update_now", "google_pick_client"}
+               "shannon_fix", "shannon_simulate", "shannon_simulate_report", "galaxy_data", "update_now", "google_pick_client"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2980,6 +2985,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_skills_board(self, _args: dict[str, Any]) -> dict[str, Any]:
         return {"ok": True, **skills_board.board(self._skills_status(), self._skills_state()["list"], self._hotkey_state())}
 
+    def _act_trading(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.trading_desk.act(str(args.get("action") or "scan"), args)
+
     def _act_tune_now(self, _args: dict[str, Any]) -> dict[str, Any] | None:
         if USB:
             return {"ok": False, "error": "The USB Edition picks its model when it starts."}
@@ -3101,7 +3109,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             self.events.put(("phone_chat", ("NOVA → IPHONE", reply, "assistant")))
             return reply
 
-    # ---------- Discover: GitHub projects the owner might like (studied read-only; never installed into Nova) ----------
+    # ---------- Discover: GitHub projects the owner might like (studied read-only; code installed only after asking the owner) ----------
 
     def _discover_state(self, **changes: Any) -> dict[str, Any]:
         history = self.discover.history()
@@ -3299,11 +3307,50 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_rea_report(self, args: dict[str, Any]) -> None:
         self._open_file(str(self._lab_job(args, "rea").get("report") or ""))
 
+    def _act_rea_fit_add(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        """“Add it to Nova” for a REA fit: with the owner's yes, pin the source (when it is a GitHub repo),
+        record its license, and hand a read-only study to Claude Code — treated as an update to Nova's code.
+        Nothing is installed here; if the study's plan needs code installed, Nova asks the owner first."""
+        job = self._lab_job(args, "rea")
+        findings = job.get("fit") or []
+        try:
+            finding = findings[int(args.get("index", 0))]
+        except (TypeError, ValueError, IndexError):
+            return {"ok": False, "error": "That fit is gone: open the report again."}
+        if not args.get("consented"):
+            return {"need_consent": "rea_fit_add",
+                    "detail": {"area": finding.get("area", ""), "target": job.get("target", ""),
+                               "improves": finding.get("improves", "")}}
+        if not self.deep_work.available:
+            return {"ok": False, "error": "Adding it needs Claude Code on this PC (claude.com/product/claude-code)."}
+
+        def work() -> None:
+            pinned = None
+            repo = rea_fit.extract_repo(job.get("target", "") or "")
+            if repo:
+                try:
+                    pinned = self.discover.pin({"repo": repo, "url": f"https://github.com/{repo}"})
+                except discovery.DiscoverError as exc:
+                    self._toast(f"Couldn't pin {repo}: {exc}.", "error")
+                    return
+                self.discover.decide(pinned, added=True)
+            handoff = rea_fit.handoff(finding, job.get("target", ""), report=job.get("output", ""), pin=pinned)
+            title = handoff["title"]
+            self.discover_studies[title] = pinned["repo"] if pinned else job.get("target", "")
+            self.deep_work.start(title, handoff["study_task"])
+            self._toast(f"Claude Code is studying {handoff['title']} (read-only). "
+                        "Nothing is installed yet — Nova asks you first if the plan needs code installed.", "info")
+            self._update(discover=self._discover_state())
+        threading.Thread(target=work, name="NovaReaFitAdd", daemon=True).start()
+        return None
+
     def _act_shannon_view(self, _args: dict[str, Any]) -> dict[str, Any]:
         def check() -> None:
             self.ui.emit({"type": "shannon_ready", "problem": self.shannon.problem()})
         threading.Thread(target=check, name="NovaShannonCheck", daemon=True).start()
-        return {"ok": True, "jobs": self.lab_jobs.recent("shannon"), "projects": self.shannon.projects(),
+        return {"ok": True, "jobs": sorted(self.lab_jobs.recent("shannon") + self.lab_jobs.recent("shannon_simulate"),
+                                           key=lambda item: item.get("started") or "", reverse=True),
+                "projects": self.shannon.projects(),
                 "running": self.shannon.job_id if self.shannon.process is not None else ""}
 
     def _act_shannon_start(self, args: dict[str, Any]) -> dict[str, Any] | None:
@@ -3331,11 +3378,16 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         threading.Thread(target=self.shannon.stop, name="NovaShannonStop", daemon=True).start()
 
     def _act_shannon_open(self, args: dict[str, Any]) -> dict[str, Any]:
-        return {"ok": True, "job": self._lab_job(args, "shannon")}
+        job = self.lab_jobs.get(str(args.get("id") or ""))
+        if job is None or job.get("kind") not in ("shannon", "shannon_simulate"):
+            raise ValueError("That report isn't there any more.")
+        return {"ok": True, "job": job}
 
     def _act_shannon_fix(self, args: dict[str, Any]) -> dict[str, Any]:
         """The owner solved a weak spot (or reopens it): kept with the check, so the shield remembers."""
-        job = self._lab_job(args, "shannon")
+        job = self.lab_jobs.get(str(args.get("id") or ""))
+        if job is None or job.get("kind") not in ("shannon", "shannon_simulate"):
+            raise ValueError("That report isn't there any more.")
         cards = [dict(card) for card in job.get("findings") or []]
         index = int(args.get("index", -1))
         if not 0 <= index < len(cards):
@@ -3344,7 +3396,18 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         return {"ok": True, "job": self.lab_jobs.update(job["id"], findings=cards)}
 
     def _act_shannon_report(self, args: dict[str, Any]) -> None:
-        self._open_file(str(self._lab_job(args, "shannon").get("report") or ""))
+        job = self.lab_jobs.get(str(args.get("id") or ""))
+        if job is None or job.get("kind") not in ("shannon", "shannon_simulate"):
+            raise ValueError("That report isn't there any more.")
+        self._open_file(str(job.get("report") or ""))
+
+    def _act_shannon_simulate(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Simulate attack: Shannon's stages + AiSOC triage on the owner's own app, file or local address.
+        Synchronous and fast (nothing really runs); a bad target is refused at once, like shannon_start."""
+        return self.shannon.simulate_attack(args.get("kind"), args.get("target"))
+
+    def _act_shannon_simulate_report(self, args: dict[str, Any]) -> None:
+        self._open_file(str(self._lab_job(args, "shannon_simulate").get("report") or ""))
 
     def _act_galaxy_data(self, _args: dict[str, Any]) -> None:
         vault_folder = self._vault_folder()

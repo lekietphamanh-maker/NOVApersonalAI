@@ -2,6 +2,7 @@
 // put it in the ask box; your own skills have Run.
 
 import { h, screen } from "./lab.js";
+import { mountWhatCanIDo } from "./whatcanido.js";
 
 const STATES = { ready: "Ready", setup: "Set up", cloud: "On Claude", off: "Off" };
 
@@ -10,6 +11,7 @@ export function createSkills(root, { act, onOpenChange, ask }) {
   const grid = $("#skills-grid"), search = $("#skills-search"), filters = $("#skills-filters"), keys = $("#skills-keys");
   let board = { entries: [], counts: {}, hotkeys: {} }, filter = "all";
   const view = screen(root, { onOpenChange, onOpen: refresh });
+  mountWhatCanIDo(root, "skills", { onPhrase: (phrase) => { view.close(); ask(phrase); } });
 
   async function refresh() {
     const result = await act("skills_board");

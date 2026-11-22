@@ -1,8 +1,9 @@
 """Discover: GitHub repos the owner might like, ranked by their interests and their own GitHub, learning from their picks.
 
-Nova never installs code from GitHub into herself. "Add to Nova" pins the repo to one commit, records its license, and
+Nova asks the owner before installing any code from GitHub into herself. "Add to Nova" pins the repo to one commit, records its license, and
 hands it to Claude Code (read-only) to study; what comes back is a plan in outputs/ and, when the repo is a workflow or a
-prompt, a skill note the owner reads and approves before it joins their skills. Skills are text, not code.
+prompt, a skill note the owner reads and approves before it joins their skills. If the plan needs code installed, Nova asks
+the owner first and only installs it with their approval. Skills are text, not code.
 
 What shapes the ranking: the interests in Settings, the topics and languages of the owner's own and starred repos (when
 they give their GitHub username), and every Add or Not for me so far (liked topics and languages count up, skipped ones
@@ -154,7 +155,8 @@ def study_task(item: dict[str, Any]) -> str:
     """What Claude Code is asked: read the pinned repo (no running it) and say how Nova could use it."""
     return (f"Study the GitHub repository {item['repo']} at commit {item['sha']} ({item['url']}/tree/{item['sha']}); "
             f"its license is {item.get('license') or 'not stated'}. Read its README and main files from that commit only; "
-            "never run or install anything from it. Then write, in Markdown: what it does in three lines; whether Nova "
+            "do not run or install anything from it during this study — if installing code would help, say so in the plan "
+            "and Nova will ask the owner first. Then write, in Markdown: what it does in three lines; whether Nova "
             "(the owner's Windows voice assistant) could use it, and how: (a) as a Nova skill, when it is a workflow, a "
             "prompt or a method Nova can follow with her own tools; (b) as a separate project Claude Code could build "
             "in Documents/Nova Projects; or (c) not at all, with why. Note anything risky: what it would need access to, "

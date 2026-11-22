@@ -35,6 +35,11 @@ class BuildingActions:
                                  str(args.get("notes") or ""), str(args.get("applied") or ""), args.get("result"))
         self.agent.building = self._building_act if self.building_bench.open else None
 
+    def _act_build_anatomy(self, _args: dict[str, Any]) -> dict[str, Any]:
+        if not self.building_bench.open:
+            return {"ok": False, "error": "Building mode isn't open. Ask the owner to open it (BUILD in the top bar)."}
+        return {"ok": True, "svg": self.building_bench.anatomy_svg()}
+
     def _act_build_save(self, args: dict[str, Any]) -> dict[str, Any]:
         name = self.building_bench.save(str(args.get("name") or ""), str(args.get("title") or ""), args.get("circuit"),
                                         args.get("bom"), args.get("steps"), str(args.get("notes") or ""))

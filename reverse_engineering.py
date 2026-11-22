@@ -7,6 +7,9 @@ full report is), so it can be found again and turned into something with Discove
 
 REA reads files and can run or drive the target with the owner's permissions; only software and services the owner is
 allowed to analyse. The switch in Settings is off until they read that and turn it on.
+
+When a job finishes, rea_fit scores the report against what Nova can do and stores any fits with the job (and as
+fit.json beside the blueprint), so the Rea screen can show what would make Nova better.
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ from pathlib import Path
 from typing import Callable
 
 import node_runtime
+import rea_fit
 from lab_jobs import JobLog
 from claude_code import API_KEY_VARIABLES, find as find_claude
 
@@ -186,7 +190,8 @@ def run(target: str, goal: str, folder: Path, command: str,
 class ReverseEngineering:
     """save(title, text) -> Path keeps the report (outputs/); library(title, note) files it in the Library;
     done(title, result, ok) tells the owner. jobs keeps each job for Rea's screen, and notify(event, data) tells the
-    screen as it goes ("rea_step" for each step, "rea_job" when a job starts or ends)."""
+    screen as it goes ("rea_step" for each step, "rea_job" when a job starts or ends). A finished job also carries
+    its rea_fit findings ("fit") and message ("fit_message"), and fit.json beside its blueprint."""
 
     def __init__(self, save: Callable[[str, str], Path], library: Callable[[str, str], None],
                  done: Callable[[str, str, bool], None], workspace: Path,
@@ -234,15 +239,22 @@ class ReverseEngineering:
             self.notify("rea_step", {"id": job_id, "line": line})
         try:
             report, plan = blueprint(run(target, goal, folder, command, progress=step))
+            try:  # scoring must never fail the job: no fits is a fine answer
+                fit = rea_fit.score_report(report, plan, target=name)
+            except Exception:
+                fit = {"findings": [], "message": "Fit scoring didn't run for this report."}
             path = self.save(title, f"Target: {target}\n\n{report}")
             folder.mkdir(parents=True, exist_ok=True)
             (folder / "blueprint.json").write_text(json.dumps(plan, ensure_ascii=False, indent=1), encoding="utf-8")
+            rea_fit.write_fit(folder, fit)
             summary = "\n".join(report.splitlines()[:6])
+            fit_line = f"Fit: {rea_fit.fit_summary(fit['findings'])}\n" if fit["findings"] else ""
             self.library(f"RE {name}", f"Target: {target}\nAsked: {goal or 'how it works'}\n"
                                        f"Full report: outputs/{path.name}\n"
-                                       f"Blueprint: {len(plan['parts'])} parts (Rea screen)\n\n{summary}")
+                                       f"Blueprint: {len(plan['parts'])} parts (Rea screen)\n{fit_line}\n{summary}")
             job = self.jobs.update(job_id, status="done", report=str(path), output=f"outputs/{path.name}",
                                    summary=summary, blueprint=plan, steps=steps[-60:],
+                                   fit=fit["findings"], fit_message=fit["message"],
                                    counts={"parts": len(plan["parts"])})
             self.done(title, f"outputs/{path.name}", True)
         except Exception as exc:
