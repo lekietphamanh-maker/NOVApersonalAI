@@ -68,6 +68,12 @@ export const WHAT_CAN_I_DO = {
           "plan my exit from TSLA", "how big should this trade be?",
           "how much can I risk on one trade?", "what are the odds this setup worked before?"],
   },
+  network: {
+    name: "Network",
+    what: "Your home network in one place, measured on this PC: a real speed test, Wi-Fi and router status, who's on the network, a history of your speeds, and alerts when speed drops or a device goes quiet. No account, no key, nothing leaves the PC.",
+    say: ["how fast is my internet?", "who's on my Wi-Fi?", "is anything wrong with my network?",
+          "what's my usual internet speed?"],
+  },
 };
 
 // Mount the panel for one tab into a container inside that tab's lab. Clicking a phrase calls onPhrase with it;

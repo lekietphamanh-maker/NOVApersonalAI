@@ -146,6 +146,11 @@ CATALOG: tuple[Entry, ...] = (
           "say-so.", ("scan the market for day trades", "what's the news on AAPL?", "is TSLA a good entry today?",
                       "how much can I risk on one trade?", "what are the odds this setup worked before?"),
           ("trading",), where="TRADING in the top bar"),
+    Entry("Labs", "Network", "Your home network in one place, measured on this PC: a real speed test, Wi-Fi and "
+          "router status, who's on the network, a history of your speeds, and alerts when speed drops or a device "
+          "goes quiet. No account, no key, nothing leaves the PC.",
+          ("how fast is my internet?", "who's on my Wi-Fi?", "is anything wrong with my network?"),
+          ("network",), where="NETWORK in the top bar"),
     Entry("Other screens", "TV dashboard", "Shows things on the TV's browser.", ("show the weather on the TV",),
           ("show_on_tv",)),
     Entry("Other screens", "Telegram", "Nova from anywhere by text or voice note; sends you your own files.",
