@@ -7,9 +7,12 @@ in agent._ask_claude runs unchanged whichever provider answers.
 """
 from __future__ import annotations
 
+import base64
 import json
 import re
 import uuid
+from datetime import datetime
+from pathlib import Path
 from dataclasses import dataclass, field
 from types import SimpleNamespace
 from typing import Any, Callable
@@ -224,9 +227,6 @@ def make_image(base_url: str, key: str, prompt: str, folder: Any, model: str = "
                opener: Callable[..., Any] = urlopen) -> Any:
     """An image from the prompt through an OpenAI-format images endpoint, saved as a PNG (Open-Generative-AI's idea,
     on the owner's own API brain). Returns the file's path."""
-    import base64
-    from datetime import datetime
-    from pathlib import Path
     body = {"model": model, "prompt": " ".join(str(prompt).split())[:4000], "size": "1024x1024", "n": 1}
     try:
         with opener(_request(f"{base_url.rstrip('/')}/images/generations", key, body), timeout=240) as response:
@@ -259,7 +259,6 @@ def _media_type(image: bytes) -> str:
 def look_at_picture(entry: Entry, key: str, image: bytes, question: str, opener: Callable[..., Any] = urlopen,
                     anthropic_client: Any = None) -> str:
     """One question about one picture on an API brain: Claude through its SDK, the others in the OpenAI chat format."""
-    import base64
     data = base64.b64encode(image).decode()
     question = " ".join(str(question).split())[:1000] or "Describe this picture in detail."
     if entry.provider == "anthropic":

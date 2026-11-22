@@ -92,14 +92,13 @@ def fuse_alerts(alerts: list[dict[str, Any]], window_seconds: int = 600) -> list
     window_seconds after the last one in their group start a new incident, so a fresh attack isn't folded into an
     old one. Returns incidents newest first, each with its alerts."""
     groups: list[dict[str, Any]] = []
+    by_key: dict[tuple[str, str], list[dict[str, Any]]] = {}  # (target, technique) -> its groups, in order
     for alert in alerts:
         target = " ".join(str(alert.get("target") or "").split()) or "unknown target"
         key = normalize_technique(alert.get("technique"))
         seen = _when(alert.get("time"))
         group = None
-        for candidate in groups:  # the open group for this target and technique, if the gap fits the window
-            if candidate["target"] != target or candidate["technique"] != key:
-                continue
+        for candidate in by_key.get((target, key), []):  # the open group for this target and technique, if the gap fits the window
             if seen is None or candidate["last_seen"] is None:
                 group = candidate
                 break
@@ -115,11 +114,13 @@ def fuse_alerts(alerts: list[dict[str, Any]], window_seconds: int = 600) -> list
                      "severity": "low", "count": 0, "first_seen": None, "last_seen": None,
                      "alerts": [], "proven": False, "fix": ""}
             groups.append(group)
+            by_key.setdefault((target, key), []).append(group)
         group["alerts"].append(alert)
         group["count"] += 1
         group["proven"] = group["proven"] or bool(alert.get("proven"))
-        if _SEVERITY_RANK[_severity(alert.get("severity"))] < _SEVERITY_RANK[group["severity"]]:
-            group["severity"] = _severity(alert.get("severity"))
+        severity = _severity(alert.get("severity"))
+        if _SEVERITY_RANK[severity] < _SEVERITY_RANK[group["severity"]]:
+            group["severity"] = severity
         if not group["fix"] and str(alert.get("fix") or "").strip():
             group["fix"] = str(alert["fix"]).strip()
         if seen is not None:
@@ -220,13 +221,15 @@ def triage(item: dict[str, Any], ledger: "DecisionLedger | None" = None, actor: 
     return {"verdict": verdict, "ledger_entries": entries}
 
 
+_VERDICT_RANK = {"needs review": 0, "mitigated": 1, "resolved": 2}
+
+
 def overall_verdict(verdicts: list[dict[str, Any]]) -> dict[str, Any]:
     """The worst verdict wins: needs review over mitigated over resolved."""
-    rank = {"needs review": 0, "mitigated": 1, "resolved": 2}
     if not verdicts:
         return {"verdict": "resolved", "confidence": 0.0, "rationale": "Nothing was triaged.",
                 "counts": {"resolved": 0, "mitigated": 0, "needs review": 0}}
-    worst = min(verdicts, key=lambda verdict: rank.get(verdict.get("verdict"), 2))
+    worst = min(verdicts, key=lambda verdict: _VERDICT_RANK.get(verdict.get("verdict"), 2))
     counts = {name: sum(1 for verdict in verdicts if verdict.get("verdict") == name) for name in VERDICTS}
     summary = ", ".join(f"{number} {name}" for name, number in counts.items() if number)
     return {"verdict": worst["verdict"], "confidence": worst["confidence"],

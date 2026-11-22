@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import re
 import threading
 import time
@@ -39,7 +40,6 @@ TOKEN_SHAPE = re.compile(r"^(gh[pousr]_[A-Za-z0-9]{30,255}|github_pat_[A-Za-z0-9
 
 
 def token_path() -> Path:
-    import os
     return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Alfred" / "github_token"
 
 
@@ -56,8 +56,9 @@ def save_token(value: str) -> None:
     value = value.strip()
     if not TOKEN_SHAPE.match(value):
         raise ValueError("That doesn't look like a GitHub token (it starts with ghp_ or github_pat_).")
-    token_path().parent.mkdir(parents=True, exist_ok=True)
-    token_path().write_text(value, encoding="utf-8")
+    path = token_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(value, encoding="utf-8")
 
 
 def forget_token() -> None:
@@ -237,9 +238,10 @@ class Discover:
                 data["cache"] = {"key": key, "at": self.clock(), "found": found, "mine": mine}
                 self._save(data)
         unique = list({repo.get("full_name"): repo for repo in found}.values())
-        decided = {item["repo"] for items in self.history().values() for item in items}
+        history = self.history()
+        decided = {item["repo"] for items in history.values() for item in items}
         own = {repo.get("full_name") for repo in unique if username and str(repo.get("full_name", "")).lower().startswith(username.lower() + "/")}
-        ranked = rank(unique, interests, profile(mine), taste(self.history()), decided | own, datetime.now(timezone.utc))
+        ranked = rank(unique, interests, profile(mine), taste(history), decided | own, datetime.now(timezone.utc))
         return ranked[:SHOWN]
 
     # ---------- the owner's choices ----------
