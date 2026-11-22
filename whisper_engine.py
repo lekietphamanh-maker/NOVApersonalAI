@@ -20,12 +20,64 @@ from typing import Callable
 from urllib.request import Request, urlopen
 
 SERVER_ZIP = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-x64.zip"
-MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin"
-MODEL_NAME = "ggml-small.en-q5_1.bin"
-DOWNLOAD_MB = 190
+# key -> (model file, download URL, size in MB, can it hear languages other than English?)
+MODELS = {
+    # Small English: the default. Quick on a CPU, good with accents; English only.
+    "small.en": ("ggml-small.en-q5_1.bin",
+                 "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.en-q5_1.bin", 190, False),
+    # Medium English: hears noticeably better (accents, mumbled words, names), about three times slower and bigger.
+    "medium.en": ("ggml-medium.en-q5_0.bin",
+                  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.en-q5_0.bin", 515, False),
+    # Small multilingual: same size class as small.en, hears other languages too (Vietnamese included) when the
+    # language is left to auto-detect; a little less accurate in English than small.en.
+    "small": ("ggml-small-q5_1.bin",
+              "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin", 190, True),
+}
+DEFAULT_MODEL = "small.en"
+MODEL_NAME = MODELS[DEFAULT_MODEL][0]
+MODEL_URL = MODELS[DEFAULT_MODEL][1]
+DOWNLOAD_MB = MODELS[DEFAULT_MODEL][2]
 PORT = 8179
 # Words Whisper should expect; it biases recognition toward these spellings.
 VOCABULARY = "Hey Nova, Ollama, screen assist, creative mode, homework, Claude, Gmail."
+# The owner's own words, added to the prompt above; the user can edit this list in Settings.
+DEFAULT_VOCABULARY = ["Kiet", "Keith", "Hey Nova", "screen assist", "building mode", "trading",
+                      "workplace", "homework", "ECO 251", "CHM 151", "microeconomics", "thermochemistry"]
+
+
+def build_prompt(extra_words: list[str] | None = None) -> str:
+    """The hint Whisper is given: the built-in words plus the owner's own, de-duplicated and kept short
+    (a very long prompt drowns the hint)."""
+    words: list[str] = []
+    for word in [VOCABULARY, ", ".join(extra_words or [])]:
+        for part in word.split(","):
+            part = part.strip()
+            if part and part.casefold() not in {item.casefold() for item in words}:
+                words.append(part)
+    prompt = ", ".join(words) + "."
+    return prompt if len(prompt) <= 900 else prompt[:900].rsplit(",", 1)[0] + "."
+
+
+def model_options() -> list[dict[str, object]]:
+    """Every installable model, for Settings: key, file, size and whether it hears other languages."""
+    return [{"key": key, "file": value[0], "mb": value[2], "multilingual": value[3],
+             "installed": (folder() / value[0]).is_file()} for key, value in MODELS.items()]
+
+
+def installed_any() -> bool:
+    return (folder() / "whisper-server.exe").is_file() and any(
+        (folder() / value[0]).is_file() for value in MODELS.values())
+
+
+def selected_model_file(preferred: str | None = None) -> str | None:
+    """The model file to run: the preferred one when it is downloaded, else any downloaded model
+    (small.en first), else None."""
+    order = [preferred] if preferred in MODELS else []
+    order += [key for key in MODELS if key not in order]
+    for key in order:
+        if (folder() / MODELS[key][0]).is_file():
+            return MODELS[key][0]
+    return None
 
 
 def folder() -> Path:
@@ -33,8 +85,8 @@ def folder() -> Path:
     return Path(base) / "whisper"
 
 
-def installed() -> bool:
-    return (folder() / "whisper-server.exe").is_file() and (folder() / MODEL_NAME).is_file()
+def installed(model: str = DEFAULT_MODEL) -> bool:
+    return (folder() / "whisper-server.exe").is_file() and (folder() / MODELS.get(model, MODELS[DEFAULT_MODEL])[0]).is_file()
 
 
 def _download(url: str, destination: Path, progress: Callable[[str], None], label: str) -> None:
@@ -50,8 +102,9 @@ def _download(url: str, destination: Path, progress: Callable[[str], None], labe
     os.replace(partial, destination)
 
 
-def install(progress: Callable[[str], None]) -> None:
-    """Download whisper-server and the English model. Existing files are kept; a failed download leaves no partial files."""
+def install(progress: Callable[[str], None], model: str = DEFAULT_MODEL) -> None:
+    """Download whisper-server and the chosen speech model. Existing files are kept; a failed download leaves no partial files."""
+    key = model if model in MODELS else DEFAULT_MODEL
     target = folder()
     target.mkdir(parents=True, exist_ok=True)
     if not (target / "whisper-server.exe").is_file():
@@ -63,8 +116,9 @@ def install(progress: Callable[[str], None]) -> None:
             server = next((Path(scratch) / "unpacked").rglob("whisper-server.exe"))
             for item in server.parent.iterdir():  # the server needs the DLLs beside it
                 shutil.copy2(item, target / item.name)
-    if not (target / MODEL_NAME).is_file():
-        _download(MODEL_URL, target / MODEL_NAME, progress, "English speech model")
+    name, url, _mb, _multilingual = MODELS[key]
+    if not (target / name).is_file():
+        _download(url, target / name, progress, "English speech model" if key == DEFAULT_MODEL else "speech model")
     progress("Whisper is installed.")
 
 
@@ -79,11 +133,22 @@ def wav_bytes(pcm16: bytes, sample_rate: int = 16_000) -> bytes:
 
 
 class WhisperEngine:
-    """Starts whisper-server on first use and keeps it running until stop()."""
+    """Starts whisper-server on first use and keeps it running until stop().
 
-    def __init__(self) -> None:
+    `model` is the preferred model key from MODELS; when it isn't downloaded yet the engine runs the
+    best model that is, so picking a new model in Settings never silences Whisper. `language` is "en",
+    or "auto" to let the server detect the language — only with a multilingual model; English-only
+    models are always run in English.
+    """
+
+    def __init__(self, model: str | None = None, vocabulary: list[str] | None = None,
+                 language: str = "en") -> None:
         self._process: subprocess.Popen | None = None
         self.base_url = f"http://127.0.0.1:{PORT}"
+        self.model_key = model if model in MODELS else DEFAULT_MODEL
+        self.model_file = selected_model_file(self.model_key) or MODELS[self.model_key][0]
+        self.language = language if language == "auto" and MODELS[self.model_key][3] else "en"
+        self.prompt = build_prompt(vocabulary if vocabulary is not None else DEFAULT_VOCABULARY)
 
     def _responding(self) -> bool:
         try:
@@ -97,7 +162,7 @@ class WhisperEngine:
             return
         threads = str(max(2, min(8, (os.cpu_count() or 4) - 2)))
         self._process = subprocess.Popen(
-            [str(folder() / "whisper-server.exe"), "-m", str(folder() / MODEL_NAME), "--host", "127.0.0.1",
+            [str(folder() / "whisper-server.exe"), "-m", str(folder() / self.model_file), "--host", "127.0.0.1",
              "--port", str(PORT), "-t", threads, "-ac", "768"],  # audio up to ~15 s: about twice as fast
             stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
@@ -114,7 +179,10 @@ class WhisperEngine:
     def transcribe(self, pcm16: bytes, sample_rate: int = 16_000) -> str:
         self._ensure_started()
         boundary = uuid.uuid4().hex
-        fields = {"response_format": "json", "temperature": "0", "language": "en", "prompt": VOCABULARY}
+        # No "language" field means the server detects it; an English-only model always gets "en".
+        fields = {"response_format": "json", "temperature": "0", "prompt": self.prompt}
+        if self.language != "auto":
+            fields["language"] = self.language
         parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
                  for name, value in fields.items()]
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="speech.wav"\r\n'

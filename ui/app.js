@@ -355,6 +355,7 @@ function render() {
   $("#keep-running").checked = (state.settings || {}).keep_running !== false;
   $("#mini-orb").checked = (state.settings || {}).mini_orb !== false;
   if (document.activeElement?.id !== "owner-name") $("#owner-name").value = (state.settings || {}).owner_name || "";
+  if (document.activeElement?.id !== "nova-soul") $("#nova-soul").value = (state.settings || {}).soul || "";
   $("#send").disabled = Boolean(state.busy);
 }
 
@@ -1517,6 +1518,14 @@ async function loadAudioDevices() {
   $("#whisper-info").textContent = result.whisper_installed
     ? "Speech recognition: Whisper (best for accents and broken English)."
     : "Speech recognition: basic. Whisper understands accents and broken English much better.";
+  const modelLabels = { "small.en": "Small English · quick · 190 MB", "medium.en": "Medium English · hears better · 515 MB",
+    "small": "Small multilingual · hears other languages too · 190 MB" };
+  $("#whisper-model").replaceChildren(...(result.whisper_models || []).map((model) =>
+    new Option(`${modelLabels[model.key] || model.key}${model.installed ? "" : " (not downloaded yet)"}`, model.key)));
+  $("#whisper-model").value = result.whisper_model || "small.en";
+  $("#whisper-language").value = result.whisper_language || "en";
+  $("#whisper-pause").value = result.whisper_pause_seconds ?? 2;
+  $("#whisper-vocabulary").value = (result.whisper_vocabulary || []).join(", ");
   $("#install-whisper").hidden = result.whisper_installed;
   $("#install-whisper").textContent = `Install Whisper · ${result.whisper_mb} MB`;
 }
@@ -1621,6 +1630,7 @@ $("#map-outline").addEventListener("input", typedMap);
 $("#keep-running").onchange = (event) => act("settings", { keep_running: event.target.checked });
 $("#mini-orb").onchange = (event) => act("settings", { mini_orb: event.target.checked });
 $("#owner-name").onchange = (event) => act("settings", { owner_name: event.target.value });
+$("#nova-soul").onchange = (event) => act("settings", { soul: event.target.value });
 $("#location-save").onclick = () => act("location_city", { place: $("#location-city").value });
 $("#location-city").addEventListener("keydown", (event) => { if (event.key === "Enter") $("#location-save").click(); });
 $("#location-device").onclick = () => act("location_device");
@@ -1832,7 +1842,16 @@ $("#model-offer-button").onclick = () => act("pull_model", { name: state.model.o
 $("#test-mic").onclick = () => act("test_mic", audioChoice());
 $("#test-speaker").onclick = () => act("test_speaker", audioChoice());
 $("#test-voice").onclick = () => act("test_voice");
-$("#install-whisper").onclick = () => act("install_whisper");
+$("#install-whisper").onclick = () => act("install_whisper", { model: $("#whisper-model").value });
+$("#whisper-save").onclick = async () => {
+  const result = await act("whisper_save", { whisper_model: $("#whisper-model").value,
+    whisper_language: $("#whisper-language").value, whisper_pause_seconds: Number($("#whisper-pause").value),
+    whisper_vocabulary: $("#whisper-vocabulary").value });
+  if (result.ok) {
+    audioStatus(result.whisper_installed ? "Speech settings saved." : "Speech settings saved — press Install Whisper to download the new model.", "ok");
+    loadAudioDevices();
+  }
+};
 $("#vision-button").onclick = () => act("pull_vision");
 $("#audio-save").onclick = async () => {
   const result = await act("audio_save", { ...audioChoice(), voice: $("#audio-voice").value || null });

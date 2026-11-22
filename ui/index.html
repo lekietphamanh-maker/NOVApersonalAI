@@ -805,11 +805,23 @@
       <label class="field-label" for="audio-voice">Nova's voice</label>
       <select id="audio-voice" class="field"></select>
       <p id="whisper-info" class="muted small"></p>
+      <label class="field-label" for="whisper-model">Speech recognition model</label>
+      <select id="whisper-model" class="field"></select>
+      <label class="field-label" for="whisper-language">Language Nova listens in</label>
+      <select id="whisper-language" class="field">
+        <option value="en">English</option>
+        <option value="auto">Auto-detect (needs the multilingual model — lets Nova hear Vietnamese too)</option>
+      </select>
+      <label class="field-label" for="whisper-pause">Pause before Nova decides you finished (seconds)</label>
+      <input id="whisper-pause" class="field" type="number" min="1.35" max="5" step="0.05" value="2">
+      <label class="field-label" for="whisper-vocabulary">Words Nova should expect (comma-separated)</label>
+      <input id="whisper-vocabulary" class="field" maxlength="600" placeholder="Kiet, Keith, Hey Nova, screen assist, homework" autocomplete="off">
       <div class="row wrap">
         <button class="box" id="test-mic">Test mic</button>
         <button class="box" id="test-speaker">Test speaker</button>
         <button class="box" id="test-voice">Test voice</button>
         <button class="box" id="install-whisper" hidden>Install Whisper</button>
+        <button class="box on" id="whisper-save">Save speech settings</button>
         <button class="box on" id="audio-save">Save</button>
       </div>
       <p id="audio-status" class="status-line"></p>
@@ -837,6 +849,8 @@
       <h3>You and Nova</h3>
       <label class="field-label" for="owner-name">What should Nova call you?</label>
       <input id="owner-name" class="field" maxlength="40" placeholder="Your name (optional)" autocomplete="off">
+      <label class="field-label" for="nova-soul">Nova's soul — how she is (you can edit this; it shapes how she talks to you)</label>
+      <textarea id="nova-soul" class="field" rows="4" maxlength="600" placeholder="Loves space, good music and clever code. Laughs easily and teases gently."></textarea>
       <h3>Location</h3>
       <p class="muted small" id="location-info"></p>
       <div class="row"><input id="location-city" class="field" maxlength="80" placeholder="Your city, e.g. Da Nang or Sydney, Australia" autocomplete="off">

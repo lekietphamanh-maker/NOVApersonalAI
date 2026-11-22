@@ -39,19 +39,136 @@ def _voice_settings_path() -> Path:
     return _audio_settings_path().with_name("voice_settings.json")
 
 
-def load_voice_name() -> str | None:
-    """The chosen natural voice, or None for Windows' built-in voice."""
+# A fresh Nova speaks with Emma (British, Kokoro — the most natural voice), the voice Keith chose for Muse too.
+# Nothing is downloaded for it until the owner picks it or runs "Set up everything": until Kokoro is installed,
+# _natural_voice_for() falls back to the Windows built-in voice, exactly as before.
+DEFAULT_VOICE = "Emma (British, female, most natural)"
+
+
+def saved_voice_name() -> str | None:
+    """The voice the owner actually picked in Settings, or None when they never picked one."""
     try:
         name = json.loads(_voice_settings_path().read_text(encoding="utf-8")).get("voice")
-        return name if name in piper_voice.VOICES else None
+        return name if isinstance(name, str) and name in piper_voice.VOICES else None
     except (OSError, json.JSONDecodeError, AttributeError):
         return None
+
+
+def load_voice_name() -> str | None:
+    """The chosen natural voice, or None for Windows' built-in voice.
+
+    Nothing saved yet means the default (Emma); an explicit null saved by the owner means the built-in voice.
+    """
+    try:
+        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return DEFAULT_VOICE
+    if "voice" not in data:
+        return DEFAULT_VOICE
+    name = data.get("voice")
+    if name is None:
+        return None
+    return name if name in piper_voice.VOICES else DEFAULT_VOICE
+
+
+# How long Nova waits in silence before deciding you finished a sentence. 1.35 s is the old behaviour and the
+# shortest allowed: below that, a pause for breath ends the sentence. 2.0 s is the default: a speaker who pauses
+# mid-sentence (or searches for a word in a second language) isn't cut off.
+MIN_PAUSE_SECONDS = 1.35
+MAX_PAUSE_SECONDS = 5.0
+DEFAULT_PAUSE_SECONDS = 2.0
+
+DEFAULT_WHISPER_SETTINGS: dict[str, object] = {
+    "model": whisper_engine.DEFAULT_MODEL,  # small.en: quick; medium.en hears better; small hears other languages
+    "language": "en",  # "en", or "auto" to detect the language (multilingual model only)
+    "pause_seconds": DEFAULT_PAUSE_SECONDS,
+    "vocabulary": list(whisper_engine.DEFAULT_VOCABULARY),
+}
+
+
+def clamp_pause_seconds(value: object) -> float:
+    """A pause setting, kept inside the range Nova can use: never below the old 1.35 s, never above 5 s."""
+    try:
+        seconds = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return DEFAULT_PAUSE_SECONDS
+    return min(MAX_PAUSE_SECONDS, max(MIN_PAUSE_SECONDS, seconds))
+
+
+def _clean_vocabulary(words: object) -> list[str]:
+    if not isinstance(words, list):
+        return list(whisper_engine.DEFAULT_VOCABULARY)
+    cleaned: list[str] = []
+    for word in words:
+        text = " ".join(str(word).split())[:40]
+        if text and text.casefold() not in {item.casefold() for item in cleaned}:
+            cleaned.append(text)
+    return cleaned[:40] or list(whisper_engine.DEFAULT_VOCABULARY)
+
+
+def load_whisper_settings() -> dict[str, object]:
+    """Speech-recognition settings from voice_settings.json, with the defaults for anything missing or invalid."""
+    try:
+        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    model = data.get("whisper_model")
+    language = data.get("whisper_language")
+    settings: dict[str, object] = {
+        "model": model if model in whisper_engine.MODELS else whisper_engine.DEFAULT_MODEL,
+        "language": language if language in ("en", "auto") else "en",
+        "pause_seconds": clamp_pause_seconds(data.get("whisper_pause_seconds")),
+        "vocabulary": _clean_vocabulary(data.get("whisper_vocabulary")),
+    }
+    if settings["language"] == "auto" and not whisper_engine.MODELS[str(settings["model"])][3]:
+        settings["language"] = "en"  # auto-detect needs the multilingual model; English-only models stay in English
+    return settings
+
+
+def save_whisper_settings(**changes: object) -> dict[str, object]:
+    """Store speech-recognition settings (only the keys given), validated, and return the effective settings."""
+    try:
+        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    current = load_whisper_settings()
+    if "model" in changes:
+        current["model"] = changes["model"] if changes["model"] in whisper_engine.MODELS else whisper_engine.DEFAULT_MODEL
+    if "language" in changes:
+        current["language"] = changes["language"] if changes["language"] in ("en", "auto") else "en"
+    if "pause_seconds" in changes:
+        current["pause_seconds"] = clamp_pause_seconds(changes["pause_seconds"])
+    if "vocabulary" in changes:
+        current["vocabulary"] = _clean_vocabulary(changes["vocabulary"])
+    if current["language"] == "auto" and not whisper_engine.MODELS[str(current["model"])][3]:
+        current["language"] = "en"
+    data.update({"whisper_model": current["model"], "whisper_language": current["language"],
+                 "whisper_pause_seconds": current["pause_seconds"], "whisper_vocabulary": current["vocabulary"]})
+    path = _voice_settings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp = path.with_suffix(".tmp")
+    temp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    os.replace(temp, path)
+    return current
 
 
 def save_voice_name(name: str | None) -> None:
     path = _voice_settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"voice": name}), encoding="utf-8")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            data = {}
+    except (OSError, json.JSONDecodeError):
+        data = {}
+    data["voice"] = name  # merge: the speech-recognition settings share this file
+    temp = path.with_suffix(".tmp")
+    temp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    os.replace(temp, path)
 
 
 def load_audio_preferences() -> dict[str, str | None]:
@@ -350,7 +467,8 @@ def _beep(going_to_sleep: bool = False) -> None:
 def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, seconds: float,
                        input_key: str | None = None,
                        level_callback: Callable[[float], None] | None = None,
-                       end_on_silence: bool = True, keep_audio: list[bytes] | None = None) -> str:
+                       end_on_silence: bool = True, keep_audio: list[bytes] | None = None,
+                       silence_seconds: float = 1.35) -> str:
     """Capture a bounded mic interval to RAM, transcribe locally, discard buffers.
 
     Only final recognizer results are returned; partial guesses are provisional and never used.
@@ -392,7 +510,7 @@ def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, 
                         last_speech_at = time.monotonic()
                 elif json.loads(recognizer.PartialResult()).get("partial", "").strip():
                     last_speech_at = time.monotonic()
-                if end_on_silence and last_speech_at is not None and time.monotonic() - last_speech_at > 1.35:
+                if end_on_silence and last_speech_at is not None and time.monotonic() - last_speech_at > silence_seconds:
                     break
         finals.append(str(json.loads(recognizer.FinalResult()).get("text", "")).strip())
         collected = " ".join(finals)
@@ -592,7 +710,8 @@ class VoiceController:
         self.input_key = preferences.get("input_key")
         self.output_key = preferences.get("output_key")
         self._last_notice = ""
-        self.whisper = whisper_engine.WhisperEngine() if whisper_engine.installed() else None
+        self.whisper_settings = load_whisper_settings()
+        self.whisper = self._make_whisper()
         self.voice_name = load_voice_name()
         self.on_speaking: Callable[[bool], None] | None = None  # sentence-by-sentence replies started/finished
         self._sentences: SentenceSpeaker | None = None
@@ -610,6 +729,22 @@ class VoiceController:
             self._quiet_until = 0.0 if self._interrupted else time.monotonic() + ECHO_TAIL_SECONDS
         if self.on_speaking:
             self.on_speaking(busy)
+
+    def _make_whisper(self) -> whisper_engine.WhisperEngine | None:
+        """The Whisper engine for the current settings, or None when nothing is downloaded yet."""
+        if not whisper_engine.installed_any():
+            return None
+        settings = self.whisper_settings
+        return whisper_engine.WhisperEngine(
+            model=str(settings["model"]), vocabulary=list(settings["vocabulary"]),  # type: ignore[arg-type]
+            language=str(settings["language"]))
+
+    def refresh_whisper(self) -> None:
+        """Re-read the speech settings and rebuild the Whisper engine (after a save or an install)."""
+        if self.whisper is not None:
+            self.whisper.stop()
+        self.whisper_settings = load_whisper_settings()
+        self.whisper = self._make_whisper()
 
     @property
     def available(self) -> bool:
@@ -898,7 +1033,8 @@ class VoiceController:
                 audio: list[bytes] = []
                 result = _transcribe_window(model, sd, KaldiRecognizer, hold or threading.Event(),
                                             HOLD_MAX_SECONDS if hold else COMMAND_SECONDS, self.input_key,
-                                            self._emit_level, end_on_silence=hold is None, keep_audio=audio)
+                                            self._emit_level, end_on_silence=hold is None, keep_audio=audio,
+                                            silence_seconds=float(self.whisper_settings["pause_seconds"]))
                 result = self._better_transcript(result, audio)
                 on_result(result)
             except Exception as exc:

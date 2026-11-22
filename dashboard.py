@@ -282,6 +282,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.creative.on_photo = lambda path: self.events.put(("photo_saved", path))
         self.agent.creative = self.creative
         self.agent.owner_name = str(self.settings.get("owner_name") or "")
+        self.agent.soul = str(self.settings.get("soul", agent_module.DEFAULT_SOUL))
         self.location = places.Location(load=lambda: self.settings.get("location"), save=self._save_location,
                                         region=lambda: self.settings.get("brief_region", "US"))
         self.agent.location = self.location
@@ -492,6 +493,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                          "screen_vision": bool(self.settings.get("screen_vision", True)),
                          "keep_running": self.settings.get("keep_running", True),
                          "mini_orb": self.settings.get("mini_orb", True),
+                         "soul": self.settings.get("soul", agent_module.DEFAULT_SOUL),
                          "node_path": self.settings.get("node_path", ""), **self._advance_settings()},
             "brief": None,
             "brief_loading": False,
@@ -774,7 +776,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     ACTIONS = {"send", "stop", "speak", "mic", "gestures", "phone", "phone_pairing", "phone_new_code", "assist", "autopilot", "gmail",
                "creative", "notes_save", "notes_load", "notes_new", "notes_delete", "map_expand", "read_screen", "audio_devices", "audio_save", "test_mic", "test_speaker",
-               "test_voice", "install_whisper", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
+               "test_voice", "install_whisper", "whisper_save", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
                "open_url", "status_refresh", "cancel_timer", "forget_fact",
                "setup_everything", "setup_stop", "workplace_sync", "workplace_save", "workplace_list", "workplace_load",
                "workplace_delete", "workplace_file", "build_sync", "build_save", "build_list", "build_load", "build_delete", "build_anatomy", "trading", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
@@ -1216,12 +1218,17 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     def _act_audio_devices(self, _args: dict[str, Any]) -> dict[str, Any]:
         inputs, outputs = enumerate_input_devices(), enumerate_speech_outputs()
+        whisper = self.voice.whisper_settings
         return {"ok": True, "inputs": [{"label": str(d["label"]), "key": str(d["key"])} for d in inputs],
                 "outputs": [{"label": str(d["label"]), "key": str(d["key"])} for d in outputs],
                 "input_key": self.voice.input_key, "output_key": self.voice.output_key, "voice": self.voice.voice_name,
                 "voices": [{"name": name, "mb": size, "installed": piper_voice.installed(name)}
                            for name, (_path, size) in piper_voice.VOICES.items()],
-                "whisper_installed": whisper_engine.installed(), "whisper_mb": whisper_engine.DOWNLOAD_MB,
+                "whisper_installed": whisper_engine.installed_any(),
+                "whisper_mb": whisper_engine.MODELS[str(whisper["model"])][2],
+                "whisper_models": whisper_engine.model_options(),
+                "whisper_model": whisper["model"], "whisper_language": whisper["language"],
+                "whisper_pause_seconds": whisper["pause_seconds"], "whisper_vocabulary": whisper["vocabulary"],
                 "system_default": SYSTEM_DEFAULT}
 
     def _choose_devices(self, args: dict[str, Any]) -> None:
@@ -1276,13 +1283,40 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_test_voice(self, _args: dict[str, Any]) -> None:
         self._speak("Hello, I'm Nova. How can I help you today?")
 
+    def _act_whisper_save(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        """Save the speech-recognition settings (model, language, pause, vocabulary). A model that isn't
+        downloaded yet is reported back so Settings can offer the install; nothing is downloaded here."""
+        import voice as voice_module
+        vocabulary = args.get("whisper_vocabulary")
+        if isinstance(vocabulary, str):
+            vocabulary = [word for word in vocabulary.split(",")]
+        changes: dict[str, object] = {}
+        if args.get("whisper_model") is not None:
+            changes["model"] = args["whisper_model"]
+        if args.get("whisper_language") is not None:
+            changes["language"] = args["whisper_language"]
+        if args.get("whisper_pause_seconds") is not None:
+            changes["pause_seconds"] = args["whisper_pause_seconds"]
+        if vocabulary is not None:
+            changes["vocabulary"] = vocabulary
+        settings = voice_module.save_whisper_settings(**changes)
+        self.voice.refresh_whisper()
+        model = str(settings["model"])
+        return {"ok": True, "whisper_model": model,
+                "whisper_installed": whisper_engine.installed(model),
+                "whisper_mb": whisper_engine.MODELS[model][2],
+                "whisper_language": settings["language"]}
+
     def _act_install_whisper(self, args: dict[str, Any]) -> dict[str, Any] | None:
+        import voice as voice_module
+        model = args.get("model") if args.get("model") in whisper_engine.MODELS else None
+        model = model or str(self.voice.whisper_settings.get("model") or whisper_engine.DEFAULT_MODEL)
         if not args.get("consented"):
-            return {"need_consent": "whisper", "detail": {"mb": whisper_engine.DOWNLOAD_MB}}
+            return {"need_consent": "whisper", "detail": {"mb": whisper_engine.MODELS[model][2], "model": model}}
 
         def ready() -> None:
-            self.voice.whisper = whisper_engine.WhisperEngine()
-        self._install_in_background("WHISPER", whisper_engine.install, ready)
+            self.voice.refresh_whisper()
+        self._install_in_background("WHISPER", lambda progress: whisper_engine.install(progress, model), ready)
         return None
 
     def _act_install_vietnamese_voice(self, args: dict[str, Any]) -> dict[str, Any] | None:
@@ -1440,6 +1474,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         if isinstance(args.get("owner_name"), str):
             changes["owner_name"] = " ".join(args["owner_name"].split())[:40]
             self.agent.owner_name = changes["owner_name"]
+        if isinstance(args.get("soul"), str):
+            changes["soul"] = " ".join(args["soul"].split())[:600]
+            self.agent.soul = changes["soul"]  # empty means no soul note: _soul_prompt() leaves it out
         for key, value in changes.items():
             self._save_setting(key, value)
         self._update(settings=changes)
@@ -2077,7 +2114,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                 size=f"{offer.get('size_gb', '?')} GB", done=False, optional=True,
                 action={"name": "pull_model", "args": {"name": offer["name"]}})
         add(id="whisper", name="Whisper speech recognition", why="Understands accents and broken English; writes down videos.",
-            size=f"{whisper_engine.DOWNLOAD_MB} MB", done=whisper_engine.installed(), action={"name": "install_whisper", "args": {}})
+            size=f"{whisper_engine.DOWNLOAD_MB} MB", done=whisper_engine.installed_any(), action={"name": "install_whisper", "args": {}})
         add(id="voice", name="A natural voice", why="Heart, Bella or Emma (Kokoro), or Amy, Lessac or Jenny on a slow PC.",
             size=f"{kokoro_voice.DOWNLOAD_MB} MB", done=any(piper_voice.installed(voice) for voice in piper_voice.VOICES),
             focus="#audio-voice")
