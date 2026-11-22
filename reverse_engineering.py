@@ -171,7 +171,6 @@ def run(target: str, goal: str, folder: Path, command: str,
         try:
             event = json.loads(line)
         except ValueError:
-            report = report or ""
             continue
         if isinstance(event, dict):
             step = progress_line(event)

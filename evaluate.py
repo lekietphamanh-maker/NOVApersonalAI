@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 import tempfile
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from agent import Agent, OllamaError
 from memory import Memory

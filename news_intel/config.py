@@ -75,7 +75,6 @@ class NewsConfig:
     feeds: tuple[tuple[str, str, str], ...] = field(
         default_factory=lambda: _feeds(os.environ.get("NEWS_RSS_FEEDS", "")) or DEFAULT_FEEDS)
     google_news_sites: tuple[str, ...] = ()  # the owner's own news sites, read through Google News RSS
-    run_at: str = field(default_factory=lambda: os.environ.get("NEWS_RUN_AT", "06:00"))
     llm_model: str = field(default_factory=lambda: os.environ.get("NEWS_LLM_MODEL", "qwen3:4b"))
     ollama_url: str = field(default_factory=lambda: (os.environ.get("ALFRED_API_URL")
                                                      or os.environ.get("OLLAMA_HOST") or "http://127.0.0.1:11434"))

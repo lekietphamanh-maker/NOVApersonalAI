@@ -2,7 +2,7 @@
 title, publisher, date and link, marked as freshly retrieved so the model keeps them apart from what it already knew."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from .config import CATEGORIES
