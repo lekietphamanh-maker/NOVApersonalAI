@@ -286,6 +286,8 @@
     <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>REA</b><span class="lib-crumb">blueprint</span></div>
     <form id="rea-form" class="route-form" autocomplete="off">
       <input class="field" name="target" placeholder="App, file, folder or site to analyse" maxlength="300" required aria-label="What to analyse">
+      <button class="box small" id="rea-pick-file" type="button" title="Pick a file in the file window">Browse file…</button>
+      <button class="box small" id="rea-pick-folder" type="button" title="Pick a folder in the file window">Browse folder…</button>
       <input class="field" name="goal" placeholder="What to find out (optional)" maxlength="300" aria-label="What to find out">
       <button class="box small on" type="submit">Analyse</button>
     </form>
@@ -311,6 +313,7 @@
     <form id="shannon-form" class="route-form" autocomplete="off">
       <input class="field" name="project" list="shannon-projects" placeholder="Project folder" maxlength="300" required aria-label="Project folder">
       <datalist id="shannon-projects"></datalist>
+      <button class="box small" id="shannon-pick-project" type="button" title="Pick a project folder in the file window">Browse…</button>
       <input class="field" name="url" placeholder="Where it runs (localhost:3000)" maxlength="300" required aria-label="Where the app runs">
       <button class="box small on" type="submit">Run</button>
     </form>
