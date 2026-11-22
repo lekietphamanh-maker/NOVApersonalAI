@@ -4,6 +4,7 @@
 // spot; arrows, + and -, and webcam gestures work too. Stages, the log and past checks run along the bottom.
 
 import { h, when, screen, renderStrip } from "./lab.js";
+import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const STAGES = [["recon", "Recon"], ["analysis", "Analysis"], ["exploit", "Exploit"], ["validate", "Validate"], ["report", "Report"]];
 const SEVERITIES = ["critical", "high", "medium", "low"];
@@ -17,6 +18,8 @@ export function createShannon(root, { act, onOpenChange }) {
   const stagesBox = $("#shannon-stages"), logLine = $("#shannon-log"), strip = $("#shannon-strip");
   const problemLine = $("#shannon-problem"), form = $("#shannon-form"), stopButton = $("#shannon-stop");
   let jobs = [], job = null, log = [], running = "", selected = -1, frame = 0, spots = [];
+  let simKind = "web", simHits = [], simTimers = [];
+  const SIM_KINDS = ["app", "file", "web"];
   const view3d = { yaw: 0.4, pitch: 0.25, zoom: 1, target: null };
   const pointers = new Map();
   let drag = null, pinch = 0;
@@ -31,6 +34,7 @@ export function createShannon(root, { act, onOpenChange }) {
     for (let lon = (Math.round(lat / 13) % 2) * step / 2; lon < 360; lon += step) hexes.push([lat, lon]);
   }
 
+  mountWhatCanIDo(root.querySelector(".lab-bottom"), "shannon", { onPhrase: askPhrase });
   const view = screen(root, {
     onOpenChange: (open) => {
       onOpenChange?.(open);
@@ -40,6 +44,95 @@ export function createShannon(root, { act, onOpenChange }) {
     },
     onOpen: refresh,
   });
+
+  // ---------- Simulate attack: target picker below the shield, red blocks on it, AiSOC's verdict ----------
+  // Built here, not in index.html: the picker sits between the shield and the past checks, and only this file
+  // may change for the Shannon screen's layout.
+
+  const simStatus = h("p", { class: "muted small" });
+  const simError = h("p", { class: "muted small", style: "color:var(--warn)" });
+  const simResult = h("div", {});
+  const simInput = h("input", { class: "field", style: "flex:1;min-width:180px", placeholder: "Local address (localhost:3000)",
+    maxlength: "300", "aria-label": "Simulation target" });
+  const simButton = h("button", { class: "box small on", type: "button", onclick: simulate }, "Simulate attack");
+  const simModes = SIM_KINDS.map((kind) => h("button", {
+    class: `box small${kind === simKind ? " on" : ""}`, type: "button", onclick: () => setSimKind(kind),
+  }, kind === "app" ? "App" : kind === "file" ? "File" : "Web (local)"));
+  const simBox = h("div", { style: "padding:12px 22px;border-top:1px solid var(--line)" },
+    h("h4", { style: "margin:0 0 4px;color:#fff;font:600 13px/1.3 var(--mono)" }, "Simulate attack"),
+    h("p", { class: "muted small", style: "margin:0 0 8px" },
+      "A scripted attack on your own app, file or local address, triaged by AiSOC. Nothing really runs: the same local-only checks as a real Shannon run apply, and anything else is refused."),
+    h("div", { class: "row wrap", style: "margin-top:0" }, ...simModes),
+    h("div", { class: "row wrap" }, simInput, simButton),
+    simStatus, simError, simResult);
+  root.insertBefore(simBox, root.querySelector(".lab-bottom"));
+
+  function clearSimTimers() {
+    for (const timer of simTimers) clearTimeout(timer);
+    simTimers = [];
+  }
+
+  function clearSim() {
+    clearSimTimers();
+    simHits = [];
+    simStatus.textContent = "";
+    simError.textContent = "";
+    simResult.replaceChildren();
+  }
+
+  function setSimKind(kind) {
+    simKind = kind;
+    simModes.forEach((button, index) => button.classList.toggle("on", SIM_KINDS[index] === kind));
+    simInput.placeholder = kind === "app" ? "Project folder (under Nova Projects)"
+      : kind === "file" ? "File path (in your user folder)" : "Local address (localhost:3000)";
+    if (kind === "app") simInput.setAttribute("list", "shannon-projects");
+    else simInput.removeAttribute("list");
+    simInput.value = "";
+    simError.textContent = "";
+  }
+
+  async function simulate() {
+    clearSim();
+    simStatus.textContent = "Simulating…";
+    simButton.disabled = true;
+    const result = await act("shannon_simulate", { kind: simKind, target: simInput.value.trim() });
+    simButton.disabled = false;
+    if (!result.ok) {
+      simStatus.textContent = "";
+      simError.textContent = result.error || "The simulation didn't run.";
+      return;
+    }
+    job = result.job;  // the simulation's incidents become the shield's spots, like a real check's findings
+    log = [];
+    selected = -1;
+    drawStrip();
+    render();
+    const steps = result.steps || [];
+    steps.forEach((step, index) => {  // a red block lands on the shield as each attack step lands
+      simTimers.push(setTimeout(() => {
+        if (step.landed) {  // its place is fixed at landing time, not recomputed every frame
+          const [lat, lon] = place(simHits.length, 12);
+          simHits.push({ index: simHits.length, lat, lon });
+        }
+        simStatus.textContent = `${step.technique}: ${step.landed ? "landed" : "blocked"} — AiSOC: ${step.verdict}`;
+      }, index * 500));
+    });
+    simTimers.push(setTimeout(() => showSimResult(result), steps.length * 500 + 150));
+  }
+
+  function showSimResult(result) {
+    const verdict = result.verdict || {};
+    const color = verdict.verdict === "needs review" ? "rgb(255, 45, 85)"
+      : verdict.verdict === "mitigated" ? "rgb(255, 181, 71)" : "rgb(92, 242, 176)";
+    simStatus.textContent = "";
+    simResult.replaceChildren(
+      h("span", { class: "lab-tag", style: `color:${color};border-color:${color}` }, `AiSOC: ${verdict.verdict || "resolved"}`),
+      verdict.rationale ? h("p", { class: "muted small" }, verdict.rationale) : null,
+      h("p", { class: "muted small" }, `Report: ${result.report || ""}`),
+      h("div", { class: "row wrap" },
+        h("button", { class: "box small on", type: "button", onclick: () => act("shannon_simulate_report", { id: result.job?.id }) }, "Open report"),
+        h("button", { class: "box small", type: "button", onclick: () => { clearSim(); render(); } }, "Clear")));
+  }
 
   async function refresh() {
     const result = await act("shannon_view");
@@ -58,6 +151,7 @@ export function createShannon(root, { act, onOpenChange }) {
     job = result.job;
     log = job.log || [];
     selected = -1;
+    clearSim();
     drawStrip();
     render();
   }
@@ -139,8 +233,8 @@ export function createShannon(root, { act, onOpenChange }) {
 
   // ---------- the scene ----------
 
-  function place(index) {  // spread evenly over the sphere (golden angle), the same place every time
-    const count = Math.max(1, findings().length);
+  function place(index, count = findings().length) {  // spread evenly over the sphere (golden angle), the same place every time
+    count = Math.max(1, count);
     const lat = Math.asin(1 - 2 * (index + 0.5) / count) / RADIANS * 0.85;
     return [lat, (index * 137.508) % 360];
   }
@@ -261,6 +355,21 @@ export function createShannon(root, { act, onOpenChange }) {
     });
   }
 
+  function drawHits(g, now) {  // one red block on the shield per landed attack step; cleared on a new run
+    for (const hit of simHits) {
+      const [x, y, depth] = project(hit.lat, hit.lon, g);
+      if (depth < -0.05) continue;
+      const pulse = calm ? 0.4 : (Math.sin(now / 260) + 1) / 2, size = 9 * g.scale;
+      context.globalAlpha = 0.35 + 0.65 * Math.max(0, depth);
+      context.shadowColor = "rgb(255, 45, 85)";
+      context.shadowBlur = (10 + 18 * pulse) * g.scale;
+      context.fillStyle = `rgba(255, 45, 85, ${0.55 + 0.35 * pulse})`;
+      context.fillRect(x - size / 2, y - size / 2, size, size);
+      context.shadowBlur = 0;
+      context.globalAlpha = 1;
+    }
+  }
+
   function draw(now) {
     if (!view.isOpen()) return;
     frame = requestAnimationFrame(draw);
@@ -278,6 +387,7 @@ export function createShannon(root, { act, onOpenChange }) {
     drawStreaks(g, true, speed);
     drawShield(g);
     drawSpots(g, now);
+    drawHits(g, now);
     drawStreaks(g, false, speed);
   }
 
@@ -364,7 +474,7 @@ export function createShannon(root, { act, onOpenChange }) {
     job(next) {
       jobs = [next, ...jobs.filter((item) => item.id !== next.id)];
       running = next.status === "running" ? next.id : (running === next.id ? "" : running);
-      if (next.status === "running" && job?.id !== next.id && (!job || job.status !== "running")) { job = next; log = []; selected = -1; }
+      if (next.status === "running" && job?.id !== next.id && (!job || job.status !== "running")) { job = next; log = []; selected = -1; clearSim(); }
       if (job?.id === next.id) { job = { ...job, ...next }; render(); }
       drawStrip();
     },

@@ -2,6 +2,8 @@
 // the owner's own. It moves with the mouse, the keys, the voice ("next", "open 3", "open robotics") and hand gestures
 // (✋ swipe, ✊ open, 👎 back, ✌ close). Nova owns the data (Markdown in the vault); this page only shows it.
 
+import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
+
 const SHELVES = { topics: "Topics", projects: "Projects", ideas: "Ideas", needs: "Needs you" };
 const STATUSES = { idea: "Idea", building: "Building", shipped: "Shipped", paused: "Paused" };
 const STATUS_ORDER = { building: 0, idea: 1, paused: 2, shipped: 3 };
@@ -91,6 +93,7 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
   let cards = [], elements = [], editing = null, loading = null;
 
   const accent = () => getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+  mountWhatCanIDo(root, "library", { onPhrase: askPhrase });
 
   // ---------- what is on the shelf ----------
   function shelfCards() {

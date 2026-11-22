@@ -24,6 +24,8 @@ from urllib.parse import urlsplit, urlunsplit
 
 from lab_jobs import JobLog
 
+import aisoc
+
 PACKAGE = "@keygraph/shannon@3.5.0"  # pinned: a new Shannon is a change to Nova, reviewed like any other
 STAGES = ("recon", "analysis", "exploit", "validate", "report")
 STAGE_PATTERNS = {  # words in Shannon's --follow output that say a stage has started
@@ -39,6 +41,70 @@ NODE_MAJOR = 20
 TIMEOUT_SECONDS = 4 * 60 * 60
 LIBRARY_TOPIC = "Security checks"
 LOCAL_NAMES = {"localhost", "host.docker.internal"}
+
+
+# ---------- Simulate attack (Shannon + AiSOC) ----------
+# A scripted attack, not a real one: no exploit ever runs, nothing is installed and nothing leaves this PC. Each
+# step is one of Shannon's own stages, written so stage_of() reads it back, and each step is triaged by aisoc.py.
+# "landed" means the step reached the target (a red block on the shield); "proven" means it proved a hole.
+_BRUTE_FORCE_STEP = {"technique": "brute force", "stage": "exploit", "severity": "high", "landed": True,
+                     "proven": True, "detail": "Simulated login attempts accepted a weak test password.",
+                     "fix": "Require a strong password and lock the account after a few failed logins."}
+
+SIM_ATTACKS: dict[str, list[dict[str, Any]]] = {
+    "web": [
+        {"technique": "port scan", "stage": "recon", "severity": "low", "landed": True, "proven": False,
+         "detail": "Open ports answered on the app (the scan reached it).", "fix": ""},
+        {"technique": "service fingerprinting", "stage": "recon", "severity": "low", "landed": True, "proven": False,
+         "detail": "The web server and its version showed in its headers.", "fix": ""},
+        dict(_BRUTE_FORCE_STEP),
+        {"technique": "sql injection", "stage": "exploit", "severity": "critical", "landed": True, "proven": True,
+         "detail": "A simulated ' OR 1=1 -- probe returned rows it should not have.",
+         "fix": "Use parameterised queries; never build SQL from user input."},
+        {"technique": "cross-site scripting", "stage": "exploit", "severity": "medium", "landed": False, "proven": False,
+         "detail": "A simulated <script> probe was escaped and did not run.", "fix": ""},
+        {"technique": "path traversal", "stage": "validate", "severity": "medium", "landed": False, "proven": False,
+         "detail": "A simulated ../ probe was blocked by the app.", "fix": ""},
+    ],
+    "app": [
+        {"technique": "port scan", "stage": "recon", "severity": "low", "landed": True, "proven": False,
+         "detail": "Open ports answered on this PC (the scan reached the app's machine).", "fix": ""},
+        {"technique": "directory enumeration", "stage": "analysis", "severity": "medium", "landed": True, "proven": True,
+         "detail": "A simulated scan found an exposed backup file in the project folder.",
+         "fix": "Remove backup and hidden files from the deployed folder."},
+        dict(_BRUTE_FORCE_STEP),
+        {"technique": "sql injection", "stage": "exploit", "severity": "critical", "landed": False, "proven": False,
+         "detail": "A simulated injection probe was stopped by parameterised queries.", "fix": ""},
+        {"technique": "ssrf", "stage": "validate", "severity": "medium", "landed": False, "proven": False,
+         "detail": "A simulated request to an internal address was refused.", "fix": ""},
+    ],
+    "file": [
+        {"technique": "metadata leak", "stage": "recon", "severity": "low", "landed": True, "proven": False,
+         "detail": "The file's metadata (author, paths) was readable; nothing sensitive in it.", "fix": ""},
+        {"technique": "macro execution", "stage": "exploit", "severity": "high", "landed": False, "proven": False,
+         "detail": "A simulated macro did not run: macros are disabled for this file.", "fix": ""},
+        {"technique": "malformed file", "stage": "exploit", "severity": "medium", "landed": True, "proven": True,
+         "detail": "A crafted file made the parser crash (a denial of service).",
+         "fix": "Update the parser and open untrusted files in a sandbox."},
+        {"technique": "archive slip", "stage": "exploit", "severity": "high", "landed": False, "proven": False,
+         "detail": "A crafted archive entry trying to escape its folder was blocked.", "fix": ""},
+        {"technique": "embedded link", "stage": "validate", "severity": "medium", "landed": True, "proven": True,
+         "detail": "An embedded link in the file points outside; opening it would phone home.",
+         "fix": "Strip external links from untrusted files."},
+    ],
+}
+
+
+def _sim_line(step: dict[str, Any]) -> str:
+    """A step as a line of Shannon's own output, so stage_of() reads its stage back."""
+    technique, detail = step["technique"], step["detail"]
+    if step["stage"] == "recon":
+        return f"[pre-recon] {technique}: {detail}"
+    if step["stage"] == "analysis":
+        return f"vulnerability analysis: {technique}: {detail}"
+    if step["stage"] == "exploit":
+        return f"exploitation: {technique}: {detail}"
+    return f"validating {technique}: {detail}"
 
 
 def docker_target(url: str) -> str:
@@ -145,12 +211,19 @@ class Shannon:
     def __init__(self, jobs: JobLog, library: Callable[[str, str], None], notify: Callable[[str, dict], None],
                  key: Callable[[], str | None], home: Path | None = None, platform: str = sys.platform,
                  run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
-                 popen: Callable[..., Any] = subprocess.Popen) -> None:
+                 popen: Callable[..., Any] = subprocess.Popen, outputs: Path | None = None) -> None:
         self.jobs, self.library, self.notify, self.key = jobs, library, notify, key
         self.home = Path(home or Path.home())
+        self._outputs = Path(outputs) if outputs is not None else None
         self.platform, self._run, self._popen = platform, run, popen
         self.process: Any = None
         self.job_id = ""
+
+    @property
+    def outputs(self) -> Path:
+        """Where simulation reports and the AiSOC ledger go: the vault's outputs/ when Nova gives it, else the
+        default vault folder's outputs/."""
+        return self._outputs or (self.home / "Documents" / "Second Brain" / "outputs")
 
     @property
     def projects_folder(self) -> Path:
@@ -232,6 +305,108 @@ class Shannon:
         self.jobs.update(job["id"], stopped=True)
         process.kill()
         self._check(" ".join(shlex.quote(part) for part in ("npx", "-y", PACKAGE, "stop", job["workspace"])))
+
+    # ---------- Simulate attack: Shannon's stages + AiSOC triage, nothing really exploited ----------
+
+    def _sim_target(self, kind: str, value: Any) -> str:
+        """The target, validated exactly the way a real Shannon run validates it: a web address must be local
+        (docker_target), an app must be the owner's own project folder (_repo), a file must be the owner's own
+        file under their user folder. Anything else is refused with the same ValueError."""
+        text = " ".join(str(value or "").split())
+        if not text:
+            raise ValueError("Say what to simulate the attack on: an app, a file, or a local address.")
+        if kind == "web":
+            return docker_target(text)
+        if kind == "app":
+            return str(self._repo(text))
+        path = Path(os.path.expanduser(text))
+        if not path.is_absolute():
+            path = self.home / text
+        if not path.is_file():
+            raise ValueError(f"there's no file {path}")
+        if self.home.resolve() not in path.resolve().parents:
+            raise ValueError("Simulate only on your own files (in your user folder)")
+        return str(path)
+
+    def simulate_attack(self, kind: str, value: Any,
+                        rationale_hook: Callable[[dict[str, Any]], str | None] | None = None) -> dict[str, Any]:
+        """Runs the scripted attack on the target and feeds every step through AiSOC triage and the ledger.
+        Needs no Docker, no API key and no network: nothing is really attacked, installed or sent anywhere. The
+        report and the ledger go to outputs/; the job is filed as kind "shannon_simulate" so the screen can show
+        it again. Raises ValueError for a target Shannon wouldn't accept."""
+        kind = str(kind or "").strip().lower()
+        if kind not in SIM_ATTACKS:
+            raise ValueError("Pick app, file or web for the simulation.")
+        target = self._sim_target(kind, value)
+        stamp = datetime.now()
+        slug = re.sub(r"[^a-z0-9]+", "-", target.lower()).strip("-")[-40:] or "target"
+        base = self.outputs / f"{stamp:%Y-%m-%d %H%M} simulated attack {slug}"
+        ledger = aisoc.DecisionLedger(base.with_suffix(".jsonl"))
+        job = self.jobs.add("shannon_simulate", title=f"Simulated attack: {target}", target=target,
+                            target_kind=kind, counts={})
+        ledger.append("nova", "simulate_start", f"{kind} target {target}", "simulation started", job=job["id"])
+        alerts: list[dict[str, Any]] = []
+        for step in SIM_ATTACKS[kind]:
+            line = _sim_line(step)
+            alert = {"technique": step["technique"], "target": target, "stage": stage_of(line) or step["stage"],
+                     "severity": step["severity"], "landed": step["landed"], "proven": step["proven"],
+                     "detail": step["detail"], "fix": step["fix"],
+                     "time": stamp.isoformat(timespec="seconds"), "line": line}
+            alerts.append(alert)
+            ledger.append("shannon", "attack_step", f"{step['technique']} on {target}",
+                          f"landed={step['landed']} proven={step['proven']}",
+                          stage=alert["stage"], severity=step["severity"])
+        incidents = aisoc.fuse_alerts(alerts)
+        verdicts: list[dict[str, Any]] = []
+        cards: list[dict[str, str]] = []
+        by_technique = {}
+        for incident in incidents:
+            result = aisoc.triage(incident, ledger=ledger, rationale_hook=rationale_hook)
+            verdicts.append(result["verdict"])
+            by_technique[incident["technique"]] = result["verdict"]
+            first = incident["alerts"][0]
+            cards.append({"severity": incident["severity"], "kind": incident["technique"],
+                          "title": f"{incident['technique']}: {first['detail']}"[:160],
+                          "where": target, "proof": first["detail"][:1200], "fix": incident["fix"][:1200]})
+        steps = [{**alert, "verdict": by_technique[alert["technique"]]["verdict"],
+                  "confidence": by_technique[alert["technique"]]["confidence"],
+                  "rationale": by_technique[alert["technique"]]["rationale"],
+                  "technique_id": by_technique[alert["technique"]]["technique_id"],
+                  "tactic": by_technique[alert["technique"]]["tactic"]} for alert in alerts]
+        overall = aisoc.overall_verdict(verdicts)
+        ledger.append("aisoc", "triage_done", f"{len(incidents)} incidents from {len(alerts)} steps",
+                      overall["verdict"], confidence=overall["confidence"])
+        report = self._write_sim_report(base.with_suffix(".md"), target, kind, stamp, steps, overall, ledger.path)
+        done = self.jobs.update(job["id"], status="done", stage="report", findings=cards, counts=counts(cards),
+                                report=str(report), verdict=overall, ledger=str(ledger.path))
+        return {"ok": True, "job": done, "kind": kind, "target": target, "steps": steps,
+                "incidents": incidents, "verdict": overall, "report": str(report), "ledger": str(ledger.path)}
+
+    def _write_sim_report(self, path: Path, target: str, kind: str, stamp: datetime, steps: list[dict[str, Any]],
+                          overall: dict[str, Any], ledger: Path) -> Path:
+        """The simulation's report in outputs/, never replacing an earlier one."""
+        self.outputs.mkdir(parents=True, exist_ok=True)
+        counter = 1
+        while path.exists():
+            counter += 1
+            path = path.with_name(f"{path.stem} {counter}{path.suffix}")
+        lines = [f"# Simulated attack: {target}", "",
+                 f"Made by Nova {stamp:%Y-%m-%d %H:%M} — a simulation, not a real attack: no exploit ran, nothing "
+                 "was installed and nothing left this PC.", "",
+                 f"Target: {target} ({kind})", f"AiSOC verdict: **{overall['verdict']}** "
+                 f"(confidence {overall['confidence']}) — {overall['rationale']}", "",
+                 "## Steps", ""]
+        for step in steps:
+            landed = "landed" if step["landed"] else "blocked"
+            proven = "proved a hole" if step["proven"] else "proved nothing"
+            lines.append(f"- **{step['technique']}** ({step['tactic']} {step['technique_id']}, {step['stage']}, "
+                         f"{step['severity']}) — {landed}, {proven}. AiSOC: {step['verdict']} "
+                         f"(confidence {step['confidence']}). {step['rationale']}")
+            if step["fix"]:
+                lines.append(f"  Fix: {step['fix']}")
+        lines += ["", f"Decision ledger: {ledger}", ""]
+        path.write_text("\n".join(lines), encoding="utf-8")
+        return path
 
     def _follow(self, job: dict[str, Any], output: Path) -> None:
         reached = -1

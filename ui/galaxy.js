@@ -3,6 +3,8 @@
 // are luminous threads. Click a star to read it; type to search; the camera flies to a source when Nova
 // quotes it. All rendering is canvas 2D with a manual perspective projection — no Three.js dependency.
 
+import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
+
 const TAU = Math.PI * 2;
 const COLORS = { wiki: null, fact: "91, 224, 160", skill: "140, 160, 255", source: "158, 123, 189" };
 const KINDS = { wiki: "Topic", fact: "Memory", skill: "Skill", source: "Source" };
@@ -19,6 +21,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
   const infoKind = info.querySelector(".kind");
   const infoBody = info.querySelector("p");
   const search = root.querySelector(".galaxy-search input");
+  mountWhatCanIDo(root.querySelector(".galaxy-hud"), "galaxy", { onPhrase: askPhrase });
   const countEl = root.querySelector(".galaxy-title small");
   let open = false, nodes = [], edges = [], accent = "255, 176, 64";
   let camYaw = 0, camPitch = 0.3, camDist = 90, targetYaw = 0, targetPitch = 0.3, targetDist = 90;

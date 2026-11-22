@@ -1,6 +1,8 @@
 // Nova's route map: the city's roads in dim gold, the search spreading out from the start along the streets (one
 // colour per leg), then the fastest path lighting up. Nova works the route out (routes.py); this page only draws it.
 
+import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
+
 const LEG_COLORS = ["#3be4ff", "#ff5fd2", "#7dff9a", "#ffb040", "#a78bff"];
 const PLAY_MS = 6500;
 
@@ -28,6 +30,7 @@ const mercatorY = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360
 export function createRoute(root, { act, onOpenChange }) {
   const $ = (selector) => root.querySelector(selector);
   const canvas = $("#route-map"), context = canvas.getContext("2d"), info = $("#route-info");
+  mountWhatCanIDo(info, "route", { onPhrase: askPhrase });
   let route = null, opened = false, started = 0, frame = 0, base = null;
 
   function open() {

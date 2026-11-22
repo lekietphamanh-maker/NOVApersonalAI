@@ -52,7 +52,8 @@ class RankTests(unittest.TestCase):
         self.assertIsNone(discover.skill_from("No skill here."))
         task = discover.study_task({"repo": "a/b", "sha": "abc123", "url": "https://github.com/a/b", "license": "MIT"})
         self.assertIn("at commit abc123", task)
-        self.assertIn("never run or install anything", task)
+        self.assertIn("do not run or install anything from it during this study", task)
+        self.assertIn("Nova will ask the owner first", task)
         self.assertIn("MIT", task)
 
 

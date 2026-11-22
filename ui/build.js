@@ -3,6 +3,7 @@
 // text. Nova builds on it through build_command events: a blueprint is drawn by the bench, which reports what it placed
 // and what its checks say. The Blueprint panel holds the parts list and the build steps; projects are saved by name.
 import { h, screen } from "./lab.js";
+import { mountWhatCanIDo } from "./whatcanido.js";
 
 const SYNC_MS = 500;
 const START_TIMEOUT_MS = 60_000;
@@ -46,9 +47,9 @@ export function createBuild(root, { act, toast, onOpenChange }) {
   }
   function sync(extra = {}) {
     clearTimeout(syncTimer);
-    if (!view$.isOpen()) { act("build_sync", { open: false }); return; }
+    if (!view$.isOpen()) { act("build_sync", { open: false }); return Promise.resolve({ ok: true }); }
     const ready = bench && armed;
-    act("build_sync", { open: true, name: nameBox.value, title: plan.title, text: ready ? bench.describe() : "The bench is still starting.",
+    return act("build_sync", { open: true, name: nameBox.value, title: plan.title, text: ready ? bench.describe() : "The bench is still starting.",
       circuit: ready ? bench.getState() : null, bom: plan.bom, steps: plan.steps, notes: plan.notes, ...extra });
   }
 
@@ -90,6 +91,51 @@ export function createBuild(root, { act, toast, onOpenChange }) {
     if (event.command === "open") { if (!view$.isOpen()) view$.open(); return; }
     if (event.command === "close") { close(); return; }
     if (event.command === "blueprint" && view$.isOpen()) blueprint(event);
+    if (event.command === "anatomy" && view$.isOpen() && event.svg) showAnatomy(event.svg);
+  }
+
+  // ---------- Explain with Anatomy: the bench as an isometric figure ----------
+  // The figure is drawn by building.py (Anatomy: one shaded box per part, wires arcing part to part, a framed
+  // card with a live readout) and comes back as a standalone SVG string; it shows in the Blueprint panel.
+  const anatomyIntro = h("p", { class: "build-note" }, "Draws the bench as an isometric figure: one shaded box per part, wires arcing between them, and a live readout of the board, the part and wire counts, and the bench's checks.");
+  const anatomyBody = h("div", { class: "build-anatomy-body" }, anatomyIntro);
+  const anatomyPanel = h("details", { class: "build-anatomy" },
+    h("summary", {}, "Explain with Anatomy"), anatomyBody);
+  anatomyPanel.style.cssText = "margin-top: 16px; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: 6px; background: rgba(10, 9, 6, 0.5);";
+  anatomyPanel.querySelector("summary").style.cssText = "cursor: pointer; font: 600 11px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent);";
+  root.querySelector("#build-plan").append(anatomyPanel);
+  mountWhatCanIDo(root.querySelector("#build-plan"), "build", {
+    onPhrase: (phrase) => {
+      if (phrase === "explain this circuit with Anatomy") { explainWithAnatomy(); return; }
+      const box = root.querySelector("#build-question");
+      box.value = phrase;
+      box.focus();
+    },
+  });
+
+  function showAnatomy(svg) {
+    anatomyPanel.open = true;
+    const holder = h("div", {});
+    holder.innerHTML = svg;  // our own generated markup, with every label escaped in building.py
+    const svgEl = holder.querySelector("svg");
+    if (svgEl) svgEl.style.cssText = "display: block; width: 100%; height: auto;";
+    anatomyBody.replaceChildren(anatomyIntro, holder);
+  }
+
+  async function explainWithAnatomy() {
+    await start();
+    await sync();  // the bench as it is now goes first, so the figure matches it
+    anatomyPanel.open = true;
+    anatomyBody.replaceChildren(anatomyIntro, h("p", { class: "build-note" }, "Drawing the figure…"));
+    const answer = await act("build_anatomy");
+    if (!answer.ok || !answer.svg) {
+      const missing = String(answer.error || "").includes("Unknown action");
+      anatomyBody.replaceChildren(h("p", { class: "build-note" }, missing
+        ? "Anatomy isn't wired up in this Nova yet — the Build wiring still needs applying."
+        : `Couldn't draw the figure (${String(answer.error || "Nova didn't answer").slice(0, 120)}).`));
+      return;
+    }
+    showAnatomy(answer.svg);
   }
 
   // ---------- projects ----------
@@ -161,6 +207,9 @@ export function createBuild(root, { act, toast, onOpenChange }) {
     sync();  // tells Nova it's closed; the bench stays as it is for when it opens again
   }
 
+  const anatomyButton = h("button", { type: "button", class: "box small",
+    title: "Draw the bench as an isometric Anatomy figure", onclick: explainWithAnatomy }, "Explain with Anatomy");
+  root.querySelector("#build-close").before(anatomyButton);
   root.querySelector("#build-save").onclick = save;
   root.querySelector("#build-new").onclick = startOver;
   root.querySelector("#build-close").onclick = close;

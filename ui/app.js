@@ -6,6 +6,7 @@ import { createWorld } from "./world.js";
 import { createRoute } from "./route.js";
 import { createRea } from "./rea.js";
 import { createBuild } from "./build.js";
+import { createTrading } from "./trading.js";
 import { createShannon } from "./shannon.js";
 import { createSkills } from "./skills.js";
 import { h } from "./lab.js";
@@ -81,7 +82,7 @@ function labOpened(name, open) {
   $(`[data-act=${name}]`).classList.toggle("on", open);
   if (!open && solo === name) window.close();
   if (!open) return;
-  for (const other of [world, routeView, library, rea, shannon, galaxy, skills, workplace, build]) if (other && other !== labs[name] && other.isOpen()) other.close();
+  for (const other of [world, routeView, library, rea, shannon, galaxy, skills, workplace, build, trading]) if (other && other !== labs[name] && other.isOpen()) other.close();
 }
 const labs = {};
 function closeLabs() { for (const lab of Object.values(labs)) if (lab.isOpen()) lab.close(); }
@@ -91,6 +92,8 @@ const workplace = labs.workplace = createWorkplace($("#workplace"), { act: (...a
   onOpenChange: (open) => labOpened("workplace", open) });
 const build = labs.build = createBuild($("#build"), { act: (...args) => act(...args), toast: (...args) => toast(...args),
   onOpenChange: (open) => labOpened("build", open) });
+const trading = labs.trading = createTrading($("#trading"), { act: (...args) => act(...args),
+  onOpenChange: (open) => labOpened("trading", open) });
 const galaxy = labs.galaxy = createGalaxy($("#galaxy"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("galaxy", open) });
 const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
   ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
@@ -1360,6 +1363,7 @@ const CONSENT = {
   google_mcp: () => ["Nova's Gmail and Drive for your Claude apps", "Nova will serve its Gmail and Google Drive tools on this PC (127.0.0.1, port 47821) for Claude Code and Claude Desktop.\n\n• Only programs on this PC that have the private key can use it; you paste the key into your Claude apps. Don't share it.\n• Those apps can read your unread mail, save drafts (never send) and search and read your Drive files. What they read goes to Claude (Anthropic) under your Claude account.\n• Your Claude app asks you before each tool, so Nova doesn't ask again.\n• New key shuts out every app set up with the old one.\n\nTurn it off any time."],
   knowledge: (detail) => [`Download ${detail.title}?`, `${detail.gb ? `About ${detail.gb} GB` : "Its size is shown once you click Show download sizes"}, from Kiwix's library (the same Wikipedia files offline libraries and Project NOMAD use), into Nova's data folder.\n\nAfter that Nova can look things up in it with the internet off. It downloads in the background; you can keep using Nova, and if it's cut off it carries on from where it stopped.`, "Download"],
   reverse: () => ["Reverse engineering with REA", "Nova will be able to hand \"reverse engineer ...\" jobs to Claude Code (on your plan) with REA, an open-source reverse engineering toolkit (github.com/morluto/rea, pinned to rea-agents 6.9.0, run with npx).\n\n• Only use it on software, sites and files you're allowed to analyse; respect licenses and terms of service. Nova asks Claude not to patch, crack or bypass anything.\n• REA reads files and can run or drive the target with your Windows permissions.\n• What it finds goes to Claude (your plan), and the report to outputs/ and your Library.\n• It needs Claude Code and Node.js 22.23 or newer.\n\nTurn it off any time."],
+  rea_fit_add: (detail) => ["Add this to Nova?", `Nova will ask Claude Code to study ${detail.area} from ${detail.target} (read-only) and plan how it could improve ${detail.improves}.\n\n• The study reads only: if the plan needs code installed from GitHub, Nova asks you first and installs nothing without your yes.\n• The study's skill note comes back for you to read and approve before anything joins Nova.\n\nTreated as an update to Nova's code.`, "Study it, I'll decide"],
   shannon: () => ["Shannon attacks your app for real", "Shannon (github.com/KeygraphHQ/shannon, pinned to 3.5.0) is an AI pentester: it reads your project's code, then really tries to break into the running app (injection, XSS, logins, access control, SSRF) and reports only what it could prove, with the fix.\n\n• Only your own apps, running on this PC or your home network. Nova refuses other addresses. Use a test copy: it can change or delete data in the app it attacks.\n• It runs in Docker inside WSL2 and talks to Claude with your Claude API key: your code and the app's answers go to Anthropic, and a full run costs API credit (it can be tens of dollars) and takes an hour or two.\n• The report goes to the project's Security checks folder and your Library.\n\nYou are asked this once.", "I understand, run it"],
   telegram_relay: () => ["Nova on Telegram with the PC off", "Nova will put a small relay on your own Cloudflare account (free). While your PC is off, Telegram sends your messages there instead.\n\n• Kept on your Cloudflare account: your bot token, your Telegram id, your name and what Nova remembers (so she still knows you), the reminders of the next three days (so they still come), the key of the online brain you chose, and the messages sent while the PC was off, until the PC is back and reads them.\n• While the PC is off, the brain you chose (Claude Haiku with your API key, or Ollama Cloud) answers; it can talk and plan, not use the PC. Voice notes and files wait for the PC.\n• When the PC starts, it takes Telegram back and the conversation continues there.\n\nRemove relay takes all of it off your Cloudflare account."],
   telegram: () => ["Nova on Telegram", "Nova will answer your own private Telegram bot from this PC, wherever you are.\n\n• Only you: the first account that sends the pairing code becomes the owner; everyone else is ignored without a reply.\n• Your messages and Nova's answers travel through Telegram's servers (bot chats are not end-to-end encrypted). Don't send passwords there.\n• Voice notes are turned into text on this PC and not kept.\n• Nova can send you your own files when you ask (from Desktop, Documents, Downloads, Pictures, Videos, Music).\n• With Screen assist on, she can also work the PC for you from the chat. When she needs a yes or no, she asks in the chat.\n\nNothing on this PC opens to the internet: Nova asks Telegram for new messages. Turn it off any time."],
@@ -1562,6 +1566,7 @@ $("[data-act=screen]").onclick = screenMenu;
 $("[data-act=map]").onclick = () => openMap(!mapOpen);
 $("[data-act=workplace]").onclick = () => (workplace.isOpen() ? workplace.close() : workplace.open());
 $("[data-act=build]").onclick = () => (build.isOpen() ? build.close() : build.open());
+$("[data-act=trading]").onclick = () => (trading.isOpen() ? trading.close() : trading.open());
 $("[data-act=advance]").onclick = () => act("advance", { on: !(state.settings || {}).advance });
 $("[data-act=library]").onclick = () => (library.isOpen() ? library.close() : library.open());
 $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.open());
@@ -1905,6 +1910,7 @@ document.addEventListener("keydown", (event) => {
   if (library.isOpen() && openPane === null && library.handleKey(event)) { event.preventDefault(); return; }
   if (rea.isOpen() && openPane === null && !typing && rea.handleKey(event)) { event.preventDefault(); return; }
   if (shannon.isOpen() && openPane === null && !typing && shannon.handleKey(event)) { event.preventDefault(); return; }
+  if (trading.isOpen() && openPane === null && !typing && trading.handleKey(event)) { event.preventDefault(); return; }
   if (mapOpen && !typing && mindmap.handleKey(event)) { event.preventDefault(); return; }
   if (event.key === "Escape") {
     if (!$("#creative-layer").hidden) closeCreative();
@@ -1914,6 +1920,7 @@ document.addEventListener("keydown", (event) => {
     else if (rea.isOpen()) rea.close();
     else if (shannon.isOpen()) shannon.close();
     else if (skills.isOpen()) skills.close();
+    else if (trading.isOpen()) trading.close();
     else if (mapOpen) openMap(false);
     else act("stop");
     return;

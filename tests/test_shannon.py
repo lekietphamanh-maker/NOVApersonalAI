@@ -136,5 +136,66 @@ class RunTests(unittest.TestCase):
         self.assertIn("Claude API key", self.runner.problem())
 
 
+class SimulateTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.home = Path(tempfile.mkdtemp())
+        (self.home / "Documents" / "Nova Projects" / "shop").mkdir(parents=True)
+        (self.home / "notes.txt").write_text("my own file")
+        self.runner = shannon.Shannon(JobLog(self.home / "jobs.json"), library=lambda title, note: None,
+                                      notify=lambda event, data: None, key=lambda: "sk-ant-test",
+                                      home=self.home, platform="win32",
+                                      outputs=self.home / "outputs")
+
+    def test_non_local_targets_are_refused_the_way_shannon_refuses_them(self) -> None:
+        for kind, value in (("web", "https://example.com"), ("web", "http://8.8.8.8"),
+                            ("app", "missing"), ("app", "/etc"),
+                            ("file", "missing.txt"), ("file", "/etc/passwd")):
+            with self.assertRaises(ValueError, msg=f"{kind} {value}"):
+                self.runner.simulate_attack(kind, value)
+        with self.assertRaises(ValueError):
+            self.runner.simulate_attack("sideways", "localhost:3000")
+        with self.assertRaises(ValueError):
+            self.runner.simulate_attack("web", "")
+
+    def test_each_step_line_reads_back_as_its_own_stage(self) -> None:
+        for steps in shannon.SIM_ATTACKS.values():
+            for step in steps:
+                self.assertEqual(shannon.stage_of(shannon._sim_line(step)), step["stage"], step["technique"])
+
+    def test_a_web_simulation_is_triaged_filed_and_reported(self) -> None:
+        result = self.runner.simulate_attack("web", "localhost:3000")
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["target"], "http://host.docker.internal:3000")
+        self.assertEqual(len(result["steps"]), 6)
+        self.assertEqual(result["verdict"]["verdict"], "mitigated")  # proven holes with fixes, nothing unhandled
+        self.assertEqual(result["verdict"]["counts"], {"resolved": 4, "mitigated": 2, "needs review": 0})
+        for step in result["steps"]:
+            self.assertIn(step["verdict"], ("resolved", "mitigated", "needs review"))
+            self.assertTrue(step["technique_id"] and step["tactic"] != "unknown")
+        report = Path(result["report"])
+        self.assertTrue(report.is_file())
+        self.assertIn("AiSOC verdict: **mitigated**", report.read_text(encoding="utf-8"))
+        self.assertIn("a simulation, not a real attack", report.read_text(encoding="utf-8"))
+        ledger = shannon.aisoc.replay_ledger(result["ledger"])
+        self.assertEqual([entry["action"] for entry in ledger],
+                         ["simulate_start"] + ["attack_step"] * 6 + ["triage"] * 6 + ["triage_done"])
+        self.assertEqual(ledger[-1]["outcome"], "mitigated")
+        job = self.runner.jobs.get(result["job"]["id"])
+        self.assertEqual((job["kind"], job["status"], job["counts"]["critical"]), ("shannon_simulate", "done", 1))
+        self.assertEqual(len(job["findings"]), 6)
+
+    def test_app_and_file_targets_use_their_own_steps(self) -> None:
+        app = self.runner.simulate_attack("app", "shop")
+        self.assertEqual(app["target"], str(self.home / "Documents" / "Nova Projects" / "shop"))
+        self.assertEqual([step["technique"] for step in app["steps"]],
+                         ["port scan", "directory enumeration", "brute force", "sql injection", "ssrf"])
+        filed = self.runner.simulate_attack("file", "notes.txt")
+        self.assertEqual(filed["target"], str(self.home / "notes.txt"))
+        self.assertEqual([step["technique"] for step in filed["steps"]],
+                         ["metadata leak", "macro execution", "malformed file", "archive slip", "embedded link"])
+        self.assertTrue(Path(filed["report"]).is_file())
+        self.assertTrue(Path(filed["ledger"]).is_file())
+
+
 if __name__ == "__main__":
     unittest.main()

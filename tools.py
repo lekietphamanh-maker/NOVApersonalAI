@@ -1,6 +1,7 @@
 """Nova's tools: validated here; anything that changes, saves, searches or sends asks the user first."""
 from __future__ import annotations
 
+import math
 import re
 from typing import Any, Callable, NamedTuple
 
@@ -304,7 +305,7 @@ WORKPLACE_TOOL = _tool(
 BUILDING_TOOL = _tool(
     "building", "Work on the owner's Building mode bench (a 3D electronics workbench they wire up and run) while it's "
     "open. Its state and the library of boards and parts come with the question. action: read (the bench again), pins "
-    "(the exact pin names of a board or part: give `part`), blueprint (build a circuit for what the owner describes). "
+    "(the exact pin names of a board or part: give `part`), blueprint (build a circuit for what the owner describes), anatomy (draw the bench as an isometric Anatomy figure in the Build lab). "
     "blueprint: give a short `title`; `board` (one board id from the library); `parts` (each {type: a part id, ref: a "
     "short name such as led or led2}); `wires` (each {a, b} as ref.PIN, the board's ref being its id, e.g. uno.D13 to "
     "led.SIG; add a ground wire for every part; color optional: red for power, black for ground); `bom` (what else "
@@ -312,11 +313,24 @@ BUILDING_TOOL = _tool(
     "themselves); `steps` (the build in order, short); `notes` (one tip). It starts the bench fresh unless keep is true. "
     "The bench draws it and checks the wiring: if the answer says ERROR, fix the wiring and call blueprint again. Use "
     "only ids and pin names from the library or from pins; never invent one.",
-    {"action": {"type": "string", "enum": ["read", "pins", "blueprint"]}, "part": _TEXT, "title": _TEXT, "board": _TEXT,
+    {"action": {"type": "string", "enum": ["read", "pins", "blueprint", "anatomy"]}, "part": _TEXT, "title": _TEXT, "board": _TEXT,
      "parts": {"type": "array", "items": {"type": "object", "properties": {"type": _TEXT, "ref": _TEXT}, "required": ["type"]}},
      "wires": {"type": "array", "items": {"type": "object", "properties": {"a": _TEXT, "b": _TEXT, "color": _TEXT}, "required": ["a", "b"]}},
      "bom": {"type": "array", "items": {"type": "object", "properties": {"item": _TEXT, "qty": {"type": "integer"}, "note": _TEXT}, "required": ["item"]}},
      "steps": {"type": "array", "items": _TEXT}, "notes": _TEXT, "keep": {"type": "boolean"}}, ["action"])
+TRADING_TOOL = _tool(
+    "trading", "Paper trading only, from the day-trader skill's method: scan the market, check the news, time an "
+    "entry, plan an exit, replay the odds, check the risk and size the trade to the budget. No order is ever placed: "
+    "there is no broker here and nothing in this tool can buy or sell. action: scan (setups on the watchlist: give "
+    "`symbols`, comma-separated, or leave it blank for the default watchlist), news (headlines and filings for "
+    "`symbol`), entry (the moment to get in for `symbol`), exit (the stop and target: give `symbol`, or `entry` and "
+    "`stop`), odds (the Time Machine: 10,000 replays of the trade for `symbol`), risk (PASS or BLOCK for `shares` "
+    "against the limits: give `symbol` or `entry` and `stop`, and `account`), budget (how many shares the account "
+    "allows: give `symbol` or `entry` and `stop`, and `account`). `account` is the paper account in dollars "
+    "(default 5000). Not financial advice.",
+    {"action": {"type": "string", "enum": ["scan", "news", "entry", "exit", "odds", "risk", "budget"]},
+     "symbol": _TEXT, "symbols": _TEXT, "entry": {"type": "number"}, "stop": {"type": "number"},
+     "target": {"type": "number"}, "account": {"type": "number"}, "shares": {"type": "number"}}, ["action"])
 ARCHMANCER_TOOL = _tool(
     "archmancer", "Look up agent-system architecture knowledge from Archmancer: how to design, build, debug or review "
     "agent systems (AI loops, tools, model calls, context, trust, evaluation, delivery). action: list (all skills), "
@@ -326,7 +340,7 @@ ARCHMANCER_TOOL = _tool(
      "skill": _TEXT, "reference": _TEXT}, ["action"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
                ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
-               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, BUILDING_TOOL, ARCHMANCER_TOOL]
+               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, BUILDING_TOOL, TRADING_TOOL, ARCHMANCER_TOOL]
 
 
 
@@ -513,6 +527,8 @@ def _bad_argument(value: Any) -> bool:
     """True if a tool argument value is not a short string, number, true/false, or a list/object of those."""
     if isinstance(value, str):
         return len(value) > 4000
+    if isinstance(value, float):
+        return not math.isfinite(value)  # NaN/inf are never a real price, count or size
     if isinstance(value, (bool, int)) or value is None:
         return False
     if isinstance(value, list):
@@ -910,6 +926,8 @@ register([WORKPLACE_TOOL], lambda _name, arguments, context: context.workplace(s
          if context.workplace is not None else "The Workplace isn't open.")
 register([BUILDING_TOOL], lambda _name, arguments, context: context.building(str(arguments.get("action") or "read"), arguments)
          if context.building is not None else "Building mode isn't open.")
+register([TRADING_TOOL], lambda _name, arguments, context: context.trading(str(arguments.get("action") or "scan"), arguments)
+         if context.trading is not None else "Trading isn't set up yet.")
 register([IMAGE_TOOL], _run_image)
 register([OPTIMIZE_PROMPT_TOOL], lambda _name, arguments, context: context.optimize(
     str(arguments["prompt"])[:8000], str(arguments.get("kind") or "user"), arguments.get("test") is not False)

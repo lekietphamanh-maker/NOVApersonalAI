@@ -4,6 +4,7 @@
 // Drag to spin and tilt, scroll or pinch to zoom, click a part; arrows, + and -, and webcam gestures work too.
 
 import { h, when, screen, renderStrip } from "./lab.js";
+import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const KINDS = { ui: ["#3be4ff", "UI"], logic: ["#5b8cff", "λ"], data: ["#a78bff", "DB"], storage: ["#ffb040", "▤"],
   network: ["#2ee6c0", "⇄"], native: ["#ff5fd2", "◆"], external: ["#ff8a4c", "↗"] };
@@ -20,14 +21,30 @@ export function createRea(root, { act, onOpenChange }) {
   const card = $("#rea-card"), title = $("#rea-title"), metrics = $("#rea-metrics"), timeline = $("#rea-timeline");
   const stagesBox = $("#rea-stages"), strip = $("#rea-strip"), problemLine = $("#rea-problem");
   let jobs = [], job = null, selected = -1, steps = [], frame = 0;
+  let fitSelected = -1;  // which fit finding the card is showing (its report), -1 for the overview
+  if (!document.getElementById("rea-fit-style")) {  // the glow for fit items lives here: Rea's styles are not ours
+    const style = document.createElement("style");
+    style.id = "rea-fit-style";
+    style.textContent = [
+      ".rea-fit-glow { border-color: #ffd34d !important; color: #ffe9a8 !important;",
+      "  box-shadow: 0 0 18px rgba(255, 211, 77, .55), 0 0 42px rgba(255, 211, 77, .25);",
+      "  animation: rea-fit-pulse 1.6s ease-in-out infinite alternate; }",
+      ".rea-fit-glow:hover, .rea-fit-glow:focus-visible { box-shadow: 0 0 26px rgba(255, 211, 77, .8), 0 0 60px rgba(255, 211, 77, .35); }",
+      "@keyframes rea-fit-pulse { from { box-shadow: 0 0 12px rgba(255, 211, 77, .45), 0 0 28px rgba(255, 211, 77, .18); }",
+      "  to { box-shadow: 0 0 26px rgba(255, 211, 77, .8), 0 0 60px rgba(255, 211, 77, .35); } }",
+      "@media (prefers-reduced-motion: reduce) { .rea-fit-glow { animation: none; } }",
+    ].join("\n");
+    document.head.append(style);
+  }
   const orbit = { rot: 0, tilt: 0.36, zoom: 1, spin: 0.0016, target: null };
   const pointers = new Map();
-  let drag = null, pinch = 0, placed = [], hover = -1;
+  let drag = null, pinch = 0, placed = [], hover = -1, fitParts = new Set();  // part ids that glow gold, rebuilt once per frame
   const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const particles = Array.from({ length: PARTICLES }, () => ({
     angle: Math.random() * Math.PI * 2, height: Math.random() * 2 - 1, speed: 0.002 + Math.random() * 0.006,
     lane: 0.25 + Math.random() * 0.75, twist: 0.6 + Math.random() * 1.4, size: 0.5 + Math.random() * 1.3 }));
 
+  mountWhatCanIDo(root.querySelector(".lab-bottom"), "rea", { onPhrase: askPhrase });
   const view = screen(root, {
     onOpenChange: (open) => {
       onOpenChange?.(open);
@@ -52,6 +69,7 @@ export function createRea(root, { act, onOpenChange }) {
     if (!result.ok) return;
     job = result.job;
     selected = -1;
+    fitSelected = -1;
     steps = job.steps || [];
     drawStrip();
     render();
@@ -76,7 +94,7 @@ export function createRea(root, { act, onOpenChange }) {
       h("b", {}, job ? job.title : "Rea"),
       h("small", {}, job ? `${job.target}${job.started ? ` · ${when(job.started)}` : ""}` : "Type an app, file, folder or site above, or say “reverse engineer …”."));
     metrics.replaceChildren(...[["Parts", list.length], ["Findings", findings], ["Links", job?.blueprint?.links?.length || 0],
-      ["Steps", steps.length]].map(([label, value]) => h("div", {}, h("small", {}, label), h("b", {}, String(value)))));
+      ["Fits", job?.fit?.length || 0], ["Steps", steps.length]].map(([label, value]) => h("div", {}, h("small", {}, label), h("b", {}, String(value)))));
     const stage = !job ? -1 : job.status === "done" ? 3 : job.status === "failed" ? -1 : steps.length < 5 ? 0 : steps.length < 15 ? 1 : 2;
     stagesBox.replaceChildren(...STAGES.map((name, index) => h("span", {
       class: `${index <= stage ? "lit" : ""}${running && index === stage ? " now" : ""}` }, name)));
@@ -86,6 +104,8 @@ export function createRea(root, { act, onOpenChange }) {
   }
 
   function renderCard() {
+    const fit = job?.fit?.[fitSelected];
+    if (fit) { renderFit(fit); return; }
     const part = parts()[selected];
     if (!part) {
       const summary = (job?.summary || "").split("\n").filter(Boolean).slice(0, 4);
@@ -95,6 +115,11 @@ export function createRea(root, { act, onOpenChange }) {
           job?.status === "running" ? "The parts appear around the core when Rea is done." :
           "Rea works through Claude Code on your plan. Only analyse software you're allowed to.")]),
         parts().length ? h("p", { class: "muted small" }, "Click a part, swipe, or use ← → to go round.") : null,
+        job?.fit?.length ? h("h5", {}, `Would fit Nova · ${job.fit.length}`) : null,
+        job?.fit?.length ? h("div", {}, job.fit.map((item, index) => h("button", {
+          class: "box small rea-fit-glow", type: "button",
+          onclick: () => { fitSelected = index; renderCard(); },
+        }, `✦ ${item.area} · ${item.score}`))) : null,
         job?.report ? h("button", { class: "box small on", type: "button", onclick: () => act("rea_report", { id: job.id }) }, "Open full report") : null,
       ].filter(Boolean));
       return;
@@ -109,6 +134,29 @@ export function createRea(root, { act, onOpenChange }) {
       h("ul", { class: "lab-list" }, part.findings.map((item) => h("li", {}, item))),
       talks.length ? h("h5", {}, "Talks to") : null, h("ul", { class: "lab-list" }, talks),
       h("button", { class: "box small", type: "button", onclick: () => choose(-1) }, "Back to overview"));
+  }
+
+  // ---------- the fit report: what it is, how it makes Nova better, and (with your yes) handing it to Nova ----------
+  function renderFit(fit) {
+    card.replaceChildren(...[
+      h("span", { class: "lab-tag rea-fit-glow" }, "✦ FITS NOVA"),
+      h("h4", {}, fit.area),
+      h("p", {}, `Score ${fit.score} / 100 — ${fit.what}`),
+      h("h5", {}, "How it makes Nova better"),
+      h("p", {}, `Improves ${fit.improves}: ${fit.how}`),
+      fit.evidence?.length ? h("p", { class: "muted small" }, `Matched in the report: ${fit.evidence.join(", ")}.`) : null,
+      fit.parts?.length ? h("p", { class: "muted small" }, `Blueprint parts: ${fit.parts.join(", ")}.`) : null,
+      h("p", { class: "muted small" }, "“Add it to Nova” only prepares a read-only study for Nova — nothing is "
+        + "installed. If the study's plan needs code installed, Nova asks you first."),
+      h("button", {
+        class: "box small on rea-fit-glow", type: "button",
+        onclick: async () => {  // Nova asks first (need_consent), then prepares the study; the button itself installs nothing
+          const result = await act("rea_fit_add", { id: job.id, index: fitSelected });
+          if (result?.ok) { fitSelected = -1; renderCard(); }  // Nova's toast says what happens next
+        },
+      }, "Add it to Nova"),
+      h("button", { class: "box small", type: "button", onclick: () => { fitSelected = -1; renderCard(); } }, "Back to overview"),
+    ].filter(Boolean));
   }
 
   function choose(index) {
@@ -218,6 +266,7 @@ export function createRea(root, { act, onOpenChange }) {
   function drawNode(g, item, now) {
     const [color, glyph] = kind(item.part), radius = 17 * g.scale * item.scale * Math.min(1.25, orbit.zoom);
     const on = item.index === selected, near = item.index === hover;
+    const fits = fitParts.has(item.part.id);  // glows gold, harder than the rest
     context.globalAlpha = 0.45 + 0.55 * (item.depth + 1) / 2;
     const trail = context.createLinearGradient(item.x, item.y, g.cx + Math.cos(item.angle - 0.5) * item.radiusX,
       g.cy + Math.sin(item.angle - 0.5) * item.radiusX * orbit.tilt);  // a fading trail behind it on its orbit
@@ -236,8 +285,8 @@ export function createRea(root, { act, onOpenChange }) {
       context.arc(item.x, item.y, radius * (1.5 + 0.35 * pulse), 0, Math.PI * 2);
       context.stroke();
     }
-    context.shadowColor = color;
-    context.shadowBlur = (on || near ? 26 : 14) * g.scale;
+    context.shadowColor = fits ? "#ffd34d" : color;
+    context.shadowBlur = fits ? 34 * g.scale : (on || near ? 26 : 14) * g.scale;
     context.fillStyle = "rgba(6, 10, 24, 0.92)";
     context.strokeStyle = color;
     context.lineWidth = (on ? 2.6 : 1.8) * g.scale;
@@ -257,7 +306,7 @@ export function createRea(root, { act, onOpenChange }) {
     context.fillText(label.toUpperCase(), item.x, item.y + radius + 13 * g.scale);
     context.fillStyle = color;
     context.font = `500 ${8.5 * g.scale}px "JetBrains Mono", monospace`;
-    context.fillText(`${item.part.kind.toUpperCase()}${item.part.findings.length ? ` · ${item.part.findings.length} FOUND` : ""}`,
+    context.fillText(`${item.part.kind.toUpperCase()}${item.part.findings.length ? ` · ${item.part.findings.length} FOUND` : ""}${fits ? " · ✦ FITS" : ""}`,
       item.x, item.y + radius + 25 * g.scale);
     context.globalAlpha = 1;
     item.radius = radius;
@@ -275,6 +324,7 @@ export function createRea(root, { act, onOpenChange }) {
       orbit.rot += orbit.spin;
     }
     context.clearRect(0, 0, g.width, g.height);
+    fitParts = new Set((job?.fit || []).flatMap((finding) => finding.parts || []));
     place(g);
     drawRing(g, g.rx * 1.18, now, false);
     drawRing(g, g.rx, now, running);
@@ -376,7 +426,7 @@ export function createRea(root, { act, onOpenChange }) {
     handleKey,
     job(next) { // a job started or ended
       jobs = [next, ...jobs.filter((item) => item.id !== next.id)];
-      if (next.status === "running" && (!job || job.status !== "running")) { job = next; steps = []; selected = -1; }
+      if (next.status === "running" && (!job || job.status !== "running")) { job = next; steps = []; selected = -1; fitSelected = -1; }
       if (job?.id === next.id) next.status === "running" ? render() : pick(next.id);
       drawStrip();
     },
