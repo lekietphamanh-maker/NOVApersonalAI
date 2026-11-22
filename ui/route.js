@@ -1,23 +1,11 @@
 // Nova's route map: the city's roads in dim gold, the search spreading out from the start along the streets (one
 // colour per leg), then the fastest path lighting up. Nova works the route out (routes.py); this page only draws it.
 
+import { h } from "./lab.js";
 import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const LEG_COLORS = ["#3be4ff", "#ff5fd2", "#7dff9a", "#ffb040", "#a78bff"];
 const PLAY_MS = 6500;
-
-function h(tag, attributes = {}, ...children) {
-  const element = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (value === undefined || value === null || value === false) continue;
-    if (key === "class") element.className = value;
-    else if (key.startsWith("on")) element.addEventListener(key.slice(2), value);
-    else element.setAttribute(key, value === true ? "" : value);
-  }
-  element.append(...children.flat().filter((child) => child !== null && child !== undefined && child !== false)
-    .map((child) => (typeof child === "string" || typeof child === "number" ? document.createTextNode(String(child)) : child)));
-  return element;
-}
 
 function minutes(seconds) {
   const total = Math.max(1, Math.round(seconds / 60));

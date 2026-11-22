@@ -48,6 +48,8 @@ REGIONS = {
     "america": [-170, -56, -30, 84], "caribbean": [-86, 9, -59, 27], "oceania": [110, -50, 180, 0],
     "pacific": [120, -50, 180, 50], "arctic": [-180, 66, 180, 90], "mediterranean": [-6, 30, 37, 46],
 }
+_REGION_PATTERNS = tuple((re.compile(rf"\b{re.escape(region)}\b"), region)
+                         for region in sorted(REGIONS, key=len, reverse=True))
 ALIASES = {
     "united states": "United States of America", "britain": "United Kingdom",
     "england": "United Kingdom", "gaza": "Palestine", "west bank": "Palestine", "kyiv": "Ukraine", "kiev": "Ukraine",
@@ -160,8 +162,8 @@ class Places:
     def find(self, text: str) -> dict[str, Any] | None:
         """A place the owner named: {"name", "bbox", "lon", "lat", "country"}; None for the whole world."""
         lowered = " ".join(str(text or "").lower().replace("the ", " ").split())
-        for region in sorted(REGIONS, key=len, reverse=True):
-            if re.search(rf"\b{re.escape(region)}\b", lowered):
+        for pattern, region in _REGION_PATTERNS:
+            if pattern.search(lowered):
                 west, south, east, north = REGIONS[region]
                 return {"name": region.title(), "bbox": REGIONS[region], "lon": (west + east) / 2, "lat": (south + north) / 2,
                         "country": None}

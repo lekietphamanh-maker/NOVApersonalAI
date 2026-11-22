@@ -615,10 +615,6 @@ class VoiceController:
     def available(self) -> bool:
         return self.model_path.is_dir()
 
-    @property
-    def preferences(self) -> dict[str, str | None]:
-        return {"input_key": self.input_key, "output_key": self.output_key}
-
     def set_audio_devices(self, input_key: str | None, output_key: str | None) -> None:
         self.input_key = input_key or None
         self.output_key = output_key or None
