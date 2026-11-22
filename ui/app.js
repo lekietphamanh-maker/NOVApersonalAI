@@ -7,6 +7,7 @@ import { createRoute } from "./route.js";
 import { createRea } from "./rea.js";
 import { createBuild } from "./build.js";
 import { createTrading } from "./trading.js";
+import { createNetwork } from "./network.js";
 import { createShannon } from "./shannon.js";
 import { createSkills } from "./skills.js";
 import { h } from "./lab.js";
@@ -82,7 +83,7 @@ function labOpened(name, open) {
   $(`[data-act=${name}]`).classList.toggle("on", open);
   if (!open && solo === name) window.close();
   if (!open) return;
-  for (const other of [world, routeView, library, rea, shannon, galaxy, skills, workplace, build, trading]) if (other && other !== labs[name] && other.isOpen()) other.close();
+  for (const other of [world, routeView, library, rea, shannon, galaxy, skills, workplace, build, trading, network]) if (other && other !== labs[name] && other.isOpen()) other.close();
 }
 const labs = {};
 function closeLabs() { for (const lab of Object.values(labs)) if (lab.isOpen()) lab.close(); }
@@ -94,6 +95,8 @@ const build = labs.build = createBuild($("#build"), { act: (...args) => act(...a
   onOpenChange: (open) => labOpened("build", open) });
 const trading = labs.trading = createTrading($("#trading"), { act: (...args) => act(...args),
   onOpenChange: (open) => labOpened("trading", open) });
+const network = labs.network = createNetwork($("#network"), { act: (...args) => act(...args),
+  onOpenChange: (open) => labOpened("network", open) });
 const galaxy = labs.galaxy = createGalaxy($("#galaxy"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("galaxy", open) });
 const skills = labs.skills = createSkills($("#skills"), { act: (...args) => act(...args), onOpenChange: (open) => labOpened("skills", open),
   ask: (phrase) => { const box = $("#text"); box.value = phrase; box.focus(); } });
@@ -1584,6 +1587,7 @@ $("[data-act=map]").onclick = () => openMap(!mapOpen);
 $("[data-act=workplace]").onclick = () => (workplace.isOpen() ? workplace.close() : workplace.open());
 $("[data-act=build]").onclick = () => (build.isOpen() ? build.close() : build.open());
 $("[data-act=trading]").onclick = () => (trading.isOpen() ? trading.close() : trading.open());
+$("[data-act=network]").onclick = () => (network.isOpen() ? network.close() : network.open());
 $("[data-act=advance]").onclick = () => act("advance", { on: !(state.settings || {}).advance });
 $("[data-act=library]").onclick = () => (library.isOpen() ? library.close() : library.open());
 $("[data-act=world]").onclick = () => (world.isOpen() ? world.close() : world.open());
@@ -1938,6 +1942,7 @@ document.addEventListener("keydown", (event) => {
   if (rea.isOpen() && openPane === null && !typing && rea.handleKey(event)) { event.preventDefault(); return; }
   if (shannon.isOpen() && openPane === null && !typing && shannon.handleKey(event)) { event.preventDefault(); return; }
   if (trading.isOpen() && openPane === null && !typing && trading.handleKey(event)) { event.preventDefault(); return; }
+  if (network.isOpen() && openPane === null && !typing && network.handleKey(event)) { event.preventDefault(); return; }
   if (mapOpen && !typing && mindmap.handleKey(event)) { event.preventDefault(); return; }
   if (event.key === "Escape") {
     if (!$("#creative-layer").hidden) closeCreative();
@@ -1948,6 +1953,7 @@ document.addEventListener("keydown", (event) => {
     else if (shannon.isOpen()) shannon.close();
     else if (skills.isOpen()) skills.close();
     else if (trading.isOpen()) trading.close();
+    else if (network.isOpen()) network.close();
     else if (mapOpen) openMap(false);
     else act("stop");
     return;

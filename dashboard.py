@@ -104,6 +104,7 @@ import workplace
 from building_actions import BuildingActions
 import building
 import trading
+import network
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -356,6 +357,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.agent.open_building = self._open_building
         self.trading_desk = trading.TradingDesk()
         self.agent.trading = self.trading_desk.answer
+        self.network_panel = network.NetworkPanel(_data_dir() / "network")
+        self.agent.network = self.network_panel.answer
         self.agent.advance = self._set_advance
         self.agent.obs_password = str(self.settings.get("obs_password") or "")
         self.agent.web = self.web
@@ -779,7 +782,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                "test_voice", "install_whisper", "whisper_save", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
                "open_url", "status_refresh", "cancel_timer", "forget_fact",
                "setup_everything", "setup_stop", "workplace_sync", "workplace_save", "workplace_list", "workplace_load",
-               "workplace_delete", "workplace_file", "build_sync", "build_save", "build_list", "build_load", "build_delete", "build_anatomy", "trading", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
+               "workplace_delete", "workplace_file", "build_sync", "build_save", "build_list", "build_load", "build_delete", "build_anatomy", "trading", "network", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
                "walkthrough_next", "walkthrough_stop", "heart", "library", "library_topic", "library_save",
                "library_delete", "library_open", "library_view", "gesture_add", "gesture_delete", "news", "news_run",
                "news_key", "news_key_forget", "news_search", "pc_stats", "model_load", "model_unload",
@@ -3023,6 +3026,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     def _act_trading(self, args: dict[str, Any]) -> dict[str, Any]:
         return self.trading_desk.act(str(args.get("action") or "scan"), args)
+
+    def _act_network(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self.network_panel.act(str(args.get("action") or "status"), args)
 
     def _act_tune_now(self, _args: dict[str, Any]) -> dict[str, Any] | None:
         if USB:

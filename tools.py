@@ -331,6 +331,14 @@ TRADING_TOOL = _tool(
     {"action": {"type": "string", "enum": ["scan", "news", "entry", "exit", "odds", "risk", "budget"]},
      "symbol": _TEXT, "symbols": _TEXT, "entry": {"type": "number"}, "stop": {"type": "number"},
      "target": {"type": "number"}, "account": {"type": "number"}, "shares": {"type": "number"}}, ["action"])
+NETWORK_TOOL = _tool(
+    "network", "Your home network, measured on this PC — no account, no key, nothing leaves the PC. action: speed "
+    "(a real download and upload against Cloudflare's speed test: download, upload and ping, saved to history), "
+    "status (Wi-Fi name, this PC, router, DNS, public IP and latency), devices (who's on the network right now, "
+    "with IP and MAC, and who went quiet since last time), history (saved speed tests and your usual speed), "
+    "alerts (speed well below usual, or a device that disappeared). If a measurement can't be made, it says so "
+    "plainly instead of guessing a number.",
+    {"action": {"type": "string", "enum": ["speed", "status", "devices", "history", "alerts"]}}, ["action"])
 ARCHMANCER_TOOL = _tool(
     "archmancer", "Look up agent-system architecture knowledge from Archmancer: how to design, build, debug or review "
     "agent systems (AI loops, tools, model calls, context, trust, evaluation, delivery). action: list (all skills), "
@@ -340,7 +348,7 @@ ARCHMANCER_TOOL = _tool(
      "skill": _TEXT, "reference": _TEXT}, ["action"])
 SKILL_TOOLS = [SKILLS_TOOL, DEEP_WORK_TOOL, BUILD_TOOL, REMINDER_TOOL, SEND_FILE_TOOL, REVERSE_TOOL, DISCOVER_TOOL, WORLD_TOOL,
                ROUTE_TOOL, WIKIPEDIA_TOOL, NOTES_TOOL, DOCUMENT_TOOL, OBS_TOOL, VSCODE_TOOL, RUN_CODE_TOOL,
-               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, BUILDING_TOOL, TRADING_TOOL, ARCHMANCER_TOOL]
+               OPTIMIZE_PROMPT_TOOL, SCREEN_RECORD_TOOL, SEO_TOOL, IMAGE_TOOL, WORKPLACE_TOOL, BUILDING_TOOL, TRADING_TOOL, NETWORK_TOOL, ARCHMANCER_TOOL]
 
 
 
@@ -927,6 +935,8 @@ register([BUILDING_TOOL], lambda _name, arguments, context: context.building(str
          if context.building is not None else "Building mode isn't open.")
 register([TRADING_TOOL], lambda _name, arguments, context: context.trading(str(arguments.get("action") or "scan"), arguments)
          if context.trading is not None else "Trading isn't set up yet.")
+register([NETWORK_TOOL], lambda _name, arguments, context: context.network(str(arguments.get("action") or "status"), arguments)
+         if context.network is not None else "Network isn't set up yet.")
 register([IMAGE_TOOL], _run_image)
 register([OPTIMIZE_PROMPT_TOOL], lambda _name, arguments, context: context.optimize(
     str(arguments["prompt"])[:8000], str(arguments.get("kind") or "user"), arguments.get("test") is not False)

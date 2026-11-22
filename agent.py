@@ -278,6 +278,7 @@ class Agent:
         self.open_building: Callable[[bool], str] | None = None        # Building mode (the 3D bench) on/off
         self.building: Callable[[str, dict[str, Any]], str] | None = None  # the open Building mode bench
         self.trading: Callable[[str, dict[str, Any]], str] | None = None  # paper trading (trading.TradingDesk.answer)
+        self.network: Callable[[str, dict[str, Any]], str] | None = None  # home network (network.NetworkPanel.answer)
         self.advance: Callable[[bool], str] | None = None              # Advance mode on/off (the HUD's red board)
         self.workplace: Callable[[str, dict[str, Any]], str] | None = None  # the open Workplace board
         self.galaxy: Callable[[], str] | None = None
@@ -550,7 +551,7 @@ class Agent:
                             notes_search=self.notes_search if self.private_topics != "personal" else None,
                             obs_password=self.obs_password, recorder=self.recorder, make_image=self.make_image,
                             workplace=self.workplace, building=self.building, galaxy=self.galaxy,
-                            trading=self.trading)
+                            trading=self.trading, network=self.network)
 
     def _claude_history(self) -> list[dict[str, Any]]:
         """The recent conversation as Claude may see it: what was said, never a personal turn, a tool result or a screen."""
@@ -733,7 +734,7 @@ class Agent:
                             wikipedia=self.wikipedia, notes_search=self.notes_search, obs_password=self.obs_password,
                             cloud=self.cloud_tools if self._may_use_cloud(prompt) else None, optimize=self.optimize,
                             recorder=self.recorder, make_image=self.make_image, workplace=self.workplace,
-                            building=self.building, galaxy=self.galaxy, trading=self.trading)
+                            building=self.building, galaxy=self.galaxy, trading=self.trading, network=self.network)
 
     def _may_use_cloud(self, prompt: str) -> bool:
         """A tool that can't run here may go to Claude, unless this turn or the privacy setting keeps things here."""
