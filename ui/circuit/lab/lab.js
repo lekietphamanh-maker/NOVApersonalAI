@@ -2,7 +2,7 @@
 import * as THREE from '../vendor/three.module.js';
 import { OrbitControls } from '../vendor/OrbitControls.js';
 import { RoundedBoxGeometry } from '../vendor/RoundedBoxGeometry.js';
-import { studioEnv } from '../core/viewer.js';
+import { studioEnv } from '../core/studio.js';
 import { glowSprite } from '../core/builder.js';
 
 const MODULE_IDS = ['led', 'rgb', 'button', 'pot', 'buzzer', 'servo', 'motor', 'motor-driver', 'battery', 'ultrasonic', 'oled', 'dht11', 'ldr', 'level-shifter'];
@@ -17,7 +17,6 @@ const LED_PART_IDS = ['led_l', 'led_d2', 'led_pc13', 'led_user', 'led', 'led_act
 const WIRE = { red: '#d3302b', black: '#1c1c1e', yellow: '#f1c21b', green: '#2e9e4f', blue: '#1f6fd6', orange: '#ee7a1c', white: '#ecebe6', purple: '#8a48b8' };
 const SIGNAL_COLORS = ['yellow', 'green', 'blue', 'orange', 'white', 'purple'];
 const PITCH = 2.54, BB_H = 8.5;
-const emit = (detail) => { try { window.dispatchEvent(new CustomEvent('site:track', { detail })); } catch {} };   // anonymous usage events (js/track.js listens)
 const MAX_PARTS = 40, MAX_WIRES = 200;  // what Nova's side of a saved board keeps
 const THUMBS = new Map();   // type → data URL (shared by every Lab instance on the page)
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -109,7 +108,6 @@ class Lab {
       <button class="rl-btn" data-lab="unwire">Remove wires</button>
       <button class="rl-btn" data-lab="view">Top view</button>
       <button class="rl-btn" data-lab="sound" aria-pressed="true">Sound on</button>
-      <button class="rl-btn rl-full" data-lab="full" aria-pressed="false"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Full screen</span></button>
     </div>
   </div>
   <div class="rl-main">
@@ -138,7 +136,6 @@ class Lab {
       else if (a === 'unwire') { this.stop(); [...this.wires].forEach(w => this.removeWire(w, true)); this._changed(); }
       else if (a === 'view') { this.topView = !this.topView; this.el.view.textContent = this.topView ? '3D view' : 'Top view'; this._frameAll(true); }
       else if (a === 'sound') { this.sound = !this.sound; b.textContent = this.sound ? 'Sound on' : 'Sound off'; b.setAttribute('aria-pressed', this.sound); if (!this.sound) this._silence(); }
-      else if (a === 'full') this._toggleFull();
       else if (a === 'add') this.addItem(v, {}, true);
       else if (a === 'mission') { this._hideOverlay(); this.loadMission(this.missions.find(m => m.id === v)); }
       else if (a === 'free') { this._hideOverlay(); this.freeBuild(); }
@@ -160,13 +157,6 @@ class Lab {
     const press = (e, down) => { const b = e.target.closest('[data-press]'); if (!b) return; const it = this.items.find(i => i.id === Number(b.dataset.press)); if (it) { it.state.pressed = down; b.classList.toggle('is-down', down); this._applyState(it); } };
     this.root.addEventListener('pointerdown', (e) => press(e, true));
     for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) this.root.addEventListener(ev, (e) => press(e, false), true);
-  }
-  /** Full screen is the host's job (it moves the bench into a large overlay and back); this only keeps the button honest. */
-  _toggleFull(force) {
-    const on = force ?? !this.isFull; this.isFull = on;
-    this.opts.onFullChange?.(on);
-    const b = this.root.querySelector('[data-lab="full"]'); if (b) { b.setAttribute('aria-pressed', on); b.querySelector('span').textContent = on ? 'Exit full screen' : 'Full screen'; }
-    this.refit();
   }
   _fmt(v, unit) { return (Math.abs(v) < 2 && unit === '' ? v.toFixed(2) : Math.round(v)) + (unit ? ' ' + unit : ''); }
 
@@ -216,8 +206,7 @@ class Lab {
     this._onDocDown = (e) => { if (!this.root.contains(e.target)) this.focused = false; }; document.addEventListener('pointerdown', this._onDocDown);
     this._onKey = (e) => {
       if (!this.focused || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName || '')) return;
-      if (e.key === 'Escape') { if (!this.from && !this.selItem && !this.selWire && this.el.overlay.hidden && this.isFull) this._toggleFull(false); this._hideOverlay(); this._cancelWire(); this._select(null); }
-      else if (e.key === 'f' || e.key === 'F') this._toggleFull();
+      if (e.key === 'Escape') { this._hideOverlay(); this._cancelWire(); this._select(null); }
       else if (e.key === 'Delete' || e.key === 'Backspace') { this._deleteSel(); e.preventDefault(); }
       else if (e.key === 'r' || e.key === 'R') this._rotateSel();
     }; window.addEventListener('keydown', this._onKey);
@@ -341,7 +330,7 @@ class Lab {
     for (const pin of item.pins) if (pin.baseY == null) pin.baseY = this._surfaceY(item, pin);
     if (def.apply) try { def.apply(built, item.state); } catch (e) { console.warn(e); }
     this.items.push(item);
-    if (user) { emit({ k: 'add', l: type }); this._select(item); this._changed(); this._frameAll(true); }
+    if (user) { this._select(item); this._changed(); this._frameAll(true); }
     return item;
   }
   _autoRef(id) { let n = 1, r = id; while (this.items.some(i => i.ref === r)) r = id + (++n); return r; }
@@ -480,8 +469,7 @@ class Lab {
   }
   _changed() {
     this._nets(); this._erc();
-    if (this.mission) { this.done = this.mission.wires.map(w => this._wireDone(w)); if (this.running && !this.done.every(Boolean)) this.stop(); if (!this.wiredSent && this.done.length && this.done.every(Boolean)) { this.wiredSent = true; emit({ k: 'mission', l: this.mission.id, i: 1 }); } }
-    const bad = (this.erc || []).length; if (bad > (this.ercSeen || 0)) emit({ k: 'erc', l: this.erc.some(e => e.sev === 'err') ? 'err' : 'warn' }); this.ercSeen = bad;
+    if (this.mission) { this.done = this.mission.wires.map(w => this._wireDone(w)); if (this.running && !this.done.every(Boolean)) this.stop(); }
     this._renderSide(); this._renderControls(); this._targets(); this._bar(); this.dirty = true;
     this.opts.onChange?.();
   }
@@ -489,12 +477,12 @@ class Lab {
   // ───────────────────────── modes ─────────────────────────
   freeBuild() {
     this.stop(); this.clearBench(); this.mode = 'free'; this.mission = null; this.tab = 'steps';
-    this.el.title.textContent = 'Free build'; emit({ k: 'lab', l: 'free' });
+    this.el.title.textContent = 'Free build';
     this._changed(); this._frameAll(false); this._hint('Pick boards and parts on the left, then click a pin to start a wire.');
   }
   loadMission(m) {
     if (!m) return this.freeBuild();
-    this.stop(); this.clearBench(); this.mode = 'mission'; this.mission = m; this.tab = 'steps'; this.wiredSent = false; emit({ k: 'mission', l: m.id, i: 0 });
+    this.stop(); this.clearBench(); this.mode = 'mission'; this.mission = m; this.tab = 'steps';
     this.el.title.innerHTML = `<b>${esc(m.title)}</b> <span>${esc(m.level || '')}${m.minutes ? ' · ' + m.minutes + ' min' : ''}</span>`;
     for (const p of m.parts) this.addItem(p.type, p);
     this._changed(); this._frameAll(false); this._hint('Click a glowing pin, then the pin it should connect to.');
@@ -530,7 +518,6 @@ class Lab {
     if (this.running) return;
     if (this.mission && !this.done.every(Boolean)) { this._hint(`Finish the wiring first: ${this.done.filter(d => !d).length} connection(s) to go.`, true); return; }
     this.running = true; this.simT = 0; this.serial = []; this._cancelWire(); this._select(null);
-    emit({ k: 'run', l: this.mission ? this.mission.id : 'free' }); if (this.mission) emit({ k: 'mission', l: this.mission.id, i: 2 });
     if (this.mission) {
       const lab = this, timers = [], loops = [], by = (ref) => lab.items.find(i => i.ref === ref);
       const sim = this.sim = { timers, loops,
@@ -540,7 +527,7 @@ class Lab {
         loop(fn) { loops.push(fn); }, log(ref, text) { lab._log(by(ref)?.name || ref, text); }, tone(ref, hz) { lab._tone(ref, hz); } };
       try { this.mission.run(sim); } catch (e) { console.error(e); this._log('lab', 'Script error: ' + e.message); }
       this.tab = 'serial';
-      setTimeout(() => { if (this.running && this.mission) { this.success = true; emit({ k: 'mission', l: this.mission.id, i: 3 }); this._renderSide(); } }, 2500);
+      setTimeout(() => { if (this.running && this.mission) { this.success = true; this._renderSide(); } }, 2500);
     }
     this._changed(); this._hint(this.mission?.watch || 'Running. Try the controls at the bottom left.');
   }
@@ -661,7 +648,7 @@ class Lab {
     if (!d) return;
     this._setPtr(e); const h = this._hit();
     if (this.from) {
-      if (h.pin && h.pin !== this.from) { const w = this.addWire(this.from, h.pin); this._cancelWire(); if (w) { emit({ k: 'wire', l: this.mission ? this.mission.id : 'free' }); this._changed(); this._hint('Connected. Click another pin to add the next wire.'); } }
+      if (h.pin && h.pin !== this.from) { const w = this.addWire(this.from, h.pin); this._cancelWire(); if (w) { this._changed(); this._hint('Connected. Click another pin to add the next wire.'); } }
       else if (h.pin === this.from && !d.started && !d.moved) this._cancelWire();
       else if (!h.pin && !d.moved && !d.started) this._cancelWire();
       else if (!h.pin && d.started && d.moved) this._cancelWire();
@@ -733,7 +720,7 @@ class Lab {
       const ia = it.def.interact; if (!ia) continue;
       if (ia === 'press') rows.push(`<label><span>${esc(it.name)}</span><button class="rl-press" data-press="${it.id}">Hold to press</button></label>`);
       else { const sl = ia === 'knob' ? { key: 'value', min: 0, max: 1, unit: '', label: 'Knob' } : ia.slider; if (!sl) continue; const v = it.state[sl.key] ?? sl.min;
-        rows.push(`<label><span>${esc(it.name)} · ${esc(sl.label)}</span><input type="range" min="${sl.min}" max="${sl.max}" step="${(sl.max - sl.min) / 200}" value="${v}" data-ctl="${it.id}" data-key="${sl.key}" data-unit="${esc(sl.unit || '')}"><output>${this._fmt(v, sl.unit || '')}</output></label>`); }
+        rows.push(`<label><span>${esc(it.name)} · ${esc(sl.label)}</span><input type="range" min="${sl.min}" max="${sl.max}" step="${(sl.max - sl.min) / 200}" value="${esc(v)}" data-ctl="${it.id}" data-key="${sl.key}" data-unit="${esc(sl.unit || '')}"><output>${this._fmt(v, sl.unit || '')}</output></label>`); }
     }
     this.el.controls.hidden = !rows.length; this.el.controls.innerHTML = rows.length ? `<h5>Try it</h5>${rows.join('')}` : '';
   }
@@ -868,9 +855,7 @@ class Lab {
     return lines.join('\n');
   }
   /** The host moved or resized the bench: redraw at the new size. */
-  refit() { this._resize(); this._frameAll(false); requestAnimationFrame(() => { if (!this.dead) { this._resize(); this._frameAll(false); } }); }
   destroy() {
-    if (this.isFull) this.opts.onFullChange?.(false);  // the host's full-screen overlay goes with it
     this.dead = true; cancelAnimationFrame(this.raf); this.resizeObserver?.disconnect();
     document.removeEventListener('pointerdown', this._onDocDown); window.removeEventListener('keydown', this._onKey);
     try { this.stop(); this._silence(); } catch {}

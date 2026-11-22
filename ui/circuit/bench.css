@@ -84,16 +84,10 @@
 .rl-part:hover i.has-img { background-size: 132%; }
 .rl-main { grid-template-columns: 232px minmax(0, 1fr) 320px; }
 /* full screen */
-.rl-full { display: inline-flex; align-items: center; gap: 7px; }
-.rl-max { position: fixed !important; inset: 0 !important; z-index: 2000 !important; width: 100vw !important; height: 100vh !important; height: 100dvh !important; max-width: none !important; max-height: none !important; min-height: 0 !important; margin: 0 !important; border-radius: 0 !important; border: 0 !important; }
-.rl-max .rl { border-radius: 0; }
-:fullscreen.rl-max, :fullscreen .rl { border-radius: 0; }
-html.rl-noscroll, html.rl-noscroll body { overflow: hidden !important; }
 @media (max-width: 1100px) { .rl-main { grid-template-columns: 190px minmax(0, 1fr) 270px; } .rl-part i { flex-basis: 44px; height: 32px; } }
 @media (max-width: 820px) { .rl-main { grid-template-columns: 1fr; } }
 
 /* bare mode (?bare=1): only the 3D bench, for covers and embeds */
-.rl-bare .rl-bar, .rl-bare .rl-palette, .rl-bare .rl-side, .rl-bare .rl-hint, .rl-bare .rl-controls { display: none !important; } .rl-bare .rl-main { grid-template-columns: 1fr !important; }
 
 .rl-btn.is-on { background: var(--ink); color: #fff; border-color: var(--ink); }
 

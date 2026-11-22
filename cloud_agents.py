@@ -1,9 +1,11 @@
 """The Cloud brain: AI agents the owner signs in to with an account (a subscription, no API key). Claude Code on the
-Claude plan is the full one: it runs Nova's tools over MCP (plan_brain.PlanBrain). Codex (a ChatGPT account) and Gemini
-CLI (a Google account) answer through their own command line: they can search the web themselves but don't use Nova's
-tools, so actions on this PC stay with Claude Code or the AI on this PC.
+Claude plan is the full one: it runs Nova's tools over MCP (plan_brain.PlanBrain). The others (Codex, Gemini CLI,
+OpenCode, Hermes Agent) answer through their own command line: they can search the web and run their own tools, but
+don't use Nova's, so actions on this PC stay with Claude Code or the AI on this PC.
 
-Each agent installs with npm (Node.js) and connects by its own sign-in, which Nova opens in a terminal window.
+Each agent installs with npm (Node.js) or, like Hermes, with its own installer, and connects by its own sign-in or setup,
+which Nova opens in a terminal window. Hermes and OpenCode can also run on the Ollama on this PC: that is chosen in
+their own setup.
 """
 from __future__ import annotations
 
@@ -13,12 +15,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.request
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from cloud_brain import Unavailable
 
 TIMEOUT_SECONDS = 300
+INSTALL_SECONDS = 1800   # an agent's own installer fetches its own Python and tools
 
 
 @dataclass(frozen=True)
@@ -31,6 +36,7 @@ class Agent:
     login: tuple[str, ...]      # the sign-in, run in a terminal window the owner sees
     ask: tuple[str, ...]        # one answer, non-interactive; the request goes in on standard input
     full: bool = False          # runs Nova's tools (only Claude Code, through MCP)
+    installer: tuple[str, str] = ()  # the agent's own installer scripts (macOS/Linux, Windows) when it isn't an npm package
 
 
 AGENTS: tuple[Agent, ...] = (
@@ -40,6 +46,11 @@ AGENTS: tuple[Agent, ...] = (
           ("exec", "--skip-git-repo-check", "-")),
     Agent("gemini", "Gemini CLI", "your Google account", "gemini", "@google/gemini-cli", ("gemini",),
           ("-p", "Answer the request that came in on standard input.")),
+    Agent("opencode", "OpenCode", "a provider you sign in to (it has free models)", "opencode", "opencode-ai",
+          ("opencode", "auth", "login"), ("run",)),
+    Agent("hermes", "Hermes Agent", "a Nous account, or a model you set up in it (Ollama too: it needs 64K context)",
+          "hermes", "", ("hermes", "setup"), ("chat", "-Q", "--query-file", "-"),
+          installer=("https://hermes-agent.nousresearch.com/install.sh", "https://hermes-agent.nousresearch.com/install.ps1")),
 )
 
 
@@ -54,14 +65,36 @@ def find(item: Agent) -> str | None:
         return claude_code.find()  # also where Claude Code's own installer puts it
     import node_runtime
     node_runtime.refresh_path()
-    return shutil.which(item.command) or shutil.which(f"{item.command}.cmd")
+    local = Path.home() / ".local" / "bin" / item.command  # where a script installer puts a command a shell hasn't seen yet
+    return shutil.which(item.command) or shutil.which(f"{item.command}.cmd") or (str(local) if local.is_file() else None)
 
 
 def _quiet() -> dict[str, Any]:
     return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)} if sys.platform == "win32" else {}
 
 
-def install(item: Agent, run: Callable[..., subprocess.CompletedProcess] = subprocess.run) -> str:
+def _download(url: str) -> bytes:
+    with urllib.request.urlopen(url, timeout=60) as response:
+        return response.read(2_000_000)
+
+
+def _run_own_installer(item: Agent, run: Callable[..., subprocess.CompletedProcess],
+                       download: Callable[[str], bytes]) -> subprocess.CompletedProcess:
+    """The agent's own installer, fetched over HTTPS to a temporary file and run without a shell, in its non-interactive
+    mode (it installs into the owner's own folders: no administrator prompt)."""
+    windows = sys.platform == "win32"
+    url = item.installer[1 if windows else 0]
+    if not url.startswith("https://"):
+        raise RuntimeError("an installer is only fetched over https")
+    with tempfile.TemporaryDirectory() as folder:
+        script = Path(folder) / ("install.ps1" if windows else "install.sh")
+        script.write_bytes(download(url))
+        command = (["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-NonInteractive"] if windows
+                   else ["bash", str(script), "--non-interactive"])
+        return run(command, capture_output=True, text=True, timeout=INSTALL_SECONDS, **_quiet())
+
+
+def _run_npm_install(item: Agent, run: Callable[..., subprocess.CompletedProcess]) -> subprocess.CompletedProcess:
     """npm install -g <package>: needs Node.js (which Nova's setup installs)."""
     import node_runtime
     node = node_runtime.find()
@@ -71,9 +104,14 @@ def install(item: Agent, run: Callable[..., subprocess.CompletedProcess] = subpr
     npm = shutil.which("npm") or shutil.which("npm.cmd")
     if npm is None:
         raise RuntimeError("npm wasn't found next to Node.js")
-    result = run([npm, "install", "-g", item.package], capture_output=True, text=True, timeout=900, **_quiet())
+    return run([npm, "install", "-g", item.package], capture_output=True, text=True, timeout=900, **_quiet())
+
+
+def install(item: Agent, run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
+            download: Callable[[str], bytes] = _download) -> str:
+    result = _run_own_installer(item, run, download) if item.installer else _run_npm_install(item, run)
     if result.returncode != 0:
-        raise RuntimeError((result.stderr or result.stdout or "npm failed").strip().splitlines()[-1][:200])
+        raise RuntimeError((result.stderr or result.stdout or "the installer failed").strip().splitlines()[-1][:200])
     return f"{item.label} is installed. Next: Connect account."
 
 

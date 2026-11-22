@@ -10,12 +10,14 @@ from agent import SCREEN_MARKER
 
 class BuildingActions:
     def _building_act(self, action: str, arguments: dict[str, Any]) -> str:
+        if not self.ui.clients:  # the window is closed: the bench isn't there to answer
+            return "Building mode isn't open. Ask the owner to open it (BUILD in the top bar)."
         return self.building_bench.act(action, arguments)
 
     def _with_building(self, prompt: str) -> str:
         """The question as the model gets it: the open bench rides along like a screen does (never saved, and only the
         latest one stays in the conversation)."""
-        bench = self.building_bench.context()
+        bench = self.building_bench.context() if self.ui.clients else ""
         if not bench or SCREEN_MARKER in prompt:
             return prompt
         return f"{prompt}{SCREEN_MARKER} {secrets.token_hex(4)}: {bench}"

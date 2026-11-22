@@ -12,6 +12,7 @@ import building
 import instant_commands
 import tools
 
+EMPTY_BENCH = {"v": 1, "items": [], "wires": []}
 CATALOG = building.load_catalog(Path(__file__).resolve().parent.parent / "ui" / "circuit" / "catalog.json")
 BLINK = {"title": "Blinking LED", "board": "uno", "parts": [{"type": "led"}],
          "wires": [{"a": "uno.d13", "b": "led.sig", "color": "Yellow"}, {"a": "uno.GND", "b": "led.GND"}],
@@ -115,7 +116,7 @@ class BenchTests(unittest.TestCase):
         def answer(event: dict[str, Any]) -> None:  # the HUD, drawing it and reporting what the bench's checks say
             threading.Thread(target=lambda: bench.sync(True, "", "", "", None, None, None, "", event["token"],
                                                        {"parts": 2, "wired": 2, "missing": [], "checks": "no problems found."})).start()
-        bench.sync(True)
+        bench.sync(True, circuit=EMPTY_BENCH)
         said = bench.act("blueprint", BLINK)
         self.assertEqual(sent[0]["type"], "building_command")
         self.assertEqual(sent[0]["command"], "blueprint")
@@ -129,7 +130,7 @@ class BenchTests(unittest.TestCase):
         def answer(event: dict[str, Any]) -> None:
             bench.sync(True, "", "", "", None, None, None, "", event["token"], {
                 "parts": 2, "wired": 1, "missing": ["wire uno.D13 to led.SIG"], "checks": "ERROR: Short circuit: Arduino Uno R3 5V is wired straight to GND."})
-        bench.sync(True)
+        bench.sync(True, circuit=EMPTY_BENCH)
         said = bench.act("blueprint", BLINK)
         self.assertIn("Could not place: wire uno.D13 to led.SIG.", said)
         self.assertIn("ERROR: Short circuit", said)
@@ -138,7 +139,7 @@ class BenchTests(unittest.TestCase):
     def test_a_bench_that_does_not_answer_is_said_so_and_a_bad_plan_never_reaches_it(self) -> None:
         sent: list[dict[str, Any]] = []
         bench = building.BuildingBench(Path(tempfile.mkdtemp()), sent.append, CATALOG)
-        bench.sync(True)
+        bench.sync(True, circuit=EMPTY_BENCH)
         original = building.APPLY_WAIT_SECONDS
         building.APPLY_WAIT_SECONDS = 0.05
         self.addCleanup(setattr, building, "APPLY_WAIT_SECONDS", original)
@@ -147,6 +148,17 @@ class BenchTests(unittest.TestCase):
         self.assertIn("Not done", bench.act("blueprint", {**BLINK, "board": "nope"}))
         self.assertEqual(sent, [])
         self.assertIn("read, pins or blueprint", bench.act("explode", {}))
+
+    def test_a_bench_that_is_still_starting_says_so_at_once(self) -> None:
+        sent: list[dict[str, Any]] = []
+        bench = building.BuildingBench(Path(tempfile.mkdtemp()), sent.append, CATALOG)
+        bench.sync(True, text="The bench is still starting.")  # the HUD has opened but not sent the bench yet
+        self.assertIn("still starting", bench.act("blueprint", BLINK))
+        self.assertEqual(sent, [])
+
+    def test_a_pin_is_found_the_way_the_bench_finds_it(self) -> None:
+        self.assertEqual(building.resolve_pin(CATALOG["boards"]["uno"]["pins"], "3V3"), "3.3V")
+        self.assertEqual(building.resolve_pin(CATALOG["boards"]["uno"]["pins"], "3.3 v"), "3.3V")
 
     def test_the_building_tool_runs_through_nova_and_says_when_it_is_closed(self) -> None:
         bench = open_bench()
@@ -167,9 +179,10 @@ class ProjectTests(unittest.TestCase):
 
     def test_a_project_keeps_the_bench_the_parts_list_and_the_steps(self) -> None:
         bench = open_bench()
+        self.assertTrue(bench.save("", "", self.CIRCUIT, [], [], "").startswith("Building "))  # untitled
         name = bench.save('Blink/ "one"', "Blinking LED", self.CIRCUIT, BLINK["bom"], BLINK["steps"], "tip")
         self.assertEqual(name, "Blink one")
-        self.assertEqual([entry["name"] for entry in bench.saved()], [name])
+        self.assertIn(name, [entry["name"] for entry in bench.saved()])
         loaded = bench.load(name)
         self.assertEqual(loaded["circuit"], self.CIRCUIT | {"items": [{**self.CIRCUIT["items"][0], "x": 0.0, "y": 0.0},
                                                                        {**self.CIRCUIT["items"][1], "x": 68.5, "y": -3.0}],
@@ -177,7 +190,7 @@ class ProjectTests(unittest.TestCase):
         self.assertEqual(loaded["bom"][0], {"item": "220 ohm resistor", "qty": 1, "note": "only for a bare LED"})
         self.assertEqual(loaded["steps"], ["Plug the Uno into USB.", "Wire D13 to the LED's SIG pin."])
         bench.delete(name)
-        self.assertEqual(bench.saved(), [])
+        self.assertNotIn(name, [entry["name"] for entry in bench.saved()])
         with self.assertRaises(ValueError):
             bench.load(name)
 

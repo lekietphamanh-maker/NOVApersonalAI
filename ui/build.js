@@ -6,12 +6,12 @@ import { h, screen } from "./lab.js";
 
 const SYNC_MS = 500;
 const START_TIMEOUT_MS = 60_000;
-const BENCH_KEYS = ["Escape", "Delete", "Backspace", "r", "R", "f", "F"];  // the bench's own, once the owner has clicked in it
+const BENCH_KEYS = ["Escape", "Delete", "Backspace", "r", "R"];  // the bench's own, once the owner has clicked in it
 
 export function createBuild(root, { act, toast, onOpenChange }) {
   const host = root.querySelector("#build-bench"), nameBox = root.querySelector("#build-name"), reply = root.querySelector("#build-reply");
   const dirtyMark = root.querySelector("#build-dirty");
-  let bench = null, starting = null, armed = false, dirty = false, syncTimer = 0;
+  let bench = null, starting = null, armed = false, dirty = false, edited = false, applying = false, syncTimer = 0;
   let plan = { title: "", bom: [], steps: [], notes: "" };
   const view$ = screen(root, { onOpenChange, onOpen: () => { start(); sync(); } });
 
@@ -39,6 +39,7 @@ export function createBuild(root, { act, toast, onOpenChange }) {
   function changed() {
     if (!armed) return;
     setDirty(true);
+    edited ||= !applying;  // the owner's own changes since the last save, blueprint or open
     renderPlan();
     clearTimeout(syncTimer);
     syncTimer = setTimeout(sync, SYNC_MS);
@@ -68,8 +69,16 @@ export function createBuild(root, { act, toast, onOpenChange }) {
   // ---------- Nova's blueprint ----------
   async function blueprint(event) {
     await start();
-    if (!bench) return;
-    const result = bench.applyPlan(event.plan);
+    if (!bench) { sync({ applied: event.token, result: { missing: ["the bench didn't start"] } }); return; }
+    if (edited && !event.plan.keep) {  // a blueprint starts the bench fresh: the owner's own work is kept first
+      const kept = await act("build_save", { name: "Before Nova's build", title: plan.title, circuit: bench.getState(), bom: plan.bom, steps: plan.steps, notes: plan.notes });
+      if (kept.ok) toast("Your bench was saved as “Before Nova's build”.", "info");
+    }
+    let result;
+    applying = true;
+    try { result = bench.applyPlan(event.plan); } catch (error) { result = { missing: [String(error.message || error).slice(0, 80)] }; }
+    applying = false;
+    edited = false;
     plan = { title: event.plan.title, bom: event.plan.bom, steps: event.plan.steps, notes: event.plan.notes };
     if (event.plan.title && !nameBox.value) nameBox.value = event.plan.title;
     renderPlan();
@@ -90,6 +99,7 @@ export function createBuild(root, { act, toast, onOpenChange }) {
     if (!answer.ok) return false;
     nameBox.value = answer.name;
     setDirty(false);
+    edited = false;
     listSaved(answer.saved);
     toast(`Saved “${answer.name}”.`, "ok");
     return true;
@@ -103,19 +113,22 @@ export function createBuild(root, { act, toast, onOpenChange }) {
   async function load(name) {
     if (dirty && !(await ask(`Open “${name}”? The bench has changes that aren't saved.`, ["Save first", "save"], ["Don't save", "drop"]))) return;
     const answer = await act("build_load", { name });
-    if (!answer.ok) return;
+    if (!answer.ok || !answer.circuit) return;
     await start();
+    if (!bench) return;
     plan = { title: answer.title, bom: answer.bom, steps: answer.steps, notes: answer.notes };
     nameBox.value = answer.name;
-    if (answer.circuit) bench.setState(answer.circuit);
+    bench.setState(answer.circuit);
     renderPlan();
     setDirty(false);
+    edited = false;
     root.querySelector("#build-open").open = false;
     sync();
   }
   async function startOver() {
     if (dirty && !(await ask("Start a new project? The bench has changes that aren't saved.", ["Save first", "save"], ["Don't save", "drop"]))) return;
     await start();
+    if (!bench) return;
     plan = { title: "", bom: [], steps: [], notes: "" };
     nameBox.value = "";
     bench.freeBuild();
@@ -123,6 +136,7 @@ export function createBuild(root, { act, toast, onOpenChange }) {
     bench._changed();
     renderPlan();
     setDirty(false);
+    edited = false;
   }
   function ask(question, ...choices) {  // Save / Don't save / Cancel
     const dialog = root.querySelector("#build-dialog");
@@ -171,9 +185,9 @@ export function createBuild(root, { act, toast, onOpenChange }) {
     command,
     showReply,
     handleKey(event) {
-      // The bench claims its own keys while the owner is working in it, so Esc cancels a wire instead of leaving.
-      if (bench?.focused) return BENCH_KEYS.includes(event.key);
       const editing = document.activeElement?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || "");
+      // The bench claims its own keys while the owner is working in it, so Esc cancels a wire instead of leaving.
+      if (bench?.focused && !editing) return BENCH_KEYS.includes(event.key);
       if (event.key === "Escape") {
         if (!root.querySelector("#build-dialog").hidden) return false;
         if (editing) { document.activeElement.blur(); return true; }

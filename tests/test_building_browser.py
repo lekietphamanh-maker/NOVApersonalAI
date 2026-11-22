@@ -133,6 +133,17 @@ class BuildingModeTests(unittest.TestCase):
             built += 1
         self.assertGreaterEqual(built, 8)
 
+    def test_the_owners_own_bench_is_kept_before_a_blueprint_replaces_it(self) -> None:
+        self.page.evaluate("document.querySelector('#build-bench').bench.addItem('mod:buzzer', {}, true)")  # the owner adds a part
+        self.apply(self.plan(PLAN_ARGUMENTS), "k1")
+        kept = self.page.evaluate("window.calls.filter(c => c[0] === 'build_save').at(-1)[1]")
+        self.assertEqual(kept["name"], "Before Nova's build")
+        self.assertEqual([part["ref"] for part in kept["circuit"]["items"]], ["uno", "buzzer"])
+        self.page.wait_for_function("window.toasts.some(toast => /Before Nova/.test(toast[0]))")
+        saves = self.page.evaluate("window.calls.filter(c => c[0] === 'build_save').length")
+        self.apply(self.plan({**PLAN_ARGUMENTS, "title": "Again"}), "k2")  # nothing of the owner's to keep this time
+        self.assertEqual(self.page.evaluate("window.calls.filter(c => c[0] === 'build_save').length"), saves)
+
     def test_a_project_is_saved_started_over_and_opened_again(self) -> None:
         self.apply(self.plan(PLAN_ARGUMENTS), "t4")
         self.page.fill("#build-name", "Blink")
@@ -151,7 +162,7 @@ class BuildingModeTests(unittest.TestCase):
 
         self.page.evaluate("document.querySelector('#build-open').open = true")
         self.page.wait_for_selector("#build-saved button")
-        self.page.click("#build-saved li button")
+        self.page.locator("#build-saved li", has_text="Blink").locator("button").first.click()
         self.page.wait_for_function("document.querySelector('#build-bench').bench.items.length === 2")
         self.assertEqual(self.page.evaluate("document.querySelector('#build-bench').bench.getState()"), saved["circuit"])
         self.assertEqual(self.page.locator("#build-steps li").count(), 2)

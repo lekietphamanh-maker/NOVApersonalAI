@@ -9,6 +9,7 @@ import os
 import subprocess
 import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 from urllib.error import HTTPError
@@ -123,6 +124,43 @@ class CloudAgentTests(unittest.TestCase):
                 cloud_agents.CliBrain(item, run).turn("s", "p", [], None, print)
         self.assertTrue(cloud_agents.agent("claude-code").full)
         self.assertEqual(cloud_agents.agent("nonsense").key, "claude-code")
+
+
+class MoreAgentTests(unittest.TestCase):
+    def test_hermes_and_opencode_answer_with_the_request_on_stdin(self) -> None:
+        for key, command, expected in (("hermes", "/x/hermes", ["chat", "-Q", "--query-file", "-"]), ("opencode", "/x/opencode", ["run"])):
+            seen: dict = {}
+
+            def run(arguments, **options):
+                seen.update(arguments=arguments, options=options)
+                return subprocess.CompletedProcess(arguments, 0, "Hello.\n", "")
+            with mock.patch.object(cloud_agents, "find", lambda agent, command=command: command):
+                self.assertEqual(cloud_agents.CliBrain(cloud_agents.agent(key), run).turn("You are Nova.", "hi there", [], None, print), "Hello.")
+            self.assertEqual(seen["arguments"], [command, *expected])
+            self.assertIn("hi there", seen["options"]["input"])  # a long request never rides on the command line
+
+    def test_hermes_installs_with_its_own_installer_run_without_a_shell(self) -> None:
+        item = cloud_agents.agent("hermes")
+        for platform, tail in (("linux", ["--non-interactive"]), ("win32", ["-NonInteractive"])):
+            fetched, ran = [], []
+
+            def run(arguments, **options):
+                ran.append((arguments, options, Path(arguments[arguments.index("-File") + 1] if platform == "win32" else arguments[1]).read_bytes()))
+                return subprocess.CompletedProcess(arguments, 0, "done", "")
+            with mock.patch.object(cloud_agents.sys, "platform", platform):
+                said = cloud_agents.install(item, run, lambda url: fetched.append(url) or b"#installer")
+            self.assertEqual(fetched, [item.installer[1 if platform == "win32" else 0]])
+            arguments, options, script = ran[0]
+            self.assertEqual((arguments[-1:], script, options.get("shell")), (tail, b"#installer", None))
+            self.assertEqual(arguments[0], "powershell" if platform == "win32" else "bash")
+            self.assertIn("Hermes Agent is installed", said)
+
+    def test_a_failed_installer_says_why_and_installers_are_https_from_the_vendor(self) -> None:
+        failing = lambda arguments, **options: subprocess.CompletedProcess(arguments, 1, "", "step 3\ngit is required")  # noqa: E731
+        with self.assertRaisesRegex(RuntimeError, "git is required"):
+            cloud_agents.install(cloud_agents.agent("hermes"), failing, lambda url: b"x")
+        self.assertTrue(all(url.startswith("https://hermes-agent.nousresearch.com/") for url in cloud_agents.agent("hermes").installer))
+        self.assertEqual([item.key for item in cloud_agents.AGENTS], ["claude-code", "codex", "gemini", "opencode", "hermes"])
 
 
 class AgentLoopTests(unittest.TestCase):
