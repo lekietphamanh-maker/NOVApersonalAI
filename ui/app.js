@@ -220,7 +220,7 @@ function handle(event) {
     case "shannon_line": shannon.line(event); break;
     case "shannon_ready": shannon.ready(event); break;
     case "shannon_command": shannon.command(event.command); break;
-    case "galaxy_data": galaxy.loadData(event.graph); break;
+    case "galaxy_data": galaxy.loadData(event.graph); if (!galaxy.isOpen()) galaxy.open(); break;
   }
 }
 
@@ -1569,6 +1569,7 @@ $("[data-act=route]").onclick = () => (routeView.isOpen() ? routeView.close() : 
 $("[data-act=rea]").onclick = () => (rea.isOpen() ? rea.close() : rea.open());
 $("[data-act=shannon]").onclick = () => (shannon.isOpen() ? shannon.close() : shannon.open());
 $("[data-act=skills]").onclick = () => (skills.isOpen() ? skills.close() : skills.open());
+$("[data-act=galaxy]").onclick = () => (galaxy.isOpen() ? galaxy.close() : galaxy.open());
 $("#map-add").onclick = () => mindmap.addIdea();
 $("#map-outline-toggle").onclick = () => setPane("notes");
 $("#map-tidy").onclick = () => mindmap.tidy();
