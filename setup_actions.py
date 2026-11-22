@@ -19,7 +19,7 @@ import vision
 import whisper_engine
 from setup_everything import Step
 
-NATURAL_VOICE = "Heart (US, female, most natural)"
+NATURAL_VOICE = "Emma (British, female, most natural)"
 FIRST_RUN_DELAY_MS = 20_000  # after the window, the model check and the first greeting
 
 
@@ -58,7 +58,10 @@ class SetupActions:
             not auto_tune.due(self.settings.get("tuning"), VERSION, self.hardware)
 
     def _natural_voice(self) -> None:
-        natural_already = (self.voice.voice_name or "").split(" (")[0] in ("Heart", "Bella", "Emma")
+        # The owner's own pick of another Kokoro voice stays; "never picked" (saved voice is None) is not a pick —
+        # the effective default is Emma, but only the saved choice counts here, so setup still installs her.
+        from voice import saved_voice_name
+        natural_already = (saved_voice_name() or "").split(" (")[0] in ("Heart", "Bella", "Emma")
         if not natural_already:  # the owner's own pick of another Kokoro voice stays
             self._voice_installed(NATURAL_VOICE)
 
@@ -95,9 +98,12 @@ class SetupActions:
                  kokoro_voice.installed, kokoro_voice.install, self._natural_voice),
         ]
         if sys.platform == "win32":
+            model = str(self.voice.whisper_settings.get("model") or whisper_engine.DEFAULT_MODEL)
             steps.append(Step("whisper", "Whisper speech recognition", "Understands accents and broken English.",
-                              whisper_engine.DOWNLOAD_MB, whisper_engine.installed, whisper_engine.install,
-                              lambda: setattr(self.voice, "whisper", whisper_engine.WhisperEngine())))
+                              whisper_engine.MODELS.get(model, whisper_engine.MODELS[whisper_engine.DEFAULT_MODEL])[2],
+                              whisper_engine.installed_any,
+                              lambda progress, _model=model: whisper_engine.install(progress, _model),
+                              lambda: self.voice.refresh_whisper()))
         if not usb:
             steps.append(Step("vision", "Vision model", "Names anything you show the camera; reads pictures on this PC.",
                               int(vision.VISION_GB * 1024), lambda: bool(self.state["model"].get("vision")),
