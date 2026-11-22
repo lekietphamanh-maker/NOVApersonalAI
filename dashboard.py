@@ -1308,7 +1308,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                 "whisper_language": settings["language"]}
 
     def _act_install_whisper(self, args: dict[str, Any]) -> dict[str, Any] | None:
-        import voice as voice_module
         model = args.get("model") if args.get("model") in whisper_engine.MODELS else None
         model = model or str(self.voice.whisper_settings.get("model") or whisper_engine.DEFAULT_MODEL)
         if not args.get("consented"):

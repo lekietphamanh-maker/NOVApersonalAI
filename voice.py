@@ -39,6 +39,15 @@ def _voice_settings_path() -> Path:
     return _audio_settings_path().with_name("voice_settings.json")
 
 
+def _read_voice_settings() -> dict[str, object]:
+    """The saved voice settings file, or {} when it is missing, broken, or not an object."""
+    try:
+        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 # A fresh Nova speaks with Emma (British, Kokoro — the most natural voice), the voice Keith chose for Muse too.
 # Nothing is downloaded for it until the owner picks it or runs "Set up everything": until Kokoro is installed,
 # _natural_voice_for() falls back to the Windows built-in voice, exactly as before.
@@ -47,11 +56,8 @@ DEFAULT_VOICE = "Emma (British, female, most natural)"
 
 def saved_voice_name() -> str | None:
     """The voice the owner actually picked in Settings, or None when they never picked one."""
-    try:
-        name = json.loads(_voice_settings_path().read_text(encoding="utf-8")).get("voice")
-        return name if isinstance(name, str) and name in piper_voice.VOICES else None
-    except (OSError, json.JSONDecodeError, AttributeError):
-        return None
+    name = _read_voice_settings().get("voice")
+    return name if isinstance(name, str) and name in piper_voice.VOICES else None
 
 
 def load_voice_name() -> str | None:
@@ -59,10 +65,7 @@ def load_voice_name() -> str | None:
 
     Nothing saved yet means the default (Emma); an explicit null saved by the owner means the built-in voice.
     """
-    try:
-        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, AttributeError):
-        return DEFAULT_VOICE
+    data = _read_voice_settings()
     if "voice" not in data:
         return DEFAULT_VOICE
     name = data.get("voice")
@@ -77,14 +80,6 @@ def load_voice_name() -> str | None:
 MIN_PAUSE_SECONDS = 1.35
 MAX_PAUSE_SECONDS = 5.0
 DEFAULT_PAUSE_SECONDS = 2.0
-
-DEFAULT_WHISPER_SETTINGS: dict[str, object] = {
-    "model": whisper_engine.DEFAULT_MODEL,  # small.en: quick; medium.en hears better; small hears other languages
-    "language": "en",  # "en", or "auto" to detect the language (multilingual model only)
-    "pause_seconds": DEFAULT_PAUSE_SECONDS,
-    "vocabulary": list(whisper_engine.DEFAULT_VOCABULARY),
-}
-
 
 def clamp_pause_seconds(value: object) -> float:
     """A pause setting, kept inside the range Nova can use: never below the old 1.35 s, never above 5 s."""
@@ -108,12 +103,7 @@ def _clean_vocabulary(words: object) -> list[str]:
 
 def load_whisper_settings() -> dict[str, object]:
     """Speech-recognition settings from voice_settings.json, with the defaults for anything missing or invalid."""
-    try:
-        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            data = {}
-    except (OSError, json.JSONDecodeError):
-        data = {}
+    data = _read_voice_settings()
     model = data.get("whisper_model")
     language = data.get("whisper_language")
     settings: dict[str, object] = {
@@ -129,12 +119,7 @@ def load_whisper_settings() -> dict[str, object]:
 
 def save_whisper_settings(**changes: object) -> dict[str, object]:
     """Store speech-recognition settings (only the keys given), validated, and return the effective settings."""
-    try:
-        data = json.loads(_voice_settings_path().read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            data = {}
-    except (OSError, json.JSONDecodeError):
-        data = {}
+    data = _read_voice_settings()
     current = load_whisper_settings()
     if "model" in changes:
         current["model"] = changes["model"] if changes["model"] in whisper_engine.MODELS else whisper_engine.DEFAULT_MODEL
@@ -159,12 +144,7 @@ def save_whisper_settings(**changes: object) -> dict[str, object]:
 def save_voice_name(name: str | None) -> None:
     path = _voice_settings_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if not isinstance(data, dict):
-            data = {}
-    except (OSError, json.JSONDecodeError):
-        data = {}
+    data = _read_voice_settings()
     data["voice"] = name  # merge: the speech-recognition settings share this file
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(data, indent=2), encoding="utf-8")
@@ -495,7 +475,7 @@ def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, 
     last_speech_at: float | None = None
     start = time.monotonic()
     try:
-        with _open_input(sd, input_key, callback) as _stream:
+        with _open_input(sd, input_key, callback):
             while not stop_event.is_set() and time.monotonic() - start < seconds:
                 try:
                     chunk = audio_queue.get(timeout=0.2)
@@ -874,7 +854,7 @@ class VoiceController:
                     for piece in carried:
                         audio_queue.put_nowait(piece)
                     quiet_wake_until = time.monotonic() + 3.0 if carried else 0.0
-                    with _open_input(sd, self.input_key, callback) as _stream:
+                    with _open_input(sd, self.input_key, callback):
                         while not self._stop.is_set() and not self._nova_talking():
                             if listening_until and time.monotonic() > listening_until:
                                 listening_until = 0.0
@@ -955,7 +935,7 @@ class VoiceController:
         held = 0
         recent: list[bytes] = []  # the last ~1.5 s heard, handed to the request listener on a cut-off
         self.echo.new_stream()
-        with _open_input(sd, self.input_key, callback) as _stream:
+        with _open_input(sd, self.input_key, callback):
             while not self._stop.is_set() and self._nova_talking():
                 try:
                     chunk, captured_at = audio_queue.get(timeout=0.1)
