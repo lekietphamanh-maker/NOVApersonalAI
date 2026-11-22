@@ -8,7 +8,6 @@ and a restart; accounts need the owner to sign in) is listed at the end instead 
 """
 from __future__ import annotations
 
-import os
 import shutil
 import subprocess
 import sys
