@@ -8,7 +8,6 @@ import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import library
 from library import Library, parse_command
 
 

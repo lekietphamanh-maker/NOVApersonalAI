@@ -414,7 +414,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.window_hwnd: int | None = None
         self.window_process: subprocess.Popen | None = None
         self.turn_cancel = threading.Event()
-        self.assist_acting = False  # Nova is moving the mouse or typing right now
         self.escape_is_novas = False  # this very step presses Esc itself: don't take it for the user's Esc
         self.takeover_until = 0.0  # the mini orb flares and the banner shows until then (monotonic)
         self.takeover_warned = False  # the first step of a request waits a moment so the warning is seen first
@@ -754,8 +753,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _save_setting(self, key: str, value: Any) -> None:
         self.settings[key] = value
         try:
-            _settings_path().parent.mkdir(parents=True, exist_ok=True)
-            _settings_path().write_text(json.dumps(self.settings, indent=2), encoding="utf-8")
+            path = _settings_path()
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(self.settings, indent=2), encoding="utf-8")
         except OSError:
             pass  # the switch still works for this session
 
@@ -784,10 +784,10 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
-               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report", "rea_fit_add",
+               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report", "rea_fit_add", "rea_pick",
                "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
                "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
-               "shannon_fix", "shannon_simulate", "shannon_simulate_report", "galaxy_data", "update_now", "google_pick_client"}
+               "shannon_fix", "shannon_simulate", "shannon_simulate_report", "shannon_pick", "galaxy_data", "update_now", "google_pick_client"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -2339,8 +2339,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     def _news_config(self) -> NewsConfig:
         return NewsConfig(llm_model=self.agent.model, ollama_url=self.agent.base_url,
-                          google_news_sites=tuple(self.state["settings"].get("news_outlets") or ()),
-                          run_at=str(self.settings.get("news_run_at") or "06:00"))
+                          google_news_sites=tuple(self.state["settings"].get("news_outlets") or ()))
 
     # ---------- the World view: public feeds and the news desk on a globe (world_monitor) ----------
 
@@ -3301,6 +3300,16 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.reverse.start(target, " ".join(str(args.get("goal") or "").split())[:300])
         return None
 
+    def _act_rea_pick(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Opens the native file window so the owner clicks the file or folder to analyse instead of typing its path."""
+        from tkinter import filedialog
+        if str(args.get("kind") or "file") == "folder":
+            path = filedialog.askdirectory(title="Pick a folder to analyse")
+        else:
+            path = filedialog.askopenfilename(title="Pick a file to analyse",
+                                              filetypes=[("All files", "*.*")])
+        return {"ok": True, "picked": bool(path), "path": path or ""}
+
     def _act_rea_open(self, args: dict[str, Any]) -> dict[str, Any]:
         return {"ok": True, "job": self._lab_job(args, "rea")}
 
@@ -3405,6 +3414,18 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         """Simulate attack: Shannon's stages + AiSOC triage on the owner's own app, file or local address.
         Synchronous and fast (nothing really runs); a bad target is refused at once, like shannon_start."""
         return self.shannon.simulate_attack(args.get("kind"), args.get("target"))
+
+    def _act_shannon_pick(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Opens the native file window so the owner clicks the project folder (app) or file to simulate on."""
+        from tkinter import filedialog
+        projects = self.shannon.projects_folder
+        start = projects if projects.is_dir() else Path.home()
+        if str(args.get("kind") or "file") == "app":
+            path = filedialog.askdirectory(title="Pick a project folder to simulate on", initialdir=str(start))
+        else:
+            path = filedialog.askopenfilename(title="Pick a file to simulate on", initialdir=str(Path.home()),
+                                              filetypes=[("All files", "*.*")])
+        return {"ok": True, "picked": bool(path), "path": path or ""}
 
     def _act_shannon_simulate_report(self, args: dict[str, Any]) -> None:
         self._open_file(str(self._lab_job(args, "shannon_simulate").get("report") or ""))
@@ -3977,7 +3998,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _set_acting(self, acting: bool, presses_escape: bool = False) -> None:
         """Called from the agent's thread right before (and after) Nova moves the mouse or types. The mini orb
         flares and a banner says not to touch the mouse, and the first step waits a moment so you see it first."""
-        self.assist_acting = acting
         self.escape_is_novas = acting and presses_escape
         if acting:
             first = not self.takeover_warned
@@ -4489,8 +4509,7 @@ def main() -> int:
     if "--news-run" in sys.argv:
         # One news desk run without the window (Windows Task Scheduler at 06:00): the same settings Nova uses.
         settings = _load_settings()
-        config = NewsConfig(google_news_sites=tuple(daily_brief.saved_outlets(settings.get("news_outlets"))),
-                            run_at=str(settings.get("news_run_at") or "06:00"))
+        config = NewsConfig(google_news_sites=tuple(daily_brief.saved_outlets(settings.get("news_outlets"))))
         try:  # the model Nova picks for this PC; without Ollama the articles are saved and read next time
             installed = [item["name"] for item in _http_json(f"{Agent().base_url}/api/tags", timeout=10).get("models", [])]
             config.llm_model = choose_model(settings.get("model", "auto"), installed, detect_hardware()).model

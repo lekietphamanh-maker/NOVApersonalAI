@@ -18,7 +18,6 @@ except ImportError:
 
 import claude_code
 import dashboard  # noqa: E402
-import skills as skill_notes
 from agent import Agent
 from memory import Memory
 from skills import Skills, check_schedule, parse, render, slot_today

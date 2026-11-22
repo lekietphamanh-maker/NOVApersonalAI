@@ -232,28 +232,6 @@ function canMat(wmm, lmm, lines = [], { dots = false, key = '', ink = '#585b5f' 
 
 // ───────────────────────── sizes ─────────────────────────
 /** Overall size of a connector: w = width (across, local y), d = depth (local x, from the mouth), h = height above the board. */
-export function connectorSize(name, o = {}) {
-  switch (name) {
-    case 'usbB': return { w: 12.0, d: 16.4, h: 10.8 };
-    case 'usbMini': return { w: 7.7, d: 9.3, h: 3.9 };
-    case 'usbMicro': return { w: 7.5, d: 5.6, h: 2.5 };
-    case 'usbC': return { w: 8.94, d: 7.3, h: 3.2 };
-    case 'usbA': return (o.stack ?? 2) === 2 ? { w: 13.2, d: 17.5, h: 15.6 } : { w: 13.2, d: 14.0, h: 7.0 };
-    case 'rj45': return { w: 16.0, d: 21.0, h: 13.5 };
-    case 'microHdmi': return { w: 6.5, d: 7.5, h: 2.9 };
-    case 'audioJack': return { w: 6.0, d: 14.5, h: 5.0 };          // d includes the 2.5 mm barrel
-    case 'barrelJack': return { w: 9.0, d: 14.0, h: 11.0 };
-    case 'fpc': { const n = o.n ?? 15, p = o.pitch ?? 1.0; return { w: (n - 1) * p + 8, d: o.d ?? 2.8, h: o.h ?? 5.5 }; }
-    case 'microSD': return { w: 12.0, d: 11.5, h: 1.5 };            // card sticks 3.6 mm out of the mouth
-    case 'rfModule': return (o.type ?? 'esp32-wroom') === 'esp12' ? { w: 16.0, d: 24.0, h: 3.05 } : { w: 18.0, d: 25.5, h: 3.15 };
-    case 'shieldCan': return { w: o.l ?? 10, d: o.w ?? 12, h: o.h ?? 1.8 };
-    case 'chipAntenna': return { w: o.w ?? 1.6, d: o.len ?? 3.2, h: o.h ?? 1.1 };
-    case 'slideSwitch': return { w: 2.7, d: 6.7, h: 1.4 };          // + lever 1.5 mm towards local −y
-    case 'jstPH': { const n = o.n ?? 2; return { w: 2 * (n - 1) + 5.9, d: 6.0, h: 4.8 }; }
-    default: return null;
-  }
-}
-
 // ═════════════════════════ USB-B (full size, through-hole) ═════════════════════════
 export function usbB(b, { x = 0, y = 0, rot = 0, side = 'top' } = {}) {
   const f = foot(b, x, y, rot, side), B = new Builder();

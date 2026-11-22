@@ -14,17 +14,6 @@ export function h(tag, attributes = {}, ...children) {
   return element;
 }
 
-const SVG = "http://www.w3.org/2000/svg";
-export function s(tag, attributes = {}, ...children) {
-  const element = document.createElementNS(SVG, tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (key.startsWith("on")) element.addEventListener(key.slice(2), value);
-    else if (value !== undefined && value !== null) element.setAttribute(key, value);
-  }
-  element.append(...children.filter(Boolean).map((child) => (typeof child === "string" ? document.createTextNode(child) : child)));
-  return element;
-}
-
 export function when(iso) {
   const date = new Date(iso);
   return Number.isNaN(date.getTime()) ? "" : date.toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -59,10 +48,4 @@ export function renderStrip(container, jobs, activeId, onPick, describe) {
   }, h("b", {}, job.title || "job"), h("small", {}, `${when(job.started)} · ${describe(job)}`))) : [
     h("span", { class: "muted small" }, "Past reports show here. They're also in your Library."),
   ]));
-}
-
-// A live feed of steps, newest at the bottom, kept short.
-export function renderFeed(container, lines) {
-  container.replaceChildren(...lines.slice(-60).map((line) => h("li", {}, line)));
-  container.scrollTop = container.scrollHeight;
 }

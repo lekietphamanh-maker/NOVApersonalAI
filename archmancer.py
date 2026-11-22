@@ -58,7 +58,7 @@ def search(query: str) -> str:
     if not words:
         return list_skills()
 
-    scored: list[tuple[int, str, str, Path]] = []
+    scored: list[tuple[int, str, str, str]] = []
     for skill_name, doc_title, path in _all_docs():
         try:
             text = path.read_text(encoding="utf-8")
@@ -67,7 +67,7 @@ def search(query: str) -> str:
         lower = text.lower()
         hits = sum(lower.count(w) for w in words)
         if hits > 0:
-            scored.append((hits, skill_name, doc_title, path))
+            scored.append((hits, skill_name, doc_title, text))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     if not scored:
@@ -75,8 +75,7 @@ def search(query: str) -> str:
 
     result_parts: list[str] = []
     used = 0
-    for _hits, skill_name, doc_title, path in scored[:5]:
-        text = path.read_text(encoding="utf-8")
+    for _hits, skill_name, doc_title, text in scored[:5]:
         passages = _extract_passages(text, words)
         if not passages:
             continue

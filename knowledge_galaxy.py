@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -114,9 +114,9 @@ def build_graph(vault_folder: Path | None = None,
             nid = _node_id("fact", text)
             label = text[:60] + ("..." if len(text) > 60 else "")
             nodes[nid] = Node(id=nid, label=label, kind="fact", excerpt=text)
+            words = set(re.findall(r"\w{4,}", text.lower()))
             for wiki_node in list(nodes.values()):
                 if wiki_node.kind == "wiki":
-                    words = set(re.findall(r"\w{4,}", text.lower()))
                     if any(w in wiki_node.label.lower() for w in words):
                         edges.append(Edge(source=wiki_node.id, target=nid))
 

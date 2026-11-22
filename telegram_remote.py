@@ -162,7 +162,8 @@ def find_file(words: str, folders: list[Path]) -> list[Path]:
             children[:] = [child for child in children if child.lower() not in SKIPPED_FOLDERS and not child.startswith(".")]
             for name in files:
                 seen += 1
-                if all(word in name.lower() for word in wanted):
+                lower = name.lower()
+                if all(word in lower for word in wanted):
                     found.append(Path(folder) / name)
             if seen > SEARCH_LIMIT:
                 break

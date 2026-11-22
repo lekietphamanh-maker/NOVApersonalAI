@@ -54,6 +54,7 @@ export function createShannon(root, { act, onOpenChange }) {
   const simResult = h("div", {});
   const simInput = h("input", { class: "field", style: "flex:1;min-width:180px", placeholder: "Local address (localhost:3000)",
     maxlength: "300", "aria-label": "Simulation target" });
+  const simBrowse = h("button", { class: "box small", type: "button", onclick: pickSimTarget }, "Browse…");
   const simButton = h("button", { class: "box small on", type: "button", onclick: simulate }, "Simulate attack");
   const simModes = SIM_KINDS.map((kind) => h("button", {
     class: `box small${kind === simKind ? " on" : ""}`, type: "button", onclick: () => setSimKind(kind),
@@ -63,9 +64,10 @@ export function createShannon(root, { act, onOpenChange }) {
     h("p", { class: "muted small", style: "margin:0 0 8px" },
       "A scripted attack on your own app, file or local address, triaged by AiSOC. Nothing really runs: the same local-only checks as a real Shannon run apply, and anything else is refused."),
     h("div", { class: "row wrap", style: "margin-top:0" }, ...simModes),
-    h("div", { class: "row wrap" }, simInput, simButton),
+    h("div", { class: "row wrap" }, simInput, simBrowse, simButton),
     simStatus, simError, simResult);
   root.insertBefore(simBox, root.querySelector(".lab-bottom"));
+  simBrowse.hidden = true;  // the default mode is Web (local), a typed address — no file window until App/File is picked
 
   function clearSimTimers() {
     for (const timer of simTimers) clearTimeout(timer);
@@ -85,10 +87,16 @@ export function createShannon(root, { act, onOpenChange }) {
     simModes.forEach((button, index) => button.classList.toggle("on", SIM_KINDS[index] === kind));
     simInput.placeholder = kind === "app" ? "Project folder (under Nova Projects)"
       : kind === "file" ? "File path (in your user folder)" : "Local address (localhost:3000)";
+    simBrowse.hidden = kind === "web";  // a web address is typed, not picked from a file window
     if (kind === "app") simInput.setAttribute("list", "shannon-projects");
     else simInput.removeAttribute("list");
     simInput.value = "";
     simError.textContent = "";
+  }
+
+  async function pickSimTarget() {  // the file window: click the project folder or file, its path lands in the box
+    const result = await act("shannon_pick", { kind: simKind });
+    if (result.picked && result.path) simInput.value = result.path;
   }
 
   async function simulate() {
@@ -464,6 +472,10 @@ export function createShannon(root, { act, onOpenChange }) {
     problemLine.hidden = true;
     await act("shannon_start", { project: form.project.value, url: form.url.value });
   });
+  $("#shannon-pick-project").onclick = async () => {  // the file window, starting in Nova Projects
+    const result = await act("shannon_pick", { kind: "app" });
+    if (result.picked && result.path) form.project.value = result.path;
+  };
   stopButton.onclick = () => act("shannon_stop");
   $("#shannon-close").onclick = () => view.close();
 

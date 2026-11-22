@@ -43,7 +43,6 @@ CALENDAR_TOOLS.append(_tool(
     "minutes: how long (default 30). days: how many days ahead to look (default 5, at most 14). weekends: include "
     "Saturday and Sunday (default false). Answer with the times and a short message the owner can send.",
     {"minutes": {"type": "integer"}, "days": {"type": "integer"}, "weekends": {"type": "boolean"}}, []))
-CALENDAR_TOOL_NAMES = {tool["function"]["name"] for tool in CALENDAR_TOOLS}
 
 
 def _local(moment: datetime) -> str:

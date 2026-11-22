@@ -5,11 +5,9 @@ assumed: a GPU share is only shown when Ollama reports it.
 from __future__ import annotations
 
 import ctypes
-import os
 import re
 import subprocess
 import sys
-import time
 from typing import Any
 
 GIB = 1024 ** 3

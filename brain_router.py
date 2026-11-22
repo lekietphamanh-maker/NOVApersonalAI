@@ -83,10 +83,6 @@ def personal(text: str) -> bool:
     return bool(PERSONAL.search(str(text)))
 
 
-def sensitive(text: str, private: str = "secrets") -> bool:
-    return bool((PERSONAL if private == "personal" else SECRETS).search(str(text)))
-
-
 def spoken_answer(text: str) -> bool | None:
     """A spoken yes or no to the question Nova asked (True: yes), or None when it is neither."""
     said = " ".join(re.sub(r"[^\w\s']", " ", str(text).lower()).split())

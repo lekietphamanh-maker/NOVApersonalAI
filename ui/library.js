@@ -2,6 +2,7 @@
 // the owner's own. It moves with the mouse, the keys, the voice ("next", "open 3", "open robotics") and hand gestures
 // (✋ swipe, ✊ open, 👎 back, ✌ close). Nova owns the data (Markdown in the vault); this page only shows it.
 
+import { h } from "./lab.js";
 import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const SHELVES = { topics: "Topics", projects: "Projects", ideas: "Ideas", needs: "Needs you" };
@@ -9,19 +10,6 @@ const STATUSES = { idea: "Idea", building: "Building", shipped: "Shipped", pause
 const STATUS_ORDER = { building: 0, idea: 1, paused: 2, shipped: 3 };
 const KIND_LABEL = { topic: "Topic", about: "About", project: "Project", idea: "Idea", new: "New", empty: "Empty" };
 const VISIBLE = 5; // cards shown on each side of the one in front
-
-function h(tag, attributes = {}, ...children) {
-  const element = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (value === undefined || value === null || value === false) continue;
-    if (key === "class") element.className = value;
-    else if (key.startsWith("on")) element.addEventListener(key.slice(2), value);
-    else element.setAttribute(key, value === true ? "" : value);
-  }
-  element.append(...children.flat().filter((child) => child !== null && child !== undefined && child !== false)
-    .map((child) => (typeof child === "string" || typeof child === "number" ? document.createTextNode(String(child)) : child)));
-  return element;
-}
 
 const pad = (number) => String(number).padStart(2, "0");
 const fill = (parent, ...children) => { parent.append(...children.filter(Boolean)); return parent; };
@@ -92,7 +80,17 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
   const remembered = {}; // where each shelf was, to come back to it
   let cards = [], elements = [], editing = null, loading = null;
 
-  const accent = () => getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+  const accent = (() => {  // the accent only changes in Settings: don't ask the style engine every frame
+    let cached = "", key = "";
+    return () => {
+      const now = document.documentElement.dataset.accent || "";
+      if (now !== key) {
+        key = now;
+        cached = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+      }
+      return cached;
+    };
+  })();
   mountWhatCanIDo(root, "library", { onPhrase: askPhrase });
 
   // ---------- what is on the shelf ----------
@@ -518,6 +516,5 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
   }
 
   addEventListener("resize", () => { if (opened) place(); });
-  return { open, close, isOpen: () => opened, command, handleKey, reload: () => (opened ? load() : null),
-    state: () => ({ shelf, index, cards: cards.map((card) => card.title), topic: topic && topic.name, expanded }) };
+  return { open, close, isOpen: () => opened, command, handleKey, reload: () => (opened ? load() : null) };
 }

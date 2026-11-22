@@ -483,6 +483,5 @@ export function createCore(canvas, { widget = false } = {}) {
     setLevel(value) { micLevel = Math.max(0, Math.min(1, Number(value) || 0)); },
     setAccent(rgb) { accent = String(rgb).split(",").map((part) => Number(part.trim()) || 0); },
     flashError(milliseconds = 2200) { errorUntil = performance.now() + milliseconds; },
-    get frameCost() { return frameCost; },
   };
 }

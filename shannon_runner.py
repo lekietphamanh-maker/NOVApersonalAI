@@ -36,6 +36,7 @@ STAGE_PATTERNS = {  # words in Shannon's --follow output that say a stage has st
     "report": re.compile(r"\b(reporting|report (phase|agent|generation))\b", re.IGNORECASE),
 }
 SEVERITIES = ("critical", "high", "medium", "low")
+_SEVERITY_RANK = {severity: index for index, severity in enumerate(SEVERITIES)}
 LEVELS = {"error": "high", "warning": "medium", "note": "low"}  # SARIF level → severity when no score is given
 NODE_MAJOR = 20
 TIMEOUT_SECONDS = 4 * 60 * 60
@@ -197,7 +198,7 @@ def findings(sarif: dict) -> list[dict[str, str]]:
                 "proof": _text(result.get("message"))[:1200],
                 "fix": (_text(rule.get("help")) or _text(rule.get("fullDescription")))[:1200],
             })
-    return sorted(cards, key=lambda card: SEVERITIES.index(card["severity"]))
+    return sorted(cards, key=lambda card: _SEVERITY_RANK[card["severity"]])
 
 
 def counts(cards: list[dict[str, str]]) -> dict[str, int]:
@@ -368,11 +369,12 @@ class Shannon:
             cards.append({"severity": incident["severity"], "kind": incident["technique"],
                           "title": f"{incident['technique']}: {first['detail']}"[:160],
                           "where": target, "proof": first["detail"][:1200], "fix": incident["fix"][:1200]})
-        steps = [{**alert, "verdict": by_technique[alert["technique"]]["verdict"],
-                  "confidence": by_technique[alert["technique"]]["confidence"],
-                  "rationale": by_technique[alert["technique"]]["rationale"],
-                  "technique_id": by_technique[alert["technique"]]["technique_id"],
-                  "tactic": by_technique[alert["technique"]]["tactic"]} for alert in alerts]
+        steps = []
+        for alert in alerts:
+            verdict = by_technique[alert["technique"]]
+            steps.append({**alert, "verdict": verdict["verdict"], "confidence": verdict["confidence"],
+                          "rationale": verdict["rationale"], "technique_id": verdict["technique_id"],
+                          "tactic": verdict["tactic"]})
         overall = aisoc.overall_verdict(verdicts)
         ledger.append("aisoc", "triage_done", f"{len(incidents)} incidents from {len(alerts)} steps",
                       overall["verdict"], confidence=overall["confidence"])
@@ -421,9 +423,11 @@ class Shannon:
                 tail = [*tail[-79:], line]
                 self.notify("shannon_line", {"id": job["id"], "line": line})
                 stage = stage_of(line)
-                if stage and STAGES.index(stage) > reached:
-                    reached = STAGES.index(stage)
-                    self.notify("shannon_job", {"job": self.jobs.update(job["id"], stage=stage)})
+                if stage:
+                    index = STAGES.index(stage)
+                    if index > reached:
+                        reached = index
+                        self.notify("shannon_job", {"job": self.jobs.update(job["id"], stage=stage)})
             code = self.process.wait()
         finally:
             timer.cancel()

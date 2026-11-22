@@ -7,7 +7,6 @@ best ones goes to the model as a source to answer from, named, instead of the mo
 from __future__ import annotations
 
 import html
-import re
 import shutil
 import threading
 import xml.etree.ElementTree as ElementTree
@@ -101,7 +100,6 @@ class Wikipedia:
     def __init__(self, folder: Path, opener: Callable[..., Any] = urlopen) -> None:
         self.folder, self._open = Path(folder), opener
         self._archives: dict[Path, Any] = {}
-        self.download_state: dict[str, Any] = {}
         self._lock = threading.Lock()
 
     def installed(self) -> list[Path]:

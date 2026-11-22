@@ -89,8 +89,6 @@
 
 /* bare mode (?bare=1): only the 3D bench, for covers and embeds */
 
-.rl-btn.is-on { background: var(--ink); color: #fff; border-color: var(--ink); }
-
 /* In the Workplace the bench lives in a resizable card: the side panel drops under the stage, then the parts list goes. */
 .rl-host { container-type: size; }
 @container (max-width: 920px) {

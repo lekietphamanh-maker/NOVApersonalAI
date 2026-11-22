@@ -334,7 +334,6 @@ class Lab {
     return item;
   }
   _autoRef(id) { let n = 1, r = id; while (this.items.some(i => i.ref === r)) r = id + (++n); return r; }
-  _size(item) { const bx = new THREE.Box3().setFromObject(item.holder); return bx; }
   _freeSpot(item) {
     const sz = new THREE.Box3().setFromObject(item.holder).getSize(new THREE.Vector3()), hw = sz.x / 2 + 8, hd = sz.z / 2 + 8;
     const boxes = this.items.map(i => new THREE.Box3().setFromObject(i.holder));

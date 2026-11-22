@@ -65,10 +65,12 @@ def resolve_pin(pins: list[dict[str, Any]], query: str) -> str | None:
         if name.casefold() == wanted.casefold():
             return name
     squashed = _squash(wanted)
-    exact = {name for name in names if _squash(name) == squashed}
+    squashed_names = [_squash(name) for name in names]
+    exact = {name for name, squashed_name in zip(names, squashed_names) if squashed_name == squashed}
     if len(exact) == 1:
         return exact.pop()
-    tokens = {name for name in names if squashed in {_squash(token) for token in re.split(r"[\s/·,()]+", name) if token}}
+    tokens = {name for name in names
+              if squashed in {_squash(token) for token in re.split(r"[\s/·,()]+", name) if token}}
     return tokens.pop() if len(tokens) == 1 else None
 
 
@@ -108,12 +110,14 @@ def clean_circuit(circuit: Any) -> dict[str, Any] | None:
     if not isinstance(circuit, dict):
         return None
     parts: list[dict[str, Any]] = []
+    seen_refs: set[str] = set()
     for part in (circuit.get("items") if isinstance(circuit.get("items"), list) else [])[:MAX_CIRCUIT_PARTS]:
         if not isinstance(part, dict):
             continue
         ref, kind = str(part.get("ref") or ""), str(part.get("type") or "")
-        if not PART_REF.fullmatch(ref) or not PART_TYPE.fullmatch(kind) or any(known["ref"] == ref for known in parts):
+        if not PART_REF.fullmatch(ref) or not PART_TYPE.fullmatch(kind) or ref in seen_refs:
             continue
+        seen_refs.add(ref)
         entry: dict[str, Any] = {"ref": ref, "type": kind, "x": max(-5000.0, min(5000.0, _finite(part.get("x")))),
                                  "y": max(-5000.0, min(5000.0, _finite(part.get("y")))),
                                  "rot": int(_finite(part.get("rot"))) % 360 // 90 * 90, "state": _settings(part.get("state"))}
@@ -244,7 +248,7 @@ def _anatomy_figure(circuit: dict[str, Any] | None, title: str, board_id: str, b
     board = next((item for item in items if isinstance(item, dict) and str(item.get("type") or "").startswith("board:")), None)
     parts = sorted((item for item in items if isinstance(item, dict) and item is not board),
                    key=lambda item: str(item.get("ref") or ""))
-    wires = sorted((wire for wire in ((circuit or {}).get("wires") or []) if isinstance(wire, dict)),
+    wires = sorted((wire for wire in wires_all if isinstance(wire, dict)),
                    key=lambda wire: (str(wire.get("a")), str(wire.get("b"))))[:_ANATOMY_MAX_WIRES_DRAWN]
     fig = _AnatomyFig()
     # A heavy base on feet, with a soft halo under it; the board sits on the base.
@@ -441,8 +445,10 @@ class BuildingBench:
     def saved(self) -> list[dict[str, Any]]:
         if not self.folder.exists():
             return []
-        projects = sorted(self.folder.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True)
-        return [{"name": path.stem, "saved": datetime.fromtimestamp(path.stat().st_mtime).strftime("%d %b %H:%M")} for path in projects[:100]]
+        timed = [(path.stat().st_mtime, path) for path in self.folder.glob("*.json")]
+        timed.sort(key=lambda item: item[0], reverse=True)
+        return [{"name": path.stem, "saved": datetime.fromtimestamp(mtime).strftime("%d %b %H:%M")}
+                for mtime, path in timed[:100]]
 
     def load(self, name: str) -> dict[str, Any]:
         path = self.folder / f"{safe_name(name)}.json"

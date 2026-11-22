@@ -11,23 +11,11 @@ export const LAYERS = {
   fires: { label: "Wildfires", color: "#ff8a1f" },
   volcanoes: { label: "Volcanoes", color: "#ff5fd2" },
 };
+import { h } from "./lab.js";
 import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const RADIANS = Math.PI / 180;
 const IDLE_SPIN = 0.012; // degrees per frame while nobody touches it
-
-function h(tag, attributes = {}, ...children) {
-  const element = document.createElement(tag);
-  for (const [key, value] of Object.entries(attributes)) {
-    if (value === undefined || value === null || value === false) continue;
-    if (key === "class") element.className = value;
-    else if (key.startsWith("on")) element.addEventListener(key.slice(2), value);
-    else element.setAttribute(key, value === true ? "" : value);
-  }
-  element.append(...children.flat().filter((child) => child !== null && child !== undefined && child !== false)
-    .map((child) => (typeof child === "string" || typeof child === "number" ? document.createTextNode(String(child)) : child)));
-  return element;
-}
 
 function ago(stamp) {
   const minutes = Math.max(0, Math.round((Date.now() - new Date(stamp).getTime()) / 60000));
@@ -53,6 +41,7 @@ export function createWorld(root, { act, onOpenChange }) {
   const view = { lon: 20, lat: 20, zoom: 1 };
   mountWhatCanIDo(root.querySelector(".world-side"), "world", { onPhrase: askPhrase });
   let flight = null, dragging = null, lastTouch = 0, frame = 0, selected = null;
+  let lineAccent = "", lineAccentKey = "";
 
   async function loadMap() {
     if (map) return;
@@ -74,7 +63,12 @@ export function createWorld(root, { act, onOpenChange }) {
   }
 
   function drawLines(geometry) {
-    const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+    const accentKey = document.documentElement.dataset.accent || "";
+    if (accentKey !== lineAccentKey) {  // the accent only changes in Settings: don't ask the style engine every frame
+      lineAccentKey = accentKey;
+      lineAccent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+    }
+    const accent = lineAccent;
     context.lineWidth = 1 * geometry.scale;
     context.strokeStyle = `rgba(${accent}, 0.10)`;
     for (let lat = -60; lat <= 60; lat += 30) path(Array.from({ length: 73 }, (_, step) => [step * 5 - 180, lat]), geometry);
@@ -268,5 +262,5 @@ export function createWorld(root, { act, onOpenChange }) {
     button.addEventListener("click", () => { days = Number(button.dataset.worldDays); load(); });
   }
 
-  return { open, close, isOpen: () => opened, setData, flyTo, view: () => ({ ...view }), events: () => events.slice() };
+  return { open, close, isOpen: () => opened, setData, flyTo };
 }

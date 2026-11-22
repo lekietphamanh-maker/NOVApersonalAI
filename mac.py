@@ -34,7 +34,6 @@ KEYCODES: dict[int, tuple[int, ...]] = {
          0x01, 0x11, 0x20, 0x09, 0x0D, 0x07, 0x10, 0x06))},
     **{ord(digit): (code,) for digit, code in zip("0123456789", (0x1D, 0x12, 0x13, 0x14, 0x15, 0x17, 0x16, 0x1A, 0x1C, 0x19))},
 }
-KEY_NAMES = {0x11: "Control", 0x12: "Option", 0x5B: "Command", 0x5C: "Command", 0x08: "Delete", 0x0D: "Return"}
 COMBINED_SESSION = 0  # kCGEventSourceStateCombinedSessionState
 KEYCHAIN_SERVICE = "nova-personal-ai"  # no spaces: `security -i` gets it unquoted
 

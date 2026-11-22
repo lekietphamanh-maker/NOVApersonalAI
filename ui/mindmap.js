@@ -895,11 +895,7 @@ export function createMindMap(canvas, { onSelect = () => {}, onChange = () => {}
       return infoOf(node);
     },
     startLink,
-    get linking() { return Boolean(linking); },
     setExpanding(path) { expanding = path ?? null; },
-    /** For tests: where each idea is drawn, in pixels from the canvas' top-left. */
-    screenPositions() { return items.map((item) => ({ label: item.node.label, at: toScreen(item.x, item.y) })); },
-    deselect() { selected = null; },
     /** Map keys while it is open; returns true when the key was used. */
     handleKey(event) {
       if (editing) return false;

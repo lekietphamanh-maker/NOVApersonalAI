@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import ctypes
 import json
-import os
 import platform
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from typing import Any, Callable
 from urllib.request import Request, urlopen
 
@@ -41,9 +40,6 @@ class HardwareProfile:
     gpus: list[dict[str, Any]]
     acceleration_status: str
     notes: list[str]
-
-    def serializable(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 def _ram() -> tuple[float | None, float | None]:

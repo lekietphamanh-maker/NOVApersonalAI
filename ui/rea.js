@@ -38,7 +38,7 @@ export function createRea(root, { act, onOpenChange }) {
   }
   const orbit = { rot: 0, tilt: 0.36, zoom: 1, spin: 0.0016, target: null };
   const pointers = new Map();
-  let drag = null, pinch = 0, placed = [], hover = -1, fitParts = new Set();  // part ids that glow gold, rebuilt once per frame
+  let drag = null, pinch = 0, placed = [], hover = -1, fitParts = new Set();  // part ids that glow gold, rebuilt in render()
   const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const particles = Array.from({ length: PARTICLES }, () => ({
     angle: Math.random() * Math.PI * 2, height: Math.random() * 2 - 1, speed: 0.002 + Math.random() * 0.006,
@@ -87,6 +87,7 @@ export function createRea(root, { act, onOpenChange }) {
   // ---------- the edges: title, counts, the selected part, stages and the timeline ----------
 
   function render() {
+    fitParts = new Set((job?.fit || []).flatMap((finding) => finding.parts || []));  // rebuilt here, not every frame
     const list = parts(), findings = list.reduce((sum, part) => sum + part.findings.length, 0);
     const running = job?.status === "running";
     title.replaceChildren(
@@ -324,7 +325,6 @@ export function createRea(root, { act, onOpenChange }) {
       orbit.rot += orbit.spin;
     }
     context.clearRect(0, 0, g.width, g.height);
-    fitParts = new Set((job?.fit || []).flatMap((finding) => finding.parts || []));
     place(g);
     drawRing(g, g.rx * 1.18, now, false);
     drawRing(g, g.rx, now, running);
@@ -418,6 +418,12 @@ export function createRea(root, { act, onOpenChange }) {
     const result = await act("rea_start", { target: form.target.value, goal: form.goal.value });
     if (result.ok !== false) form.reset();
   });
+  const pickInto = async (kind) => {  // the file window: click a file or folder, its path lands in the target box
+    const result = await act("rea_pick", { kind });
+    if (result.picked && result.path) $("#rea-form").target.value = result.path;
+  };
+  $("#rea-pick-file").onclick = () => pickInto("file");
+  $("#rea-pick-folder").onclick = () => pickInto("folder");
   $("#rea-close").onclick = () => view.close();
 
   return {

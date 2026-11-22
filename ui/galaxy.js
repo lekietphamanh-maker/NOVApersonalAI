@@ -60,7 +60,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
   }
 
   // --- drawing ---
-  function drawFrame(time) {
+  function drawFrame() {
     if (!open) return;
     frameId = requestAnimationFrame(drawFrame);
     ctx.clearRect(0, 0, w, h);
@@ -95,11 +95,12 @@ export function createGalaxy(root, { act, onOpenChange }) {
     }
     ctx.globalAlpha = 1;
 
-    // edges
+    // edges (look the ends up once per frame, not once per edge)
+    const byId = new Map(nodes.map((node) => [node.id, node]));
     for (const edge of edges) {
-      const sn = nodes.find((n) => n.id === edge.source);
-      const tn = nodes.find((n) => n.id === edge.target);
-      if (!sn || !tn) continue;
+      const sn = byId.get(edge.source);
+      const tn = byId.get(edge.target);
+      if (!sn || !tn || sn._hidden || tn._hidden) continue;
       const p1 = project(sn.x, sn.y, sn.z);
       const p2 = project(tn.x, tn.y, tn.z);
       if (!p1 || !p2) continue;
@@ -112,6 +113,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
     // nodes sorted back-to-front
     const projected = [];
     for (const node of nodes) {
+      if (node._hidden) continue;
       const p = project(node.x, node.y, node.z);
       if (!p) continue;
       projected.push({ node, ...p });
@@ -159,6 +161,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
   function nodeAt(mx, my) {
     let best = null, bestDist = 20;
     for (const node of nodes) {
+      if (node._hidden) continue;
       const p = project(node.x, node.y, node.z);
       if (!p) continue;
       const d = Math.hypot(p.sx - mx, p.sy - my);
@@ -256,17 +259,11 @@ export function createGalaxy(root, { act, onOpenChange }) {
     window.removeEventListener("resize", resize);
   }
 
-  function setAccent(rgb) { accent = rgb; }
-
   return {
     isOpen: () => open,
     open: openGalaxy,
     close,
     loadData,
     flyTo,
-    setAccent,
-    update(state) {
-      if (state.galaxy) loadData(state.galaxy);
-    },
   };
 }

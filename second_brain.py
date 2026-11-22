@@ -277,7 +277,9 @@ class Vault:
         scored = []
         for path in self.wiki.glob("*.md"):
             text = path.read_text(encoding="utf-8", errors="replace")
-            score = sum(3 for word in words if word in path.stem.lower()) + sum(1 for word in words if word in text.lower())
+            lower = text.lower()
+            stem = path.stem.lower()
+            score = sum(3 for word in words if word in stem) + sum(1 for word in words if word in lower)
             if score:
                 scored.append((score, path.stem, text))
         out, total = [], 0
@@ -717,13 +719,3 @@ def make_video_ear(transcribe: Callable[[bytes], str], busy: Callable[[], bool])
             return ""  # silence: nothing to transcribe
         return transcribe(samples.tobytes())
     return listen
-
-
-def videos_audible() -> str:
-    """'' when the PC's sound can be recorded for video transcripts, else why not."""
-    try:
-        import soundcard
-        soundcard.default_speaker()
-        return ""
-    except Exception as exc:
-        return f"the PC's sound can't be recorded here ({exc})"

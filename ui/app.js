@@ -170,20 +170,21 @@ function handle(event) {
       event.chat.forEach((item) => addChat(item, false));
       render();
       (event.notices || []).forEach((notice) => toast(notice.text, notice.tone, notice.action));
-      if (new URLSearchParams(location.hash.slice(1)).get("open") === "creative") {
+      const open = new URLSearchParams(location.hash.slice(1)).get("open");
+      if (open === "creative") {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`); // not again on reload
         act("creative");
       }
       if (solo && !labs[solo].isOpen()) labs[solo].open();
-      if (new URLSearchParams(location.hash.slice(1)).get("open") === "building") {
+      if (open === "building") {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`);
         build.open();
       }
-      if (new URLSearchParams(location.hash.slice(1)).get("open") === "workplace") {
+      if (open === "workplace") {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`);
         workplace.open();
       }
-      if (new URLSearchParams(location.hash.slice(1)).get("open") === "library") {
+      if (open === "library") {
         history.replaceState(null, "", `#token=${encodeURIComponent(token)}`);
         library.open();
       } else if (library.isOpen()) act("library_view", { open: true }); // Nova restarted: the Library is still here
@@ -235,6 +236,8 @@ const coverImage = new Image();
 let coverKey = "";
 let discAngle = 0;
 let discLast = performance.now();
+const musicDisc = $("#music-disc"), discContext = musicDisc.getContext("2d");
+let discAccent = "", discAccentKey = "";
 function renderMusic() {
   const music = state.music;
   $("#music").hidden = !music;
@@ -253,9 +256,14 @@ function drawMusic(now) {
   if (!music || $("#music").hidden) return;
   if (music.playing) discAngle += elapsed * 3.46; // 33 rpm
   else musicBands = musicBands.map((level) => level * 0.9);
-  const canvas = $("#music-disc"), context = canvas.getContext("2d");
+  const canvas = musicDisc, context = discContext;
   const size = canvas.width, center = size / 2, radius = size * 0.27;
-  const accent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+  const accentKey = document.documentElement.dataset.accent || "";
+  if (accentKey !== discAccentKey) {  // the accent only changes in Settings: don't ask the style engine every frame
+    discAccentKey = accentKey;
+    discAccent = getComputedStyle(document.documentElement).getPropertyValue("--accent-rgb").trim() || "255, 176, 64";
+  }
+  const accent = discAccent;
   context.clearRect(0, 0, size, size);
   const count = 72;
   context.lineWidth = 4;

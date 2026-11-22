@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import json
 import os
 import re
@@ -547,7 +548,6 @@ class Agent:
 
     def _ask_claude(self, prompt: str, approve_tool: Callable[[str, dict[str, Any]], bool], cancel: Any) -> str | None:
         """One turn on Claude. None when Claude couldn't be reached before saying anything (the local model answers)."""
-        from datetime import datetime
         tools = claude_tools(self._online_tools())
         names = {tool["name"].lower(): tool["name"] for tool in tools}
         # Turning the online brain on covered its searches (only the search words go to DuckDuckGo): no question each time.
@@ -614,7 +614,6 @@ class Agent:
     def _ask_plan(self, prompt: str, approve_tool: Callable[[str, dict[str, Any]], bool], cancel: Any) -> str | None:
         """One turn on Claude through Claude Code (the owner's Claude plan). Claude Code runs the tool loop and calls
         Nova's tools through nova_mcp. None when it couldn't answer before saying anything (the local model answers)."""
-        from datetime import datetime
         approve = lambda name, details: name == "web_search" or approve_tool(name, details)  # noqa: E731
         system = self._plan_system()
         now = f"Now: {datetime.now():%A %d %B %Y, %H:%M} (the owner's local time).\n\n"
@@ -731,7 +730,6 @@ class Agent:
                            cancel: Any) -> str | None:
         """A screen job on Claude, Clicky's way: each SCREEN list comes with a screenshot where every control's number is
         drawn on it. None when Claude couldn't be reached before saying anything (the local model does the job)."""
-        from datetime import datetime
         tools = claude_tools([*SCREEN_TOOLS, *GENERAL_TOOLS])
         names = {tool["name"].lower(): tool["name"] for tool in tools}
         system = [{"type": "text", "text": self._online_system(CLAUDE_SYSTEM) + screen_prompt(self.autopilot) + VISION_NOTE,
@@ -814,7 +812,6 @@ class Agent:
     def _ask_free_cloud(self, prompt: str, approve_tool: Callable[[str, dict[str, Any]], bool], cancel: Any) -> str | None:
         """One turn on the free online brain, like Claude's: no personal data, only safe tools, searches covered by
         turning it on. None when it couldn't answer before saying anything (the local model answers)."""
-        from datetime import datetime
         tools = self._online_tools()
         allowed = {tool["function"]["name"] for tool in tools}
         approve = lambda name, details: name == "web_search" or approve_tool(name, details)  # noqa: E731
