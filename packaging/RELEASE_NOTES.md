@@ -1,3 +1,10 @@
+## New in v2.15.1
+
+- **Nova hears you better**: speech recognition now offers a bigger English model (medium.en) that hears accents better, and a multilingual model that can hear Vietnamese too. Nova also waits 2 seconds of silence before deciding you finished a sentence (was 1.35 s), so she stops cutting you off mid-thought. And she now expects your own words — your name, ECO 251, CHM 151, her commands — with a word list you can edit in Settings.
+- **Emma is the default voice**: a fresh Nova speaks with Emma (British, Kokoro — the most natural voice) instead of falling back to the stiff built-in Windows voice.
+- **Nova's soul**: her personality is rewritten short and punchy, so the small local model actually follows it instead of ignoring it — warm, a little playful, a joke when something's funny, real excitement when you finish something hard. There's a new "Nova's soul" box in Settings where you can write how she talks and jokes, in your own words.
+- **Fixed**: the cloud path used to tell the online brain to "be yourself underneath", which made it drop Nova's personality entirely — online answers came out flat. Nova now stays Nova, whichever brain answers.
+
 ## New in v2.15.0
 
 - **Trading tab** (the new **TRADING** button): Nova's take on the day-trader skill, in plain language. Seven cards — Scan, News, Entry, Exit, Time Machine odds, Risk and Budget — over free public data (Yahoo Finance, SEC EDGAR, the House Clerk). **Paper trading only**: no broker, no keys, no live orders anywhere in the code, and no trade goes through without you saying yes.
