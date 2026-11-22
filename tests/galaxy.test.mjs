@@ -1,1 +1,102 @@
-Ly8gVGhlIEtub3dsZWRnZSBHYWxheHkncyBzZWFyY2g6IHR5cGluZyBhIHF1ZXJ5IGhpZGVzIHRoZSBzdGFycyB0aGF0IGRvbid0IG1hdGNoCi8vICh0aGV5IHN0b3AgYmVpbmcgZHJhd24gYW5kIHN0b3AgYmVpbmcgaG92ZXJhYmxlL2NsaWNrYWJsZSksIGFuZCBjbGVhcmluZyB0aGUKLy8gc2VhcmNoIGJyaW5ncyB0aGVtIGFsbCBiYWNrLiBUaGUgZ2FsYXh5IGRyYXdzIG9uIGEgY2FudmFzLCBzbyB0aGlzIHRlc3Qgc3R1YnMKLy8gdGhlIERPTSBhbmQgYSAyRCBjb250ZXh0IGFuZCByZWFkcyBiYWNrIHdoYXQgZHJhd0ZyYW1lKCkgYWN0dWFsbHkgZHJldy4KaW1wb3J0IHsgdGVzdCB9IGZyb20gIm5vZGU6dGVzdCI7CmltcG9ydCBhc3NlcnQgZnJvbSAibm9kZTphc3NlcnQvc3RyaWN0IjsKCmxldCBub3dNcyA9IDA7Cmdsb2JhbFRoaXMucGVyZm9ybWFuY2UgPSB7IG5vdzogKCkgPT4gbm93TXMgfTsKZ2xvYmFsVGhpcy5kZXZpY2VQaXhlbFJhdGlvID0gMTsKZ2xvYmFsVGhpcy5tYXRjaE1lZGlhID0gKCkgPT4gKHsgbWF0Y2hlczogZmFsc2UgfSk7CmxldCByYWZDYiA9IG51bGw7Cmdsb2JhbFRoaXMucmVxdWVzdEFuaW1hdGlvbkZyYW1lID0gKGNiKSA9PiB7IHJhZkNiID0gY2I7IHJldHVybiAxOyB9OwpnbG9iYWxUaGlzLmNhbmNlbEFuaW1hdGlvbkZyYW1lID0gKCkgPT4ge307Cmdsb2JhbFRoaXMuYWRkRXZlbnRMaXN0ZW5lciA9ICgpID0+IHt9OwpnbG9iYWxUaGlzLnJlbW92ZUV2ZW50TGlzdGVuZXIgPSAoKSA9PiB7fTsKZ2xvYmFsVGhpcy53aW5kb3cgPSBnbG9iYWxUaGlzOwoKZnVuY3Rpb24gbWFrZUVsKHRhZykgewogIGNvbnN0IGVsID0gewogICAgdGFnLCBjaGlsZHJlbjogW10sIHN0eWxlOiB7fSwgY2xhc3NOYW1lOiAiIiwgdGV4dENvbnRlbnQ6ICIiLCB2YWx1ZTogIiIsCiAgICBsaXN0ZW5lcnM6IHt9LCBfcToge30sCiAgICBjbGFzc0xpc3Q6IHsgYWRkKCkge30sIHJlbW92ZSgpIHt9LCB0b2dnbGUoKSB7fSwgY29udGFpbnM6ICgpID0+IGZhbHNlIH0sCiAgICBhZGRFdmVudExpc3RlbmVyKHR5cGUsIGZuKSB7IChlbC5saXN0ZW5lcnNbdHlwZV0gPz89IFtdKS5wdXNoKGZuKTsgfSwKICAgIGFwcGVuZCguLi5jKSB7IGVsLmNoaWxkcmVuLnB1c2goLi4uYyk7IH0sCiAgICBzZXRBdHRyaWJ1dGUoKSB7fSwKICAgIGdldEJvdW5kaW5nQ2xpZW50UmVjdDogKCkgPT4gKHsgbGVmdDogMCwgdG9wOiAwLCB3aWR0aDogODAwLCBoZWlnaHQ6IDYwMCB9KSwKICAgIGNsb3Nlc3Q6ICgpID0+IG51bGwsCiAgICBmb2N1cygpIHt9LAogICAgcXVlcnlTZWxlY3RvcihzZWwpIHsKICAgICAgaWYgKGVsLl9xW3NlbF0pIHJldHVybiBlbC5fcVtzZWxdOwogICAgICBpZiAoc2VsLnN0YXJ0c1dpdGgoIi4iKSkgewogICAgICAgIGNvbnN0IGNscyA9IHNlbC5zbGljZSgxKTsKICAgICAgICByZXR1cm4gZWwuY2hpbGRyZW4uZmluZCgoYykgPT4gKGMuY2xhc3NOYW1lIHx8ICIiKS5zcGxpdCgiICIpLmluY2x1ZGVzKGNscykpID8/IG51bGw7CiAgICAgIH0KICAgICAgcmV0dXJuIGVsLmNoaWxkcmVuLmZpbmQoKGMpID0+IGMudGFnID09PSBzZWwpID8/IG51bGw7CiAgICB9LAogIH07CiAgcmV0dXJuIGVsOwp9Cmdsb2JhbFRoaXMuZG9jdW1lbnQgPSB7CiAgY3JlYXRlRWxlbWVudDogKHRhZykgPT4gbWFrZUVsKHRhZyksCiAgY3JlYXRlVGV4dE5vZGU6ICh0KSA9PiAoeyB0ZXh0Q29udGVudDogdCB9KSwKICBxdWVyeVNlbGVjdG9yOiAoKSA9PiBudWxsLAp9OwoKY29uc3QgbGFiZWxzRHJhd24gPSBbXTsKY29uc3QgY3R4ID0gewogIGZpbGxUZXh0KHRleHQpIHsgbGFiZWxzRHJhd24ucHVzaCh0ZXh0KTsgfSwKICBjbGVhclJlY3QoKSB7fSwgYmVnaW5QYXRoKCkge30sIGFyYygpIHt9LCBmaWxsKCkge30sIHN0cm9rZSgpIHt9LAogIG1vdmVUbygpIHt9LCBsaW5lVG8oKSB7fSwgc2V0VHJhbnNmb3JtKCkge30sCiAgY3JlYXRlUmFkaWFsR3JhZGllbnQ6ICgpID0+ICh7IGFkZENvbG9yU3RvcCgpIHt9IH0pLAp9Owpjb25zdCBjYW52YXMgPSBtYWtlRWwoImNhbnZhcyIpOwpjYW52YXMuZ2V0Q29udGV4dCA9ICgpID0+IGN0eDsKY29uc3QgaW5mbyA9IG1ha2VFbCgiZGl2Iik7CmluZm8uX3EgPSB7IGgzOiBtYWtlRWwoImgzIiksICIua2luZCI6IG1ha2VFbCgiZGl2IiksIHA6IG1ha2VFbCgicCIpIH07CmNvbnN0IHNlYXJjaEVsID0gbWFrZUVsKCJpbnB1dCIpOwpjb25zdCByb290ID0gbWFrZUVsKCJzZWN0aW9uIik7CnJvb3QuX3EgPSB7CiAgY2FudmFzLAogICIuZ2FsYXh5LWluZm8iOiBpbmZvLAogICIuZ2FsYXh5LXNlYXJjaCBpbnB1dCI6IHNlYXJjaEVsLAogICIuZ2FsYXh5LWh1ZCI6IG1ha2VFbCgiZGl2IiksCiAgIi5nYWxheHktdGl0bGUgc21hbGwiOiBtYWtlRWwoInNtYWxsIiksCiAgIi5nYWxheHktY2xvc2UiOiBtYWtlRWwoImJ1dHRvbiIpLAp9OwoKY29uc3QgeyBjcmVhdGVHYWxheHkgfSA9IGF3YWl0IGltcG9ydCgiLi4vdWkvZ2FsYXh5LmpzIik7CmNvbnN0IGdhbGF4eSA9IGNyZWF0ZUdhbGF4eShyb290LCB7IGFjdDogKCkgPT4ge30sIG9uT3BlbkNoYW5nZTogKCkgPT4ge30gfSk7CmdhbGF4eS5sb2FkRGF0YSh7IG5vZGVzOiBbCiAgeyBpZDogInJ1c3QiLCBsYWJlbDogIlJ1c3QiLCBraW5kOiAid2lraSIsIGV4Y2VycHQ6ICJzeXN0ZW1zIGxhbmd1YWdlIiwgeDogLTIwLCB5OiAwLCB6OiAyMCwgc2l6ZTogMSB9LAogIHsgaWQ6ICJweXRob24iLCBsYWJlbDogIlB5dGhvbiIsIGtpbmQ6ICJ3aWtpIiwgZXhjZXJwdDogInNjcmlwdGluZyBsYW5ndWFnZSIsIHg6IDIwLCB5OiAwLCB6OiAyMCwgc2l6ZTogMSB9LAogIHsgaWQ6ICJnbyIsIGxhYmVsOiAiR28iLCBraW5kOiAid2lraSIsIGV4Y2VycHQ6ICJjb21waWxlZCBsYW5ndWFnZSIsIHg6IDAsIHk6IDEwLCB6OiAyMCwgc2l6ZTogMSB9LApdLCBlZGdlczogW3sgc291cmNlOiAicnVzdCIsIHRhcmdldDogInB5dGhvbiIgfV0gfSk7CmdhbGF4eS5vcGVuKCk7CmNvbnN0IGZyYW1lID0gKCkgPT4geyBjb25zdCBjYiA9IHJhZkNiOyByYWZDYiA9IG51bGw7IGNiKDApOyB9OwoKdGVzdCgic2VhcmNoIGhpZGVzIG5vbi1tYXRjaGluZyBzdGFycyBhbmQgdGhleSBzdG9wIGJlaW5nIGhvdmVyYWJsZSIsICgpID0+IHsKICBmcmFtZSgpOwogIGFzc2VydC5kZWVwRXF1YWwoWy4uLmxhYmVsc0RyYXduXS5zb3J0KCksIFsiR28iLCAiUHl0aG9uIiwgIlJ1c3QiXSk7CiAgbGFiZWxzRHJhd24ubGVuZ3RoID0gMDsKCiAgc2VhcmNoRWwudmFsdWUgPSAicnVzdCI7IC8vIFJ1c3QgbWF0Y2hlczsgUHl0aG9uICsgR28gYmVjb21lIGhpZGRlbgogIGZvciAoY29uc3QgZm4gb2Ygc2VhcmNoRWwubGlzdGVuZXJzLmlucHV0KSBmbigpOwogIG5vd01zICs9IDIwMDA7IC8vIGxldCB0aGUgZmx5LXRvIGFuaW1hdGlvbiBmaW5pc2ggc28gcHJvamVjdGlvbiBpcyBkZXRlcm1pbmlzdGljCiAgZnJhbWUoKTsKICBhc3NlcnQuZGVlcEVxdWFsKGxhYmVsc0RyYXduLCBbIlJ1c3QiXSk7CgogIC8vIFB5dGhvbiBwcm9qZWN0cyB0byBzeOKJiDg1Miwgc3k9MzAwIG9uY2UgdGhlIGZseS10byBzZXR0bGVzOyBob3ZlcmluZyB0aGVyZQogIC8vIG11c3Qgbm90IGZpbmQgaXQgYW55IG1vcmUgKGN1cnNvciBzdGF5cyAiZ3JhYiIsIG5vdCAicG9pbnRlciIpLgogIGZvciAoY29uc3QgZm4gb2YgY2FudmFzLmxpc3RlbmVycy5wb2ludGVybW92ZSkgZm4oeyBjbGllbnRYOiA4NTIsIGNsaWVudFk6IDMwMCB9KTsKICBhc3NlcnQubm90RXF1YWwoY2FudmFzLnN0eWxlLmN1cnNvciwgInBvaW50ZXIiKTsKfSk7Cgp0ZXN0KCJjbGVhcmluZyB0aGUgc2VhcmNoIGJyaW5ncyBldmVyeSBzdGFyIGJhY2siLCAoKSA9PiB7CiAgbGFiZWxzRHJhd24ubGVuZ3RoID0gMDsKICBzZWFyY2hFbC52YWx1ZSA9ICIiOwogIGZvciAoY29uc3QgZm4gb2Ygc2VhcmNoRWwubGlzdGVuZXJzLmlucHV0KSBmbigpOwogIGZyYW1lKCk7CiAgYXNzZXJ0LmRlZXBFcXVhbChbLi4ubGFiZWxzRHJhd25dLnNvcnQoKSwgWyJHbyIsICJQeXRob24iLCAiUnVzdCJdKTsKfSk7Cg==
+// The Knowledge Galaxy's search: typing a query hides the stars that don't match
+// (they stop being drawn and stop being hoverable/clickable), and clearing the
+// search brings them all back. The galaxy draws on a canvas, so this test stubs
+// the DOM and a 2D context and reads back what drawFrame() actually drew.
+import { test } from "node:test";
+import assert from "node:assert/strict";
+
+let nowMs = 0;
+globalThis.performance = { now: () => nowMs };
+globalThis.devicePixelRatio = 1;
+globalThis.matchMedia = () => ({ matches: false });
+let rafCb = null;
+globalThis.requestAnimationFrame = (cb) => { rafCb = cb; return 1; };
+globalThis.cancelAnimationFrame = () => {};
+globalThis.addEventListener = () => {};
+globalThis.removeEventListener = () => {};
+globalThis.window = globalThis;
+
+function makeEl(tag) {
+  const el = {
+    tag, children: [], style: {}, className: "", textContent: "", value: "",
+    listeners: {}, _q: {},
+    classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+    addEventListener(type, fn) { (el.listeners[type] ??= []).push(fn); },
+    append(...c) { el.children.push(...c); },
+    setAttribute() {},
+    getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }),
+    closest: () => null,
+    focus() {},
+    querySelector(sel) {
+      if (el._q[sel]) return el._q[sel];
+      if (sel.startsWith(".")) {
+        const cls = sel.slice(1);
+        return el.children.find((c) => (c.className || "").split(" ").includes(cls)) ?? null;
+      }
+      return el.children.find((c) => c.tag === sel) ?? null;
+    },
+  };
+  return el;
+}
+globalThis.document = {
+  createElement: (tag) => makeEl(tag),
+  createTextNode: (t) => ({ textContent: t }),
+  querySelector: () => null,
+};
+
+const labelsDrawn = [];
+const ctx = {
+  fillText(text) { labelsDrawn.push(text); },
+  clearRect() {}, beginPath() {}, arc() {}, fill() {}, stroke() {},
+  moveTo() {}, lineTo() {}, setTransform() {},
+  createRadialGradient: () => ({ addColorStop() {} }),
+};
+const canvas = makeEl("canvas");
+canvas.getContext = () => ctx;
+const info = makeEl("div");
+info._q = { h3: makeEl("h3"), ".kind": makeEl("div"), p: makeEl("p") };
+const searchEl = makeEl("input");
+const root = makeEl("section");
+root._q = {
+  canvas,
+  ".galaxy-info": info,
+  ".galaxy-search input": searchEl,
+  ".galaxy-hud": makeEl("div"),
+  ".galaxy-title small": makeEl("small"),
+  ".galaxy-close": makeEl("button"),
+};
+
+const { createGalaxy } = await import("../ui/galaxy.js");
+const galaxy = createGalaxy(root, { act: () => {}, onOpenChange: () => {} });
+galaxy.loadData({ nodes: [
+  { id: "rust", label: "Rust", kind: "wiki", excerpt: "systems language", x: -20, y: 0, z: 20, size: 1 },
+  { id: "python", label: "Python", kind: "wiki", excerpt: "scripting language", x: 20, y: 0, z: 20, size: 1 },
+  { id: "go", label: "Go", kind: "wiki", excerpt: "compiled language", x: 0, y: 10, z: 20, size: 1 },
+], edges: [{ source: "rust", target: "python" }] });
+galaxy.open();
+const frame = () => { const cb = rafCb; rafCb = null; cb(0); };
+
+test("search hides non-matching stars and they stop being hoverable", () => {
+  frame();
+  assert.deepEqual([...labelsDrawn].sort(), ["Go", "Python", "Rust"]);
+  labelsDrawn.length = 0;
+
+  searchEl.value = "rust"; // Rust matches; Python + Go become hidden
+  for (const fn of searchEl.listeners.input) fn();
+  nowMs += 2000; // let the fly-to animation finish so projection is deterministic
+  frame();
+  assert.deepEqual(labelsDrawn, ["Rust"]);
+
+  // Python projects to sx≈852, sy=300 once the fly-to settles; hovering there
+  // must not find it any more (cursor stays "grab", not "pointer").
+  for (const fn of canvas.listeners.pointermove) fn({ clientX: 852, clientY: 300 });
+  assert.notEqual(canvas.style.cursor, "pointer");
+});
+
+test("clearing the search brings every star back", () => {
+  labelsDrawn.length = 0;
+  searchEl.value = "";
+  for (const fn of searchEl.listeners.input) fn();
+  frame();
+  assert.deepEqual([...labelsDrawn].sort(), ["Go", "Python", "Rust"]);
+});
