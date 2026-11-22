@@ -495,9 +495,12 @@ function updateHandMusic(now) {
   }
   const zoneEvents = [];
   for (const [pointer, side] of [[left, "left"], [right, "right"]]) {
-    if (!pointer) continue;
-    const tip = pointer.screen[8];
-    zoneEvents.push(...handMusic.zones.update(side, { x: tip.x / view.width, y: tip.y / view.height }, now, aspect));
+    // A missing hand is fed as null on purpose: the zone engine needs the null to report
+    // TRACKING_LOST after its loss window. Skipping the side would leave a zone the vanished
+    // hand was inside stuck "inside" forever, with no EXIT ever firing.
+    const tip = pointer?.screen?.[8];
+    zoneEvents.push(...handMusic.zones.update(side,
+      tip ? { x: tip.x / view.width, y: tip.y / view.height } : null, now, aspect));
   }
   const { params, events } = handMusic.instrument.update({ left: left?.landmarks ?? null, right: right?.landmarks ?? null, zoneEvents, now });
   handMusic.lastParams = params;

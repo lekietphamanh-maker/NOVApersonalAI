@@ -13,9 +13,9 @@
 //  - Zones live in screen fractions (the fingertip you see on screen), not metres in XR space.
 
 export const ZONE_NOTES = Object.freeze([
-  { id: "A", name: "LEFT FIELD", freq: 293.66, pan: -0.4 },  // D3
-  { id: "B", name: "RIGHT FIELD", freq: 392.0, pan: 0 },    // G4
-  { id: "C", name: "CENTER TRIGGER", freq: 440.0, pan: 0.4 }, // A4
+  { id: "A", name: "LEFT FIELD", freq: 293.66, pan: -0.4 },  // D4, left
+  { id: "B", name: "RIGHT FIELD", freq: 392.0, pan: 0.4 },  // G4, right
+  { id: "C", name: "CENTER TRIGGER", freq: 440.0, pan: 0 }, // A4, centre
 ]);
 
 /** Default zones: centre x/y as fractions of screen width/height, radius as a fraction of screen height. */

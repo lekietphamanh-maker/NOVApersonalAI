@@ -16,7 +16,6 @@ and upload, and a public-IP lookup), and no device list or speed history is ever
 from __future__ import annotations
 
 import json
-import math
 import re
 import socket
 import subprocess
@@ -273,10 +272,9 @@ class NetworkPanel:
             pass
         if not info["ipv4"]:
             try:
-                probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                probe.connect(("8.8.8.8", 80))
-                info["ipv4"] = probe.getsockname()[0]
-                probe.close()
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                    probe.connect(("8.8.8.8", 80))
+                    info["ipv4"] = probe.getsockname()[0]
             except OSError:
                 pass
         try:

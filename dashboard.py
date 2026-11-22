@@ -696,13 +696,17 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.ui.stop()
         if self.tray is not None:
             self.tray.stop()
+        self._close_browser_window()
+        self.root.destroy()
+
+    def _close_browser_window(self) -> None:
+        """Kill just Nova's browser window (the whole Edge tree on Windows), leaving Nova running."""
         if self.window_process is not None and self.window_process.poll() is None:
             if IS_WINDOWS:  # the whole Edge tree (renderers, crash handler), so nothing outlives Nova
                 subprocess.run(["taskkill", "/PID", str(self.window_process.pid), "/T", "/F"], capture_output=True,
                                check=False, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             else:
                 self.window_process.terminate()
-        self.root.destroy()
 
     # ---------- state the HUD renders ----------
 
@@ -4534,6 +4538,29 @@ def _claude_sdk_bundled() -> bool:
         return False
 
 
+SMOKE_WAIT_SECONDS = 90.0
+
+
+def _smoke_retry(connected: bool, elapsed: float, retries_used: int,
+                 wait_seconds: float = SMOKE_WAIT_SECONDS) -> str:
+    """What the smoke test does next: "connected" (the HUD reached us), "wait" (still inside the
+    window), "retry" (one relaunch left) or "fail" (out of tries)."""
+    if connected:
+        return "connected"
+    if elapsed <= wait_seconds:
+        return "wait"
+    return "retry" if retries_used == 0 else "fail"
+
+
+def _log_smoke_never_connected(app: "AlfredApp") -> None:
+    """The diagnostic for a HUD that never connected: is the browser there, and what did it ask for?"""
+    browser = app.window_process
+    _console_log("Nova smoke test: the HUD never connected. Browser: "
+                 f"{app_window.find_edge()}; its process: "
+                 f"{'none' if browser is None else 'running' if browser.poll() is None else f'exited {browser.returncode}'}; "
+                 f"pages asked for: {list(app.ui.requests) or 'none'}", error=True)
+
+
 def main() -> int:
     global MODEL
     if "--screen-assist" in sys.argv:
@@ -4601,9 +4628,12 @@ def main() -> int:
         app._status_loop()
         if args.smoke_test:
             started = time.monotonic()
+            retries = 0  # one relaunch after a first try that never connected
 
             def check_connected() -> None:
-                if app.ui.ever_connected.is_set():
+                nonlocal started, retries
+                step = _smoke_retry(app.ui.ever_connected.is_set(), time.monotonic() - started, retries)
+                if step == "connected":
                     # Approvals rely on finding the window by its title; check that too when Edge drew it.
                     window = app_window.find_window() if app_window.find_edge() and IS_WINDOWS else True
                     if window or time.monotonic() - started > 90:
@@ -4621,12 +4651,23 @@ def main() -> int:
                         root.after(1500, app._close)
                         return
                     root.after(500, check_connected)
-                elif time.monotonic() - started > 90:
-                    browser = app.window_process
-                    _console_log("Nova smoke test: the HUD never connected. Browser: "
-                                 f"{app_window.find_edge()}; its process: "
-                                 f"{'none' if browser is None else 'running' if browser.poll() is None else f'exited {browser.returncode}'}; "
-                                 f"pages asked for: {list(app.ui.requests) or 'none'}", error=True)
+                elif step == "retry":
+                    # A cold browser on the runner sometimes never loads the HUD at all; one
+                    # relaunch is cheaper than failing the whole build on that flake.
+                    _log_smoke_never_connected(app)
+                    _console_log("Nova smoke test: relaunching the browser once and waiting again", error=True)
+                    app._close_browser_window()
+                    app.window_opened_at = 0
+                    started = time.monotonic()
+                    retries += 1
+
+                    def relaunch() -> None:
+                        app._open_window()
+                        root.after(500, check_connected)
+
+                    root.after(2000, relaunch)  # let the killed browser let go of its profile first
+                elif step == "fail":
+                    _log_smoke_never_connected(app)
                     app.smoke_failed = True
                     app._close()
                 else:

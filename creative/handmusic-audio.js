@@ -18,9 +18,9 @@ export const VOICES = Object.freeze([
 ]);
 
 export const ZONE_PINGS = Object.freeze([
-  { zone: "A", freq: 293.66, pan: -0.4, dur: 0.42 }, // D3, left
-  { zone: "B", freq: 392.0, pan: 0, dur: 0.5 },     // G4, centre
-  { zone: "C", freq: 440.0, pan: 0.4, dur: 0.58 },  // A4, right
+  { zone: "A", freq: 293.66, pan: -0.4, dur: 0.42 }, // D4, left
+  { zone: "B", freq: 392.0, pan: 0.4, dur: 0.5 },   // G4, right
+  { zone: "C", freq: 440.0, pan: 0, dur: 0.58 },    // A4, centre
 ]);
 
 const bound = (x, a, b) => Math.min(b, Math.max(a, Number.isFinite(x) ? x : a));

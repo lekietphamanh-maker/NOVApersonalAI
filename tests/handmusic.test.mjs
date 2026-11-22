@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   ZONE_NOTES, bendDeg, createHandMusicInstrument, createZoneEngine, defaultZones, handBends, palmDistance,
 } from "../creative/handmusic.js";
+import { ZONE_PINGS } from "../creative/handmusic-audio.js";
 
 /** A flat hand: wrist at (0.5, 0.8), middle knuckle 0.2 above it, thumb and index tips `gap` apart (palm units: palm = 0.2). */
 function hand(gapPalm = 1, wristY = 0.8) {
@@ -93,14 +94,29 @@ test("tracking loss never fabricates an EXIT: it reports TRACKING_LOST", () => {
   assert.equal(events.length, 1);
   assert.equal(events[0].type, "TRACKING_LOST");
   assert.ok(!events.some((e) => e.type === "EXIT"));
+  // The zone un-sticks: it is no longer inside, and a longer absence reports nothing more.
+  assert.equal(engine.isInside("right", "A"), false);
+  assert.deepEqual(engine.update("right", null, 600), []);
   // And the zone is forgotten: re-entering needs the dwell again.
-  assert.deepEqual(engine.update("right", inside, 400), []);
+  assert.deepEqual(engine.update("right", inside, 700), []);
+  assert.equal(engine.update("right", inside, 760)[0].type, "ENTER");
 });
 
-test("each zone has its own note and pan", () => {
+test("each zone has its own note and pan, matching where it sits on screen", () => {
   assert.deepEqual(ZONE_NOTES.map((z) => z.id), ["A", "B", "C"]);
   assert.ok(ZONE_NOTES[0].freq < ZONE_NOTES[1].freq && ZONE_NOTES[1].freq < ZONE_NOTES[2].freq);
-  assert.ok(ZONE_NOTES[0].pan < 0 && ZONE_NOTES[1].pan === 0 && ZONE_NOTES[2].pan > 0);
+  // A sits left (cx 0.2), B sits right (cx 0.8), C sits centre (cx 0.5): the pans must match.
+  assert.ok(ZONE_NOTES[0].pan < 0 && ZONE_NOTES[1].pan > 0 && ZONE_NOTES[2].pan === 0);
+});
+
+test("zone pings in the synth match the logic's notes and pans", () => {
+  // The note/pan table lives in two files (logic + synth); they must never drift apart again.
+  assert.deepEqual(ZONE_PINGS.map((p) => p.zone), ZONE_NOTES.map((z) => z.id));
+  for (const note of ZONE_NOTES) {
+    const ping = ZONE_PINGS.find((p) => p.zone === note.id);
+    assert.equal(ping.freq, note.freq);
+    assert.equal(ping.pan, note.pan);
+  }
 });
 
 test("pinch gate has hysteresis and opens the filter as the hand opens", () => {

@@ -27,6 +27,13 @@ def ui_folder() -> Path:
     return Path(getattr(sys, "_MEIPASS", Path(__file__).parent)) / "ui"
 
 
+class _UiHttpServer(ThreadingHTTPServer):
+    daemon_threads = True
+    # A cold browser asks for the page, its CSS, fonts and scripts all at once; the default
+    # listen backlog of 5 turns some of those connections away before the server ever sees them.
+    request_queue_size = 64
+
+
 class _Handler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".js": "text/javascript", ".css": "text/css",
                       ".html": "text/html", ".woff2": "font/woff2", ".svg": "image/svg+xml", ".png": "image/png"}
@@ -84,7 +91,26 @@ class _Handler(SimpleHTTPRequestHandler):
             return
         super().do_GET()
 
+    def _drain_body(self) -> bytes:
+        """Read the request body (kept up to MAX_ACTION_BYTES) before answering: a connection
+        closed with bytes still unread is reset by the OS, and on Windows the client then loses
+        the answer (ConnectionAbortedError WinError 10053) instead of reading the 401/403."""
+        try:
+            remaining = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return b""
+        body = b""
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 65536))
+            if not chunk:
+                break
+            if len(body) < MAX_ACTION_BYTES:
+                body += chunk[:MAX_ACTION_BYTES - len(body)]
+            remaining -= len(chunk)
+        return body
+
     def do_POST(self) -> None:  # noqa: N802
+        body = self._drain_body()
         if (urlsplit(self.path).path == "/api/replace" and self._loopback_host()
                 and self.headers.get("Content-Type") == "application/json"):
             # A newer Nova is starting: this one quits so the new one takes over. JSON only, so a web page
@@ -100,8 +126,8 @@ class _Handler(SimpleHTTPRequestHandler):
             self._json(401, {"error": "not paired"})
             return
         try:
-            body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), MAX_ACTION_BYTES)))
-            name, args = str(body["name"]), body.get("args") or {}
+            parsed = json.loads(body)
+            name, args = str(parsed["name"]), parsed.get("args") or {}
             if not isinstance(args, dict):
                 raise ValueError("args must be an object")
         except (ValueError, KeyError, TypeError):
@@ -160,10 +186,9 @@ class UiServer:
         if self._httpd is None:
             handler = partial(_Handler, directory=str(ui_folder()), server_state=self)
             try:
-                self._httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
+                self._httpd = _UiHttpServer(("127.0.0.1", port), handler)
             except OSError:
-                self._httpd = ThreadingHTTPServer(("127.0.0.1", 0), handler)
-            self._httpd.daemon_threads = True
+                self._httpd = _UiHttpServer(("127.0.0.1", 0), handler)
             threading.Thread(target=self._httpd.serve_forever, name="AlfredUi", daemon=True).start()
         return self.url
 

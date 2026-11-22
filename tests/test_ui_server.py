@@ -31,13 +31,21 @@ class UiServerTests(unittest.TestCase):
         return response.status, response.read()
 
     def test_actions_need_the_token_and_a_loopback_host(self) -> None:
-        self.assertEqual(self.request("POST", "/api/action", {"name": "send"}, token="wrong")[0], 401)
+        # A wrong token with a body, several times over: answering 401 without reading the body
+        # used to reset the connection on Windows, so the client saw an aborted connection.
+        for _ in range(10):
+            self.assertEqual(self.request("POST", "/api/action", {"name": "send"}, token="wrong")[0], 401)
         self.assertEqual(self.request("POST", "/api/action", {"name": "send"})[0], 401)
         self.assertEqual(self.request("POST", "/api/action", {"name": "send"}, self.server.token, host="evil.example:80")[0], 403)
         self.assertEqual(self.actions, [])
         status, body = self.request("POST", "/api/action", {"name": "send", "args": {"text": "hi"}}, self.server.token)
         self.assertEqual((status, json.loads(body)), (200, {"ok": True, "echo": "send"}))
         self.assertEqual(self.actions, [("send", {"text": "hi"})])
+
+    def test_the_server_queues_a_cold_browsers_burst_of_requests(self) -> None:
+        # A cold browser asks for the page, its CSS, fonts and scripts all at once; the default
+        # listen backlog of 5 turns some of those connections away before the server sees them.
+        self.assertGreaterEqual(self.server._httpd.request_queue_size, 32)
 
     def test_page_is_served_with_a_content_security_policy(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)

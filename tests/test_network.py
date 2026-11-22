@@ -261,6 +261,19 @@ class PanelTests(unittest.TestCase):
         (Path(self.tmp.name) / "network_history.json").write_text("{not json", encoding="utf-8")
         self.assertEqual(self.panel().history, [])
 
+    def test_tool_turn_reaches_the_panel(self) -> None:
+        """Regression: the v2.15.2 merge wired agent.py's execute_tool call with network=, but
+        ToolContext had no network field, so ANY tool turn crashed with TypeError. A tool turn
+        with the panel wired must answer, and without it must say so plainly instead of crashing."""
+        from tools import execute_tool
+
+        panel = self.panel()
+        result = execute_tool("network", {"action": "status"}, None, lambda *_: True, network=panel.answer)
+        self.assertIn("Network status", result)
+        self.assertIn("HomeNet-5G", result)
+        self.assertIn("Network isn't set up yet",
+                      execute_tool("network", {"action": "status"}, None, lambda *_: True))
+
 
 if __name__ == "__main__":
     unittest.main()
