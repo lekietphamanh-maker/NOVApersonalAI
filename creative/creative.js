@@ -10,6 +10,8 @@ import {
   ringPositions, rollAngle, smooth, twoHandChange, videoToScreen,
 } from "./gestures.js";
 import { LENSES, LENS_NAMES, createKissCam, createLensRenderer } from "./lenses.js";
+import { VOICES, createHandMusicInstrument, createZoneEngine } from "./handmusic.js";
+import { HandMusicSynth } from "./handmusic-audio.js";
 
 // Holograms take Nova's color, passed as #accent=r, g, b; gold by default.
 const ACCENT_RGB = (() => {
@@ -412,9 +414,12 @@ function track(now, dt) {
     const wasPinching = pointer.pinching;
     pointer.pinching = isPinching(pointer.landmarks, wasPinching);
     pointers.set(key, pointer);
-    if (pointer.pinching && !wasPinching) startGrab(pointer);
-    if (!pointer.pinching && wasPinching) endGrab(pointer);
-    swipeToSpin(pointer, dt);
+    // While Hand Music is on, a pinch plays notes instead of grabbing holograms.
+    if (!handMusic.on) {
+      if (pointer.pinching && !wasPinching) startGrab(pointer);
+      if (!pointer.pinching && wasPinching) endGrab(pointer);
+      swipeToSpin(pointer, dt);
+    }
   });
   for (const [key, pointer] of pointers) {
     if (!seen.has(key)) { endGrab(pointer); pointers.delete(key); } // hand left the picture
@@ -433,6 +438,106 @@ function track(now, dt) {
     }
   }
   watchPeaceSign(now);
+}
+
+// ---------- Hand Music: play music with your hands ----------
+//
+// The logic lives in handmusic.js (zones, gesture mapping) and handmusic-audio.js (the synth),
+// both adapted from the patterns in ewanqian/performable-music's hand-osc-lab. The input here is
+// Nova's own webcam tracking (MediaPipe, 21 landmarks), never the lab's headset input.
+// Sound goes to the default output — the same speaker Nova's voice uses.
+const handMusic = {
+  on: false, synth: new HandMusicSynth(),
+  zones: createZoneEngine(), instrument: createHandMusicInstrument(),
+  volume: (() => { try { return Math.min(100, Math.max(0, Number(localStorage.getItem("nova-handmusic-volume")) || 50)); } catch { return 50; } })(),
+  lastParams: null,
+};
+
+async function setHandMusic(on) {
+  const button = document.getElementById("handmusic-button");
+  const panel = document.getElementById("handmusic-panel");
+  const stateLine = document.getElementById("handmusic-state");
+  if (on === handMusic.on) return;
+  if (on) {
+    try {
+      await handMusic.synth.start();
+    } catch (error) {
+      setStatus(`Hand Music: audio failed to start (${error.message}).`);
+      return;
+    }
+    handMusic.synth.setVolume(handMusic.volume / 100);
+    handMusic.zones.reset(); handMusic.instrument.reset();
+    handMusic.on = true;
+    button.classList.add("on"); panel.hidden = false;
+    stateLine.textContent = "Listening — pinch to play";
+    setStatus("Hand Music on: pinch to play a note, move your index fingertip into a glowing circle to ring it.");
+  } else {
+    handMusic.on = false;
+    handMusic.synth.panic(); // stop everything now: no drone may survive the mode being off
+    handMusic.zones.reset(); handMusic.instrument.reset();
+    button.classList.remove("on"); panel.hidden = true;
+    stateLine.textContent = "Off";
+    setStatus("Hand Music off.");
+  }
+}
+
+/** Feed the tracked hands into the music logic, once per frame. Called from frame(). */
+function updateHandMusic(now) {
+  if (!handMusic.on) return;
+  const aspect = view.width / Math.max(1, view.height);
+  let left = null, right = null;
+  for (const [key, pointer] of pointers) {
+    if (key === "mouse" || !pointer.landmarks || !pointer.screen) continue;
+    if (key.startsWith("Left") && !left) left = pointer;
+    else if (key.startsWith("Right") && !right) right = pointer;
+    else if (!left) left = pointer;
+    else if (!right) right = pointer;
+  }
+  const zoneEvents = [];
+  for (const [pointer, side] of [[left, "left"], [right, "right"]]) {
+    if (!pointer) continue;
+    const tip = pointer.screen[8];
+    zoneEvents.push(...handMusic.zones.update(side, { x: tip.x / view.width, y: tip.y / view.height }, now, aspect));
+  }
+  const { params, events } = handMusic.instrument.update({ left: left?.landmarks ?? null, right: right?.landmarks ?? null, zoneEvents, now });
+  handMusic.lastParams = params;
+  let lost = false;
+  for (const event of events) {
+    if (event.type === "ZONE_ENTER") handMusic.synth.triggerZone(event.zone);
+    else if (event.type === "ZONE_LOST") lost = true; // hand vanished: fade, never invent a note-off
+  }
+  if (lost || !left && !right) handMusic.synth.release();
+  handMusic.synth.update(params, now);
+  const stateLine = document.getElementById("handmusic-state");
+  stateLine.textContent = params.gate ? `Playing · ${VOICES[params.timbre].name}` : `Listening · ${VOICES[params.timbre].name}`;
+}
+
+function drawHandMusicZones() {
+  if (!handMusic.on) return;
+  const aspect = view.width / Math.max(1, view.height);
+  for (const zone of handMusic.zones.zones) {
+    const cx = zone.cx * view.width, cy = zone.cy * view.height, r = zone.r * view.height;
+    const inside = handMusic.zones.isInside("left", zone.id) || handMusic.zones.isInside("right", zone.id);
+    hudContext.beginPath();
+    hudContext.arc(cx, cy, r, 0, Math.PI * 2);
+    hudContext.strokeStyle = inside ? `rgba(${ACCENT_RGB}, 0.95)` : `rgba(${ACCENT_RGB}, 0.45)`;
+    hudContext.lineWidth = inside ? 3 : 1.5;
+    hudContext.stroke();
+    hudContext.fillStyle = inside ? `rgba(${ACCENT_RGB}, 0.18)` : `rgba(${ACCENT_RGB}, 0.05)`;
+    hudContext.fill();
+    hudContext.fillStyle = `rgba(${ACCENT_RGB}, 0.9)`;
+    hudContext.font = "600 11px Segoe UI, system-ui, sans-serif";
+    hudContext.textAlign = "center";
+    hudContext.fillText(`${zone.id} · ${zone.name}`, cx, cy - r - 8);
+    hudContext.textAlign = "left";
+  }
+  if (handMusic.lastParams) {
+    const p = handMusic.lastParams;
+    hudContext.fillStyle = `rgba(${ACCENT_RGB}, 0.85)`;
+    hudContext.font = "600 11px Segoe UI, system-ui, sans-serif";
+    hudContext.fillText(`cutoff ${(p.cutoff * 100) | 0}% · resonance ${(p.resonance * 100) | 0}% · spread ${(p.spread * 100) | 0}% · energy ${(p.energy * 100) | 0}%`,
+      26, view.height - 48);
+  }
 }
 
 function trackObjects(now, videoSize) {
@@ -857,6 +962,7 @@ function drawHud(now) {
   drawOrb(now);
   drawKissCam(now);
   drawCountdown(now);
+  drawHandMusicZones();
   hudContext.lineWidth = 2;
   for (const [key, pointer] of pointers) {
     if (key === "mouse" || !pointer.screen) continue;
@@ -904,6 +1010,7 @@ function frame(now) {
   holoTime.value = now / 1000;
   fps += ((dt > 0 ? 1 / dt : 0) - fps) * 0.05;
   track(now, dt);
+  updateHandMusic(now);
   if (lens !== "normal") lensRenderer.draw(lens, video, now, faceWidth);
   updateKissCam(now);
   updatePhoto(now);
@@ -917,7 +1024,7 @@ function frame(now) {
   if (frameCount % 15 === 0 && window.creative.tracking) {
     const hands = [...pointers.keys()].filter((key) => key !== "mouse").length;
     const seen = shownObjects.map((item) => item.label).join(", ") || "—";
-    setStatus(`Hands ${hands} · face ${face ? "locked" : "—"} · sees ${seen} · ${objects.length} holograms · ${fps.toFixed(0)} fps`);
+    setStatus(`Hands ${hands} · face ${face ? "locked" : "—"} · sees ${seen} · ${objects.length} holograms${handMusic.on ? ` · 🎵 ${VOICES[handMusic.lastParams?.timbre ?? 0].name} · vol ${handMusic.volume}%` : ""} · ${fps.toFixed(0)} fps`);
   }
 }
 
@@ -945,6 +1052,7 @@ function runCommand(command) {
   else if (command.action === "photo") startPhoto();             // "Hey Nova, take a photo"
   else if (command.action === "lens") setLens(command.lens);
   else if (command.action === "kiss_cam") setKissCam(command.on !== false);
+  else if (command.action === "hand_music") setHandMusic(command.on !== false);
   else if (command.action === "style") applyStyle(command.style);
   else if (command.action === "label") {
     scanLabel = { text: command.text, box: scanLabel?.box ?? snapshotBox().box, at: performance.now() };
@@ -994,10 +1102,25 @@ addEventListener("keydown", (event) => {
   else if (event.key === " ") { event.preventDefault(); startPhoto(); }
   else if (event.key.toLowerCase() === "l") setLens(LENSES[(LENSES.indexOf(lens) + 1) % LENSES.length]);
   else if (event.key.toLowerCase() === "k") setKissCam(!kissCamOn);
+  else if (event.key.toLowerCase() === "m") setHandMusic(!handMusic.on);
 });
 document.getElementById("photo").addEventListener("click", startPhoto);
 document.getElementById("lens-button").addEventListener("click", () => setLens(LENSES[(LENSES.indexOf(lens) + 1) % LENSES.length]));
 document.getElementById("kisscam").addEventListener("click", () => setKissCam(!kissCamOn));
+document.getElementById("handmusic-button").addEventListener("click", () => setHandMusic(!handMusic.on));
+document.getElementById("handmusic-volume").value = String(handMusic.volume);
+document.getElementById("handmusic-volume-value").textContent = `${handMusic.volume}%`;
+document.getElementById("handmusic-voice").addEventListener("change", (event) => handMusic.instrument.setTimbre(event.target.value));
+document.getElementById("handmusic-volume").addEventListener("input", (event) => {
+  handMusic.volume = Number(event.target.value);
+  document.getElementById("handmusic-volume-value").textContent = `${handMusic.volume}%`;
+  handMusic.synth.setVolume(handMusic.volume / 100);
+  try { localStorage.setItem("nova-handmusic-volume", String(handMusic.volume)); } catch { /* private mode */ }
+});
+document.getElementById("handmusic-test").addEventListener("click", async () => {
+  try { await handMusic.synth.start(); handMusic.synth.setVolume(handMusic.volume / 100); handMusic.synth.soundCheck(); }
+  catch (error) { setStatus(`Hand Music: audio failed to start (${error.message}).`); }
+});
 addEventListener("resize", resize);
 
 window.creative = { objects, addShape, runCommand, pointers, tracking: false, trackingError: null, orb, fireControl,
