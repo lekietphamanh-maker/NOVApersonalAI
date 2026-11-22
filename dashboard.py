@@ -3347,7 +3347,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self._open_file(str(self._lab_job(args, "shannon").get("report") or ""))
 
     def _act_galaxy_data(self, _args: dict[str, Any]) -> None:
-        vault_folder = self.vault.folder if self.vault else None
+        vault_folder = self._vault_folder()
         facts = self.memory.list_facts(limit=40)
         graph = knowledge_galaxy.build_graph(vault_folder=vault_folder, facts=facts)
         self.ui.emit({"type": "galaxy_data", "graph": graph})

@@ -872,7 +872,7 @@ function renderReminders() {
 
 function renderSkills() {
   const skills = state.skills || { list: [] };
-  const list = $("#skills");
+  const list = $("#skills-list");
   const signature = JSON.stringify(skills);
   if (list.dataset.signature === signature) return;
   list.dataset.signature = signature;

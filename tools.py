@@ -509,12 +509,25 @@ def _expected(name: str) -> tuple[set[str], set[str]] | None:
     return set(parameters["properties"]), set(parameters["required"])
 
 
+def _bad_argument(value: Any) -> bool:
+    """True if a tool argument value is not a short string, number, true/false, or a list/object of those."""
+    if isinstance(value, str):
+        return len(value) > 4000
+    if isinstance(value, (bool, int)) or value is None:
+        return False
+    if isinstance(value, list):
+        return len(value) > 100 or any(_bad_argument(item) for item in value)
+    if isinstance(value, dict):
+        return len(value) > 100 or any(_bad_argument(key) or _bad_argument(item) for key, item in value.items())
+    return True
+
+
 def _invalid_arguments(name: str, arguments: Any) -> str | None:
     allowed, required = _expected(name)
     if not isinstance(arguments, dict) or not required <= set(arguments) <= allowed:
         return f"Tool arguments were invalid; expected {sorted(required)} (optional: {sorted(allowed - required)})."
-    if any(not isinstance(value, (str, int)) or (isinstance(value, str) and len(value) > 4000) for value in arguments.values()):
-        return "Tool arguments were invalid; values must be short text or numbers."
+    if any(_bad_argument(value) for value in arguments.values()):
+        return "Tool arguments were invalid; values must be short text, numbers, true/false, or lists/objects of those."
     return None
 
 
