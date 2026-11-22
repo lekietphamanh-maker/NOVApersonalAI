@@ -224,7 +224,7 @@ def _scan_setups(bars: list[dict[str, Any]]) -> list[str]:
     setups: list[str] = []
     last = bars[-1]
     if len(bars) >= 21:
-        top = _range_levels(bars[-21:-1])[0]
+        top = max(bar["high"] for bar in bars[-21:-1])
         if last["close"] > top:
             setups.append(f"Breakout — closed above the 20-day high ({_dollars(top)})")
     value = rsi(bars)

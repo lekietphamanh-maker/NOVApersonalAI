@@ -490,6 +490,7 @@ def execute_library_tool(arguments: dict[str, Any], approve: Callable[[str, dict
 def execute_location_tool(name: str, arguments: dict[str, Any], approve: Callable[[str, dict[str, Any]], bool],
                           location: Any) -> str:
     """Weather and local news for the saved place; set_location only with the owner's OK."""
+    from location import label
     if location is None:
         return "Location is not available here."
     try:
@@ -501,14 +502,12 @@ def execute_location_tool(name: str, arguments: dict[str, Any], approve: Callabl
         if not place:
             return "Not saved: give a city."
         if location.is_saved(place):  # nothing to ask: it is already the owner's place
-            from location import label
             return f"{label(location.place)} is already the owner's saved location; nothing changed."
         summary = (f"Use “{place}” as your location for the weather and local news? Nova looks it up with Open-Meteo; "
                    "the weather then comes from Open-Meteo and local news from Google News. It is kept only in Nova's "
                    "settings on this PC.")
         if not approve(name, {"summary": summary}):
             return "The owner declined; the location was not changed."
-        from location import label
         return f"Location saved: {label(location.set_city(place))}."
     except Exception as exc:  # offline, unknown place, service down
         return f"Couldn't get that: {exc}"

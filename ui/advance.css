@@ -37,7 +37,6 @@ button.adv-card:hover, button.adv-card:focus-visible { border-color: rgba(var(--
 .adv-card small.dim, .adv-widget .dim { color: var(--muted); }
 .adv-kicker { font: 600 9px/1.2 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--muted); }
 .adv-card.topic { border-left-color: var(--accent); }
-.adv-card.status-done { opacity: 0.7; }
 
 .adv-card.skill.ready .adv-kicker::before, .adv-card.skill.setup .adv-kicker::before, .adv-card.skill.cloud .adv-kicker::before,
 .adv-card.skill.off .adv-kicker::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; }

@@ -12,6 +12,9 @@ const BENCH_KEYS = ["Escape", "Delete", "Backspace", "r", "R"];  // the bench's 
 export function createBuild(root, { act, toast, onOpenChange }) {
   const host = root.querySelector("#build-bench"), nameBox = root.querySelector("#build-name"), reply = root.querySelector("#build-reply");
   const dirtyMark = root.querySelector("#build-dirty");
+  const planTitle = root.querySelector("#build-plan-title"), planHint = root.querySelector("#build-plan-hint"),
+    planBom = root.querySelector("#build-bom"), planStepsHead = root.querySelector("#build-steps-head"),
+    planSteps = root.querySelector("#build-steps"), planNotes = root.querySelector("#build-notes");
   let bench = null, starting = null, armed = false, dirty = false, edited = false, applying = false, syncTimer = 0;
   let plan = { title: "", bom: [], steps: [], notes: "" };
   const view$ = screen(root, { onOpenChange, onOpen: () => { start(); sync(); } });
@@ -57,14 +60,14 @@ export function createBuild(root, { act, toast, onOpenChange }) {
   function renderPlan() {
     const counts = new Map();
     for (const item of bench?.items || []) counts.set(item.name, (counts.get(item.name) || 0) + 1);
-    root.querySelector("#build-plan-title").textContent = plan.title || "Blueprint";
-    root.querySelector("#build-plan-hint").hidden = counts.size > 0 && (plan.steps.length > 0 || plan.bom.length > 0);
-    root.querySelector("#build-bom").replaceChildren(
+    planTitle.textContent = plan.title || "Blueprint";
+    planHint.hidden = counts.size > 0 && (plan.steps.length > 0 || plan.bom.length > 0);
+    planBom.replaceChildren(
       ...[...counts].map(([name, count]) => h("li", {}, h("b", {}, `×${count}`), h("span", {}, name))),
       ...plan.bom.map((entry) => h("li", { class: "extra" }, h("b", {}, `×${entry.qty}`), h("span", {}, entry.item), entry.note ? h("small", {}, entry.note) : null)));
-    root.querySelector("#build-steps-head").hidden = plan.steps.length === 0;
-    root.querySelector("#build-steps").replaceChildren(...plan.steps.map((step) => h("li", {}, step)));
-    root.querySelector("#build-notes").textContent = plan.notes;
+    planStepsHead.hidden = plan.steps.length === 0;
+    planSteps.replaceChildren(...plan.steps.map((step) => h("li", {}, step)));
+    planNotes.textContent = plan.notes;
   }
 
   // ---------- Nova's blueprint ----------

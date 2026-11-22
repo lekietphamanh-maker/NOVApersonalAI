@@ -1,7 +1,7 @@
 // Raspberry Pi Pico (RP2040) — bare board without headers: gold pads with castellated half-holes along both long edges.
 import * as THREE from '../vendor/three.module.js';
 import { Board } from '../core/board.js';
-import { Builder, M, colorMat } from '../core/builder.js';
+import { Builder, colorMat } from '../core/builder.js';
 import { qfn, led, diode, inductor, crystalSMD, button, passives } from '../core/parts-ic.js';
 import { usbMicro } from '../core/parts-conn.js';
 

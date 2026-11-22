@@ -167,7 +167,6 @@ export function createAdvance(root, { act, openLibrary, openSkills, ask, toast }
     },
     close() { root.hidden = true; clearInterval(clockTimer); },
     isOpen: () => !root.hidden,
-    reload: load,
     setApps(list) { apps = list; if (board) drawApps(); },
     render(next) {
       const widgetSignature = JSON.stringify([next.settings && next.settings.advance_widgets, next.weather_now, next.timers, next.reminders,

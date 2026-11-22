@@ -167,13 +167,13 @@ export function textTex(opts) {
   const g = c.getContext('2d');
   if (bg) { g.fillStyle = bg; g.fillRect(0, 0, w, h); }
   if (draw) draw(g, w, h);
-  const n = lines.length; let autoY = 0;
+  const n = lines.length;
   lines.forEach((ln, i) => {
     const o = typeof ln === 'string' ? { t: ln } : ln;
     const size = o.size ?? Math.min(h / (n + 0.6), w / 5.2);
     g.font = `${o.weight ?? 600} ${size}px ${font}`;
     g.fillStyle = o.color ?? fg; g.textAlign = o.align ?? 'center'; g.textBaseline = 'middle';
-    const y = o.y != null ? o.y * h : (h * (i + 0.5 + (0.3)) / (n + 0.6)); autoY = y;
+    const y = o.y != null ? o.y * h : (h * (i + 0.5 + (0.3)) / (n + 0.6));
     const x = o.x != null ? o.x * w : (g.textAlign === 'center' ? w / 2 : g.textAlign === 'left' ? w * 0.08 : w * 0.92);
     let tw = g.measureText(o.t).width, maxW = w * 0.9;
     if (tw > maxW) { g.save(); g.translate(x, y); g.scale(maxW / tw, 1); g.fillText(o.t, 0, 0); g.restore(); }
