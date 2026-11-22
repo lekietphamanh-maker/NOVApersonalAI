@@ -51,6 +51,7 @@ class ToolContext:
     workplace: Callable[[str, dict[str, Any]], str] | None = None  # the open Workplace board (workplace.WorkplaceBoard.act)
     building: Callable[[str, dict[str, Any]], str] | None = None  # the open Building mode bench (building.BuildingBench.act)
     trading: Callable[[str, dict[str, Any]], str] | None = None  # paper trading (trading.TradingDesk.answer)
+    network: Callable[[str, dict[str, Any]], str] | None = None  # home network (network.NetworkPanel.answer)
     galaxy: Callable[[], str] | None = None
 
 

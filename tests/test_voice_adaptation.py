@@ -154,6 +154,17 @@ class WhisperSettingsTests(unittest.TestCase):
         self.assertEqual(voice.save_whisper_settings(pause_seconds=9)["pause_seconds"], 5.0)
         self.assertEqual(voice.save_whisper_settings(pause_seconds="abc")["pause_seconds"], 2.0)
 
+    def test_broken_or_wrong_shaped_settings_file_still_gives_defaults(self) -> None:
+        path = Path(self.folder) / "voice_settings.json"
+        for broken in ('{"voice": ', "[1, 2]", '"just a string"', "42"):
+            path.write_text(broken, encoding="utf-8")
+            self.assertEqual(voice.load_whisper_settings()["model"], "small.en")
+            self.assertEqual(voice.load_voice_name(), voice.DEFAULT_VOICE)
+            self.assertIsNone(voice.saved_voice_name())
+        # Saving over a broken file repairs it instead of crashing.
+        voice.save_whisper_settings(model="medium.en")
+        self.assertEqual(voice.load_whisper_settings()["model"], "medium.en")
+
     def test_saving_a_voice_keeps_the_speech_settings(self) -> None:
         voice.save_whisper_settings(model="medium.en", pause_seconds=3)
         voice.save_voice_name("Emma (British, female, most natural)")

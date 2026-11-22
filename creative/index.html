@@ -54,6 +54,16 @@
   #trash.armed { background: rgba(255, 77, 106, 0.28); box-shadow: 0 0 24px rgba(255, 77, 106, 0.45); }
   #help { position: fixed; top: 64px; right: 26px; padding: 14px 18px; max-width: 420px; line-height: 1.65; color: var(--dim);
     background: rgba(6, 9, 12, 0.82); border: 1px solid rgba(var(--accent-rgb), 0.4); backdrop-filter: blur(8px); }
+  #handmusic-panel { position: fixed; top: 64px; right: 26px; padding: 14px 18px; width: 320px; line-height: 1.65; color: var(--dim);
+    background: rgba(6, 9, 12, 0.88); border: 1px solid rgba(var(--accent-rgb), 0.4); backdrop-filter: blur(8px); }
+  #handmusic-panel h3 { margin: 0 0 8px; color: var(--accent); font: 700 13px/1.2 "Rajdhani", sans-serif; letter-spacing: 0.24em; }
+  #handmusic-panel .row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+  #handmusic-panel label { font: 600 10.5px/1 var(--mono); letter-spacing: 0.15em; text-transform: uppercase; min-width: 52px; }
+  #handmusic-panel select { flex: 1; background: rgba(0, 0, 0, 0.6); color: var(--text); border: 1px solid var(--line); padding: 6px; font: 600 11px var(--mono); }
+  #handmusic-panel input[type="range"] { flex: 1; accent-color: var(--accent); }
+  #handmusic-panel p { margin: 8px 0 0; }
+  #handmusic-panel p b { color: var(--text); }
+  #handmusic-state { font: 600 10.5px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
   #help h3 { margin: 0 0 6px; color: var(--accent); font: 700 13px/1.2 "Rajdhani", sans-serif; letter-spacing: 0.24em; }
   #help b { color: var(--text); }
   #drop { position: fixed; inset: 0; display: none; place-items: center; color: var(--accent); background: rgba(0, 0, 0, 0.7);
@@ -91,8 +101,28 @@
   <button id="photo" title="Take a photo after 3-2-1 (Space, the orb, or hold up a peace sign)">📸 Photo</button>
   <button id="lens-button" title="Live camera effects (L)">Lens: Normal</button>
   <button id="kisscam" title="Two faces in the picture for 3 seconds: a photo (K)">Kiss cam</button>
+  <button id="handmusic-button" title="Play music with your hands (M)">🎵 Hand Music</button>
   <button id="toggle-help">?</button>
   <button id="exit" class="exit" title="Close creative mode (Esc)">✕ Exit</button>
+</div>
+<div id="handmusic-panel" hidden>
+  <h3>🎵 HAND MUSIC</h3>
+  <div class="row"><label for="handmusic-voice">Voice</label>
+    <select id="handmusic-voice">
+      <option value="0">Porcelain — soft bells</option>
+      <option value="1">String — warm pluck</option>
+      <option value="2">Air — breathy pad</option>
+    </select></div>
+  <div class="row"><label for="handmusic-volume">Volume</label>
+    <input id="handmusic-volume" type="range" min="0" max="100" value="50">
+    <span id="handmusic-volume-value">50%</span></div>
+  <div class="row"><button id="handmusic-test">▶ Test sound</button>
+    <span id="handmusic-state">Off</span></div>
+  <p><b>Pinch</b> thumb + index to play a note. <b>Move your index fingertip</b> into a glowing
+  circle to ring its note — left is low, right is higher, centre is highest.
+  <b>Open your hand</b> to brighten the sound, <b>close it</b> to darken it. Touch your index tip
+  to your middle finger to change voice. <b>Pinch with both hands</b> and hold to latch a drone.
+  Sound comes out of the default speaker, like Nova's voice.</p>
 </div>
 <div id="help" hidden>
   <h3>GESTURES</h3>
@@ -111,6 +141,9 @@
   <b>Lens</b> (L): <b>Pixel</b> sharpens as you come closer, <b>ASCII</b> draws you with your name's letters,
   <b>Glitch</b> calms down when you hold still, <b>Slit-scan</b> stretches what crosses the middle, <b>Echo</b> shows you
   3 seconds ago.<br>
+  <b>🎵 Hand Music</b> (M): pinch to play a note, move your index fingertip into a glowing circle to ring
+  its note. Open your hand to brighten the sound, close it to darken it. Sound comes out of the
+  default speaker, like Nova's voice.<br>
   <b>Kiss cam</b> (K): two faces in the picture for 3 seconds and it counts down to a photo.<br>
   <b>Show an object</b> to the camera: Nova names it (80 everyday kinds) and follows it. Ask “Hey Nova, what am I holding?”<br>
   Drop an object on <b>DELETE</b> to remove it. Drag a .glb/.obj/.stl file onto the window to load it.<br>
