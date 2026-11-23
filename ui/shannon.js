@@ -3,7 +3,7 @@
 // for medium, yellow for low. Mark one fixed and it calms to green. Drag to turn, scroll or pinch to zoom, click a
 // spot; arrows, + and -, and webcam gestures work too. Stages, the log and past checks run along the bottom.
 
-import { h, when, screen, renderStrip } from "./lab.js";
+import { h, when, screen, renderStrip, openReportPanel, pollSelfUpdate, UPDATE_STAGE_LABELS } from "./lab.js";
 import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const STAGES = [["recon", "Recon"], ["analysis", "Analysis"], ["exploit", "Exploit"], ["validate", "Validate"], ["report", "Report"]];
@@ -133,13 +133,74 @@ export function createShannon(root, { act, onOpenChange }) {
     const color = verdict.verdict === "needs review" ? "rgb(255, 45, 85)"
       : verdict.verdict === "mitigated" ? "rgb(255, 181, 71)" : "rgb(92, 242, 176)";
     simStatus.textContent = "";
+    const open = (result.job?.findings || []).filter((finding) => !finding.fixed).length;
+    const updateButton = open ? h("button", { class: "box small on", type: "button" },
+      `Update now (${open} fix${open === 1 ? "" : "es"})`) : null;
+    if (updateButton) {
+      updateButton.onclick = () => startUpdate(updateButton, simStatus, simError, result.job?.id);
+    }
     simResult.replaceChildren(
       h("span", { class: "lab-tag", style: `color:${color};border-color:${color}` }, `AiSOC: ${verdict.verdict || "resolved"}`),
       verdict.rationale ? h("p", { class: "muted small" }, verdict.rationale) : null,
       h("p", { class: "muted small" }, `Report: ${result.report || ""}`),
       h("div", { class: "row wrap" },
-        h("button", { class: "box small on", type: "button", onclick: () => act("shannon_simulate_report", { id: result.job?.id }) }, "Open report"),
+        h("button", { class: "box small on", type: "button", onclick: () => openSimReport(result) }, "Open report"),
+        updateButton,
         h("button", { class: "box small", type: "button", onclick: () => { clearSim(); render(); } }, "Clear")));
+  }
+
+  // ---------- the full report on screen, and "Update now" below it ----------
+  async function openReport(jobId, title, action) {
+    const result = await act(action, { id: jobId });
+    const current = job?.id === jobId ? job : null;
+    const open = (current?.findings || []).filter((finding) => !finding.fixed).length;
+    const progress = h("p", { class: "report-progress", hidden: true });
+    const note = h("p", { class: "report-note" });
+    const updateButton = open ? h("button", { class: "box small on", type: "button" },
+      `Update now (${open} fix${open === 1 ? "" : "es"})`) : null;
+    if (updateButton) updateButton.onclick = () => startUpdate(updateButton, progress, note, jobId);
+    openReportPanel(root, {
+      title,
+      text: result.ok ? result.text : (result.error || "The report isn't there any more."),
+      footer: result.ok ? [updateButton, progress, note].filter(Boolean) : [],
+    });
+  }
+
+  function openFullReport() {
+    openReport(job.id, job.title || "Full report", "shannon_report_text");
+  }
+
+  function openSimReport(result) {
+    openReport(result.job?.id, result.job?.title || "Simulated attack — full report", "shannon_simulate_report_text");
+  }
+
+  async function startUpdate(button, progressEl, noteEl, jobId) {
+    button.disabled = true;
+    progressEl.textContent = "Starting the update…";
+    const started = await act("shannon_update_now", { id: jobId });
+    if (!started?.ok) {
+      progressEl.textContent = started?.error || "The update didn't start.";
+      button.disabled = false;
+      return;
+    }
+    if (!started.token_set) {
+      noteEl.textContent = "No GitHub token yet — the fixes and tests run anyway, but the push waits. "
+        + "Add one in Settings → Self-update · GitHub (github.com/settings/tokens → classic token → repo scope).";
+    }
+    pollSelfUpdate(act, (state) => {
+      const running = state.steps.find((step) => step.status === "running");
+      const label = UPDATE_STAGE_LABELS[state.stage] || state.stage;
+      if (state.stage === "done") {
+        progressEl.textContent = state.summary || "Done.";
+        noteEl.textContent = "";
+      } else if (state.stage === "failed") {
+        progressEl.textContent = state.error || "The update stopped.";
+        button.disabled = false;
+      } else {
+        progressEl.textContent = `${label}…${running?.detail ? ` ${running.detail}` : ""}`
+          + (state.fix_round ? ` (fix round ${state.fix_round})` : "");
+      }
+    });
   }
 
   async function refresh() {
@@ -208,7 +269,7 @@ export function createShannon(root, { act, onOpenChange }) {
         h("p", { class: "muted small" }, job ? `${when(job.started)} · ${job.target}` :
           "Pick one of your projects, say where it runs on this PC (like localhost:3000), and Run."),
         findings().length ? h("p", {}, "Red spots first: those are the holes someone could use right now. Click one for the proof and the fix.") : null,
-        job?.report ? h("button", { class: "box small on", type: "button", onclick: () => act("shannon_report", { id: job.id }) }, "Open full report") : null);
+        job?.report ? h("button", { class: "box small on", type: "button", onclick: () => openFullReport() }, "Open full report") : null);
       return;
     }
     const color = `rgb(${COLORS[state(finding)].join(",")})`;
