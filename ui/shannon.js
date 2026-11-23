@@ -69,6 +69,62 @@ export function createShannon(root, { act, onOpenChange }) {
   root.insertBefore(simBox, root.querySelector(".lab-bottom"));
   simBrowse.hidden = true;  // the default mode is Web (local), a typed address — no file window until App/File is picked
 
+  // ---------- Attack Nova herself: one click, no target to pick ----------
+  // The same Simulate attack machinery (AiSOC triage, shield blocks, verdict, report, Update now), but the
+  // target is Nova herself — her own code and her own running screen. Update now fixes Nova's own code.
+
+  const selfStatus = h("p", { class: "muted small" });
+  const selfError = h("p", { class: "muted small", style: "color:var(--warn)" });
+  const selfResult = h("div", {});
+  const selfButton = h("button", { class: "box small on", type: "button", onclick: attackSelf }, "Attack Nova herself");
+  const selfBox = h("div", { style: "padding:12px 22px;border-top:1px solid var(--line)" },
+    h("h4", { style: "margin:0 0 4px;color:#fff;font:600 13px/1.3 var(--mono)" }, "Attack Nova herself"),
+    h("p", { class: "muted small", style: "margin:0 0 8px" },
+      "One click: Shannon attacks Nova herself — her own code and her own running screen — and Update now fixes what it finds. No real exploit runs, nothing leaves this PC, and nothing is installed from anywhere."),
+    h("p", { class: "muted small", style: "margin:0 0 8px" },
+      "Fixes go into Nova's own code, and Nova needs a restart to pick them up."),
+    h("div", { class: "row wrap" }, selfButton),
+    selfStatus, selfError, selfResult);
+  root.insertBefore(selfBox, root.querySelector(".lab-bottom"));
+
+  function clearSelf() {
+    clearSimTimers();
+    selfStatus.textContent = "";
+    selfError.textContent = "";
+    selfResult.replaceChildren();
+  }
+
+  async function attackSelf() {
+    clearSelf();
+    simHits = [];
+    selfStatus.textContent = "Attacking Nova herself…";
+    selfButton.disabled = true;
+    const result = await act("shannon_simulate", { kind: "self" });
+    selfButton.disabled = false;
+    if (!result.ok) {
+      selfStatus.textContent = "";
+      selfError.textContent = result.error || "The self-attack didn't run.";
+      return;
+    }
+    job = result.job;  // the self-attack's proven holes become the shield's spots, like any other check
+    log = [];
+    selected = -1;
+    drawStrip();
+    render();
+    const steps = result.steps || [];
+    steps.forEach((step, index) => {  // a red block lands on the shield as each attack step lands
+      simTimers.push(setTimeout(() => {
+        if (step.landed) {  // its place is fixed at landing time, not recomputed every frame
+          const [lat, lon] = place(simHits.length, 12);
+          simHits.push({ index: simHits.length, lat, lon });
+        }
+        selfStatus.textContent = `${step.technique}: ${step.landed ? "landed" : "blocked"} — AiSOC: ${step.verdict}`;
+      }, index * 500));
+    });
+    simTimers.push(setTimeout(() => showSimResult(result,
+      { status: selfStatus, error: selfError, result: selfResult, clear: clearSelf }), steps.length * 500 + 150));
+  }
+
   function clearSimTimers() {
     for (const timer of simTimers) clearTimeout(timer);
     simTimers = [];
@@ -128,25 +184,27 @@ export function createShannon(root, { act, onOpenChange }) {
     simTimers.push(setTimeout(() => showSimResult(result), steps.length * 500 + 150));
   }
 
-  function showSimResult(result) {
+  function showSimResult(result, els = { status: simStatus, error: simError, result: simResult, clear: clearSim }) {
     const verdict = result.verdict || {};
     const color = verdict.verdict === "needs review" ? "rgb(255, 45, 85)"
       : verdict.verdict === "mitigated" ? "rgb(255, 181, 71)" : "rgb(92, 242, 176)";
-    simStatus.textContent = "";
+    els.status.textContent = "";
     const open = (result.job?.findings || []).filter((finding) => !finding.fixed).length;
     const updateButton = open ? h("button", { class: "box small on", type: "button" },
       `Update now (${open} fix${open === 1 ? "" : "es"})`) : null;
     if (updateButton) {
-      updateButton.onclick = () => startUpdate(updateButton, simStatus, simError, result.job?.id);
+      updateButton.onclick = () => startUpdate(updateButton, els.status, els.error, result.job?.id);
     }
-    simResult.replaceChildren(
+    els.result.replaceChildren(
       h("span", { class: "lab-tag", style: `color:${color};border-color:${color}` }, `AiSOC: ${verdict.verdict || "resolved"}`),
       verdict.rationale ? h("p", { class: "muted small" }, verdict.rationale) : null,
       h("p", { class: "muted small" }, `Report: ${result.report || ""}`),
+      result.kind === "self" && updateButton ? h("p", { class: "muted small" },
+        "These fixes go into Nova's own code. Nova needs a restart to pick them up.") : null,
       h("div", { class: "row wrap" },
         h("button", { class: "box small on", type: "button", onclick: () => openSimReport(result) }, "Open report"),
         updateButton,
-        h("button", { class: "box small", type: "button", onclick: () => { clearSim(); render(); } }, "Clear")));
+        h("button", { class: "box small", type: "button", onclick: () => { els.clear(); render(); } }, "Clear")));
   }
 
   // ---------- the full report on screen, and "Update now" below it ----------
@@ -221,6 +279,7 @@ export function createShannon(root, { act, onOpenChange }) {
     log = job.log || [];
     selected = -1;
     clearSim();
+    clearSelf();
     drawStrip();
     render();
   }
@@ -547,7 +606,7 @@ export function createShannon(root, { act, onOpenChange }) {
     job(next) {
       jobs = [next, ...jobs.filter((item) => item.id !== next.id)];
       running = next.status === "running" ? next.id : (running === next.id ? "" : running);
-      if (next.status === "running" && job?.id !== next.id && (!job || job.status !== "running")) { job = next; log = []; selected = -1; clearSim(); }
+      if (next.status === "running" && job?.id !== next.id && (!job || job.status !== "running")) { job = next; log = []; selected = -1; clearSim(); clearSelf(); }
       if (job?.id === next.id) { job = { ...job, ...next }; render(); }
       drawStrip();
     },

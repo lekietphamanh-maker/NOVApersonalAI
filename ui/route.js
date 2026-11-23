@@ -20,6 +20,15 @@ export function createRoute(root, { act, onOpenChange }) {
   const canvas = $("#route-map"), context = canvas.getContext("2d"), info = $("#route-info");
   mountWhatCanIDo(info, "route", { onPhrase: askPhrase });
   let route = null, opened = false, started = 0, frame = 0, base = null;
+  let lastRequest = null, lastError = "";  // the last route asked for, so a failed one can be tried again
+
+  // One place the form and the Retry button both go through: asking again clears the old error first.
+  function requestRoute(args) {
+    lastRequest = args;
+    lastError = "";
+    info.replaceChildren(h("span", { class: "muted small" }, "Finding the fastest way…"));
+    act("route", args);
+  }
 
   function open() {
     if (opened) return;
@@ -128,6 +137,7 @@ export function createRoute(root, { act, onOpenChange }) {
   function show(data) {
     route = data;
     base = null;
+    lastError = "";
     started = performance.now();
     const how = { motorbike: "by motorbike", car: "by car", walk: "on foot" }[route.mode] || "";
     info.replaceChildren(
@@ -147,9 +157,26 @@ export function createRoute(root, { act, onOpenChange }) {
   $("#route-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const form = new FormData(event.target);
-    info.replaceChildren(h("span", { class: "muted small" }, "Finding the fastest way…"));
-    act("route", { start: form.get("start"), end: form.get("end"), stops: form.get("stops"), mode: form.get("mode") });
+    requestRoute({ start: form.get("start"), end: form.get("end"), stops: form.get("stops"), mode: form.get("mode") });
   });
 
-  return { open, close, show, isOpen: () => opened, error: (text) => info.replaceChildren(h("span", { class: "small" }, text)) };
+  return { open, close, show, isOpen: () => opened, error: (text) => {
+    // The same failure twice (a double answer from the back end) is shown once per request, not stacked.
+    if (text === lastError) return;
+    lastError = text;
+    // A Google Maps link in the message becomes a button that opens it; a failure that was the servers'
+    // fault (not a place Nova couldn't find) also gets a Retry button that asks for the same route again.
+    const maps = text.match(/https:\/\/www\.google\.com\/maps\/dir\/\?[^\s)]+/);
+    const parts = maps ? text.split(maps[0]) : [text];
+    const tail = (parts[1] || "").replace(/^[).,\s]+/, "").trim();
+    const retryable = /didn't answer|try again/i.test(text);
+    info.replaceChildren(
+      h("span", { class: "small" }, parts[0].trim()),
+      ...(tail ? [h("span", { class: "small" }, tail)] : []),
+      ...((maps || (retryable && lastRequest)) ? [h("div", { class: "row wrap" },
+        ...(maps ? [h("button", { class: "box small on", type: "button",
+          onclick: () => act("open_url", { url: maps[0] }) }, "Google Maps (live traffic)")] : []),
+        ...(retryable && lastRequest ? [h("button", { class: "box small", type: "button",
+          onclick: () => requestRoute(lastRequest) }, "Try again")] : []))] : []));
+  } };
 }

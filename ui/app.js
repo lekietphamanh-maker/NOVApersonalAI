@@ -1020,6 +1020,9 @@ function renderTuning() {
 function renderKnowledge() {
   const knowledge = state.knowledge;
   if (!knowledge) return;
+  // The keep thread always ends by sending a knowledge patch (kept or failed), so
+  // this is where the Keep button comes back after a download finishes.
+  $("#keep-city-save").disabled = false;
   const gb = (bytes) => (bytes ? `${(bytes / 1e9).toFixed(bytes < 1e9 ? 2 : 1)} GB` : "");
   const busy = knowledge.downloading;
   $("#knowledge-packs").replaceChildren(...knowledge.packs.map((pack) => {
@@ -1888,7 +1891,17 @@ $("#gmail-toggle").onclick = async () => {
 $("#obs-password-save").onclick = () => { act("obs_password", { password: $("#obs-password").value }); $("#obs-password").value = ""; toast("Saved on this PC.", "ok"); };
 $("#knowledge-sizes").onclick = () => { toast("Asking Kiwix's library for the sizes...", "info"); act("knowledge_catalog"); };
 $("#notes-index").onclick = () => act("notes_index");
-$("#keep-city-save").onclick = () => { toast("Downloading the roads; it can take a few minutes for a big city.", "info"); act("keep_city", { city: $("#keep-city").value }); };
+$("#keep-city-save").onclick = async () => {
+  // One click, one download, one toast: a second click during the minutes-long
+  // download used to start a second keep thread that failed the same way and
+  // showed the same "Couldn't keep..." warning twice.
+  const btn = $("#keep-city-save");
+  if (btn.disabled) return;
+  btn.disabled = true;
+  toast("Downloading the roads; it can take a few minutes for a big city.", "info");
+  const result = await act("keep_city", { city: $("#keep-city").value });
+  if (result?.error) btn.disabled = false; // never started, so no knowledge patch is coming
+};
 $("#node-path-save").onclick = () => act("node_path", { path: $("#node-path").value });
 $("#github-token-save").onclick = () => {
   act("github_token", { token: $("#github-token").value, repo: $("#github-repo").value });
