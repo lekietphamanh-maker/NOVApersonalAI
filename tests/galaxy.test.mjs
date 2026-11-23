@@ -1,7 +1,9 @@
 // The Knowledge Galaxy's search: typing a query hides the stars that don't match
 // (they stop being drawn and stop being hoverable/clickable), and clearing the
-// search brings them all back. The galaxy draws on a canvas, so this test stubs
-// the DOM and a 2D context and reads back what drawFrame() actually drew.
+// search brings them all back. Labels are on by default, and the stars drift and
+// twinkle on their own a few seconds after the owner stops touching the galaxy.
+// The galaxy draws on a canvas, so this test stubs the DOM and a 2D context and
+// reads back what drawFrame() actually drew.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -45,8 +47,9 @@ globalThis.document = {
 };
 
 const labelsDrawn = [];
+const labelPos = {};
 const ctx = {
-  fillText(text) { labelsDrawn.push(text); },
+  fillText(text, x, y) { labelsDrawn.push(text); labelPos[text] = [x, y]; },
   clearRect() {}, beginPath() {}, arc() {}, fill() {}, stroke() {},
   moveTo() {}, lineTo() {}, closePath() {}, setTransform() {},
   createRadialGradient: () => ({ addColorStop() {} }),
@@ -68,7 +71,7 @@ root._q = {
   ".galaxy-close": makeEl("button"),
 };
 
-const { createGalaxy, relaxGalaxyNodes } = await import("../ui/galaxy.js");
+const { createGalaxy, relaxGalaxyNodes, twinkleAlpha, shouldAmbientSpin } = await import("../ui/galaxy.js");
 const galaxy = createGalaxy(root, { act: () => {}, onOpenChange: () => {} });
 galaxy.loadData({ nodes: [
   { id: "rust", label: "Rust", kind: "wiki", excerpt: "systems language", x: -20, y: 0, z: 20, size: 1 },
@@ -78,32 +81,20 @@ galaxy.loadData({ nodes: [
 galaxy.open();
 const frame = () => { const cb = rafCb; rafCb = null; cb(0); };
 
-test("labels stay hidden until a star is hovered or selected", () => {
+test("labels are on by default: every visible star's name shows on the first frame", () => {
   frame();
-  assert.deepEqual(labelsDrawn, []);
+  assert.deepEqual([...labelsDrawn].sort(), ["Go", "Python", "Rust"]);
   labelsDrawn.length = 0;
-
-  // Rust projects to sx≈253, sy≈343 at the default camera; hovering it shows only its label.
-  for (const fn of canvas.listeners.pointermove) fn({ clientX: 253, clientY: 343 });
-  assert.equal(canvas.style.cursor, "pointer");
-  frame();
-  assert.deepEqual(labelsDrawn, ["Rust"]);
-  labelsDrawn.length = 0;
-
-  // Moving away hides it again.
-  for (const fn of canvas.listeners.pointermove) fn({ clientX: 0, clientY: 0 });
-  frame();
-  assert.deepEqual(labelsDrawn, []);
 });
 
-test("the Labels toggle shows every visible star's label", () => {
+test("the Labels toggle turns every label off, and back on again", () => {
+  for (const fn of labelsBtn.listeners.click) fn();
+  frame();
+  assert.deepEqual(labelsDrawn, []);
   for (const fn of labelsBtn.listeners.click) fn();
   frame();
   assert.deepEqual([...labelsDrawn].sort(), ["Go", "Python", "Rust"]);
   labelsDrawn.length = 0;
-  for (const fn of labelsBtn.listeners.click) fn();
-  frame();
-  assert.deepEqual(labelsDrawn, []);
 });
 
 test("search hides non-matching stars and they stop being hoverable", () => {
@@ -129,6 +120,41 @@ test("clearing the search brings every star back", () => {
   // Hovering Python's spot finds it again (cursor turns to "pointer").
   for (const fn of canvas.listeners.pointermove) fn({ clientX: 852, clientY: 300 });
   assert.equal(canvas.style.cursor, "pointer");
+});
+
+test("twinkleAlpha breathes around the base brightness and repeats", () => {
+  const base = 0.5;
+  assert.ok(Math.abs(twinkleAlpha(base, 0, 0) - 0.72 * base) < 1e-9);
+  assert.ok(Math.abs(twinkleAlpha(base, (Math.PI / 2) * 650, 0) - base) < 1e-9);
+  assert.ok(Math.abs(twinkleAlpha(base, (3 * Math.PI / 2) * 650, 0) - 0.44 * base) < 1e-9);
+  assert.ok(Math.abs(twinkleAlpha(base, 1234 + 2 * Math.PI * 650, 0.7) - twinkleAlpha(base, 1234, 0.7)) < 1e-9);
+});
+
+test("shouldAmbientSpin: idle resumes, recent touch, drag, flight and reduced motion do not", () => {
+  const idle = { lastInteractAt: 0, nowMs: 5000, dragging: false, flying: false, reducedMotion: false };
+  assert.equal(shouldAmbientSpin(idle), true);
+  assert.equal(shouldAmbientSpin({ ...idle, nowMs: 3000 }), false);
+  assert.equal(shouldAmbientSpin({ ...idle, dragging: true }), false);
+  assert.equal(shouldAmbientSpin({ ...idle, flying: true }), false);
+  assert.equal(shouldAmbientSpin({ ...idle, reducedMotion: true }), false);
+});
+
+test("the galaxy drifts again a few seconds after a drag, but not before", () => {
+  labelsDrawn.length = 0;
+  frame();
+  const [x0] = labelPos.Rust;
+  // Drag (and release): the spin pauses.
+  for (const fn of canvas.listeners.pointerdown) fn({ button: 0, clientX: 0, clientY: 0 });
+  for (const fn of canvas.listeners.pointerup) fn({ clientX: 0, clientY: 0 });
+  nowMs += 1000;
+  for (let i = 0; i < 40; i++) frame();
+  const [xPaused] = labelPos.Rust;
+  assert.ok(Math.abs(xPaused - x0) < 0.5, `moved while paused: ${x0} -> ${xPaused}`);
+  // Five more seconds of stillness: the ambient spin resumes and the stars move.
+  nowMs += 5000;
+  for (let i = 0; i < 40; i++) frame();
+  const [xDrifted] = labelPos.Rust;
+  assert.ok(Math.abs(xDrifted - xPaused) > 1, `did not drift: ${xPaused} -> ${xDrifted}`);
 });
 
 test("relaxGalaxyNodes spreads a clump and keeps every star on its sphere", () => {

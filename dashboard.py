@@ -515,6 +515,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     def start(self, open_window: bool = True) -> str:
         url = self.ui.start()
+        # Shannon's "Attack Nova herself" needs to know where her own screen is served from.
+        self.shannon.ui_origin = lambda: self.ui.url.split("#")[0].rstrip("/")
         self.ui.on_show = lambda: self.events.put(("open_window", ""))
         self.ui.on_replace = lambda: self.events.put(("quit", None))  # a newer Nova build is starting
         if open_window:
@@ -3583,11 +3585,17 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         return self._start_pipeline("rea", update_pipeline.fixes_from_rea_job(job), target)
 
     def _act_shannon_update_now(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Shannon's open holes, fixed in the app they were found in."""
+        """Shannon's open holes, fixed in the app they were found in — or in Nova herself, for a self-attack."""
         try:
             job = self._lab_job(args, "shannon_simulate")
         except ValueError:
             job = self._lab_job(args, "shannon")
+        if job.get("target_kind") == "self":
+            target = self._nova_repo_dir()
+            if target is None:
+                return {"ok": False,
+                        "error": "Nova's own code isn't a git checkout on this PC, so there's nothing to update here."}
+            return self._start_pipeline("shannon", update_pipeline.fixes_from_shannon_job(job), target)
         target = self._shannon_target_dir(job)
         if target is None:
             return {"ok": False,

@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  CAMERA_LADDER, CAMERA_TRIES, cameraDelayMs, describeCameraError, requestCamera,
+  CAMERA_LADDER, CAMERA_TRIES, CAMERA_WAIT_MS, cameraDelayMs, cameraTimeoutError, describeCameraError,
+  requestCamera, requestWithTimeout,
 } from "../creative/camera.js";
 
 function error(name) {
@@ -39,6 +40,10 @@ test("every failure names what happened and the exact thing to check", () => {
   assert.match(size.detail, /step down/i);
   const insecure = describeCameraError(error("SecurityError"));
   assert.match(insecure.detail, /Nova's own window/);
+  const waiting = describeCameraError(error("CameraTimeoutError"));
+  assert.match(waiting.title, /waiting for camera permission/i);
+  assert.match(waiting.detail, /click Allow/i);
+  assert.match(waiting.detail, /Try camera again/i);
   const unknown = describeCameraError(error("SomethingElse"));
   assert.match(unknown.title, /didn't start/);
 });
@@ -105,6 +110,41 @@ test("a stream whose video will not play is stopped before retrying", async () =
     (caught) => caught.name === "NotAllowedError");
   assert.equal(stopped, 1);
   assert.equal(plays, 1);
+});
+
+test("a camera request that never answers fails after the wait instead of hanging", async () => {
+  const video = fakeVideo();
+  await assert.rejects(
+    requestCamera(video, () => new Promise(() => {}), async () => {}, 30),
+    (caught) => caught.name === "CameraTimeoutError");
+});
+
+test("a timed-out request stops at once instead of retrying for a minute", async () => {
+  const video = fakeVideo();
+  let calls = 0;
+  await assert.rejects(
+    requestCamera(video, () => { calls += 1; return new Promise(() => {}); }, async () => {}, 30),
+    (caught) => caught.name === "CameraTimeoutError");
+  assert.equal(calls, 1);
+});
+
+test("a late answer's stream is stopped instead of holding the camera", async () => {
+  let stopped = 0;
+  const stream = { getTracks: () => [{ stop: () => { stopped += 1; } }] };
+  const video = fakeVideo();
+  await assert.rejects(
+    requestCamera(video, () => new Promise((resolve) => setTimeout(() => resolve(stream), 100)), async () => {}, 20),
+    (caught) => caught.name === "CameraTimeoutError");
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  assert.equal(stopped, 1);
+});
+
+test("requestWithTimeout passes a fast answer through and keeps its error", async () => {
+  assert.equal(await requestWithTimeout(async () => "ok", 50), "ok");
+  await assert.rejects(requestWithTimeout(async () => { throw error("NotFoundError"); }, 50),
+    (caught) => caught.name === "NotFoundError");
+  assert.equal(cameraTimeoutError().name, "CameraTimeoutError");
+  assert.equal(CAMERA_WAIT_MS, 10_000);
 });
 
 test("a camera that stays busy gives up after the tries run out", async () => {

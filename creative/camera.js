@@ -9,8 +9,13 @@ export const CAMERA_LADDER = [
   true,
 ];
 export const CAMERA_TRIES = 6;
+// How long one camera request may pend before Nova says so: Edge's permission prompt
+// can sit unanswered (hidden behind another window) forever, and a getUserMedia call
+// with no timeout pends with it — the page stays black with no error at all.
+export const CAMERA_WAIT_MS = 10_000;
 // A blocked camera never unblocks by retrying; a busy one usually frees within a couple of seconds.
-export const CAMERA_STOP_ERRORS = new Set(["NotAllowedError", "SecurityError"]);
+// A timed-out request never answers by retrying either: the prompt is still waiting.
+export const CAMERA_STOP_ERRORS = new Set(["NotAllowedError", "SecurityError", "CameraTimeoutError"]);
 export function cameraDelayMs(attempt) {
   return Math.min(2000, 600 * (attempt + 1));
 }
@@ -21,6 +26,9 @@ export function describeCameraError(error) {
     case "NotAllowedError":
       return { title: "The camera is blocked for this page",
         detail: "Edge is stopping Nova from using the camera. Click the camera icon in the address bar (or the lock icon next to it), set Camera to Allow, then press Try camera again." };
+    case "CameraTimeoutError":
+      return { title: "Edge is still waiting for camera permission",
+        detail: "Edge hasn't answered the camera request — its permission prompt may be hidden behind this window or another Edge window. Look for the camera prompt at the top of the Edge window, click Allow, then press Try camera again. If no prompt appears, close the other Edge windows and try again." };
     case "NotReadableError":
       return { title: "Another app is using the camera",
         detail: "The camera is busy — Nova's gesture reader may still be letting go, or another app (Zoom, Teams, a browser tab) is holding it. Wait a moment and press Try camera again; close the other app if it keeps failing." };
@@ -43,17 +51,43 @@ function stopStream(stream) {
   stream?.getTracks?.().forEach((track) => track.stop());
 }
 
+export function cameraTimeoutError() {
+  const error = new Error("The camera request timed out waiting for permission");
+  error.name = "CameraTimeoutError";
+  return error;
+}
+
+// A getUserMedia call can pend forever when Edge's permission prompt is unanswered
+// (or hidden): race it against a timer so the page says so instead of sitting black.
+// If the request answers late, its stream is stopped at once — it is not ours any more.
+export function requestWithTimeout(makeRequest, ms) {
+  let timer = null;
+  const pending = makeRequest();
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      pending.then((stream) => stopStream(stream), () => {});
+      reject(cameraTimeoutError());
+    }, ms);
+  });
+  return Promise.race([
+    pending.then((value) => { clearTimeout(timer); return value; },
+      (error) => { clearTimeout(timer); throw error; }),
+    timeout,
+  ]);
+}
+
 // Ask for the camera, stepping down the picture ladder and retrying a busy camera.
 // `request` is navigator.mediaDevices.getUserMedia; `sleep` is injectable so tests run instantly.
 // Returns { stream, width, height } once the video is playing; throws the last error otherwise.
-export async function requestCamera(video, request, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))) {
+export async function requestCamera(video, request, sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    timeoutMs = CAMERA_WAIT_MS) {
   let level = 0;
   let lastError = new Error("Camera unavailable");
   for (let attempt = 0; attempt < CAMERA_TRIES; attempt++) {
     const constraints = CAMERA_LADDER[Math.min(level, CAMERA_LADDER.length - 1)];
     let stream;
     try {
-      stream = await request({ video: constraints, audio: false });
+      stream = await requestWithTimeout(() => request({ video: constraints, audio: false }), timeoutMs);
     } catch (error) {
       lastError = error;
       if (CAMERA_STOP_ERRORS.has(error?.name)) break;

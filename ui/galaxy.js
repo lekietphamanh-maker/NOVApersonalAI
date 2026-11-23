@@ -13,7 +13,22 @@ const STAR_COUNT = 280;
 const FLY_MS = 1200;
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Spread a node cloud on its sphere so no two stars sit on top of each other: a few
+// How long a star's twinkle takes to breathe, and how long after the owner last
+// touched the galaxy the slow spin comes back on its own (4 s of stillness).
+export const TWINKLE_PERIOD_MS = 650;
+export const AMBIENT_SPIN_IDLE_MS = 4000;
+
+// One star's brightness at a moment: a gentle sine around its base brightness, so the
+// galaxy shimmers instead of sitting frozen. Pure, so the tests can pin it down.
+export function twinkleAlpha(base, nowMs, phase) {
+  return base * (0.72 + 0.28 * Math.sin(nowMs / TWINKLE_PERIOD_MS + phase));
+}
+
+// The slow spin resumes by itself once the owner has left the galaxy alone for a
+// while — dragging, zooming or flying to a star pauses it, it never stops for good.
+export function shouldAmbientSpin({ lastInteractAt, nowMs, dragging, flying, reducedMotion }) {
+  return !dragging && !flying && !reducedMotion && nowMs - lastInteractAt > AMBIENT_SPIN_IDLE_MS;
+}
 // repulsion passes, each pushing too-close pairs apart, then back onto the sphere.
 // Exported for tests; the galaxy calls it for real clouds (20+ nodes) on load.
 export function relaxGalaxyNodes(nodes, radius, iterations = 10) {
@@ -49,15 +64,23 @@ export function createGalaxy(root, { act, onOpenChange }) {
   const infoBody = info.querySelector("p");
   const search = root.querySelector(".galaxy-search input");
   const labelsBtn = root.querySelector(".galaxy-labels");
-  mountWhatCanIDo(root.querySelector(".galaxy-hud"), "galaxy", { onPhrase: askPhrase });
+  // The panel is the only in-flow child of the full-screen HUD, so it would sit at the
+  // very top-left, on top of the KNOWLEDGE GALAXY title; the stylesheet pins it below
+  // the title instead, and its own margin is cleared so the two can never collide.
+  const whatPanel = mountWhatCanIDo(root.querySelector(".galaxy-hud"), "galaxy", { onPhrase: askPhrase });
+  if (whatPanel) whatPanel.style.marginTop = "0";
   const countEl = root.querySelector(".galaxy-title small");
   let open = false, nodes = [], edges = [], accent = "255, 176, 64";
   let camYaw = 0, camPitch = 0.3, camDist = 90, targetYaw = 0, targetPitch = 0.3, targetDist = 90;
-  let dragStart = null, dragYaw = 0, dragPitch = 0, autoSpin = true;
+  let dragStart = null, dragYaw = 0, dragPitch = 0, autoSpin = true, lastInteractAt = 0;
   let selected = null, hovered = null, flyTarget = null, flyFrom = null, flyAt = 0;
-  let showLabels = false, bgStars = [], w = 0, h = 0, ratio = 1, frameId = 0;
+  // Labels are on by default: Keith changed his mind from hover-only — names always show.
+  let showLabels = true, bgStars = [], w = 0, h = 0, ratio = 1, frameId = 0;
 
   if (labelsBtn) {
+    // One source of truth: the button starts in the same state as the labels.
+    labelsBtn.setAttribute("aria-pressed", String(showLabels));
+    labelsBtn.classList.toggle("on", showLabels);
     labelsBtn.addEventListener("click", () => {
       showLabels = !showLabels;
       labelsBtn.setAttribute("aria-pressed", String(showLabels));
@@ -79,7 +102,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
       const theta = Math.random() * TAU, phi = Math.acos(2 * Math.random() - 1);
       const r = 120 + Math.random() * 80;
       bgStars.push({ x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta),
-        z: r * Math.cos(phi), brightness: 0.15 + Math.random() * 0.4 });
+        z: r * Math.cos(phi), brightness: 0.15 + Math.random() * 0.4, phase: Math.random() * TAU });
     }
   }
 
@@ -125,8 +148,13 @@ export function createGalaxy(root, { act, onOpenChange }) {
     if (!open) return;
     frameId = requestAnimationFrame(drawFrame);
     ctx.clearRect(0, 0, w, h);
+    const nowMs = performance.now();
 
-    // auto-spin
+    // auto-spin: it pauses while the owner drags, zooms or flies somewhere, then
+    // comes back on its own after a few seconds of stillness, so the galaxy never
+    // sits frozen — and it stays off entirely for reduced motion.
+    if (shouldAmbientSpin({ lastInteractAt, nowMs, dragging: !!dragStart, flying: !!flyTarget,
+        reducedMotion: reduced() })) autoSpin = true;
     if (autoSpin && !dragStart && !flyTarget && !reduced()) {
       targetYaw += 0.0008;
     }
@@ -145,11 +173,13 @@ export function createGalaxy(root, { act, onOpenChange }) {
       camDist += (targetDist - camDist) * 0.08;
     }
 
-    // background stars
+    // background stars: each one breathes on its own phase, so the sky shimmers
+    // even when the camera is still (frozen for reduced motion).
     for (const star of bgStars) {
       const p = project(star.x, star.y, star.z);
       if (!p || p.z < 2) continue;
-      const alpha = star.brightness * Math.min(1, p.z / 60);
+      const alpha = (reduced() ? star.brightness : twinkleAlpha(star.brightness, nowMs, star.phase))
+        * Math.min(1, p.z / 60);
       ctx.globalAlpha = alpha;
       ctx.fillStyle = "#c8d4e0";
       ctx.beginPath(); ctx.arc(p.sx, p.sy, Math.max(0.5, 1.2 * p.scale * 0.3), 0, TAU); ctx.fill();
@@ -181,9 +211,9 @@ export function createGalaxy(root, { act, onOpenChange }) {
     }
     projected.sort((a, b) => b.z - a.z);
 
-    // Labels are off by default: showing all 113 at once was the unreadable part. A label
-    // appears for the hovered star and the selected one; the Labels button shows them all,
-    // with near-duplicates skipped so neighbours don't print on top of each other.
+    // Labels are on by default: every star's name shows, with near-duplicates
+    // skipped so neighbours don't print on top of each other. The hovered and
+    // selected stars always get theirs; the Labels button turns them all off.
     const labeled = [];
     function labelClear(sx, sy) {
       return !labeled.some((at) => Math.abs(at.sx - sx) < 30 && Math.abs(at.sy - sy) < 14);
@@ -204,8 +234,10 @@ export function createGalaxy(root, { act, onOpenChange }) {
         ctx.beginPath(); ctx.arc(sx, sy, r * 2.5, 0, TAU); ctx.fill();
       }
 
-      // star
-      drawStar(sx, sy, r, color, isSelected ? 1 : 0.85);
+      // star: a gentle twinkle on its own phase, like the background stars
+      // (frozen for reduced motion).
+      const starAlpha = isSelected ? 1 : 0.85;
+      drawStar(sx, sy, r, color, reduced() ? starAlpha : starAlpha * twinkleAlpha(1, nowMs, node._twinkle ?? 0));
 
       // ring on selected/hovered
       if (isSelected || isHovered) {
@@ -244,7 +276,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
   canvas.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
     dragStart = { x: e.clientX, y: e.clientY }; dragYaw = targetYaw; dragPitch = targetPitch;
-    autoSpin = false;
+    autoSpin = false; lastInteractAt = performance.now();
   });
   canvas.addEventListener("pointermove", (e) => {
     if (dragStart) {
@@ -267,7 +299,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
   canvas.addEventListener("wheel", (e) => {
     e.preventDefault();
     targetDist = Math.max(20, Math.min(200, targetDist + e.deltaY * 0.06));
-    autoSpin = false;
+    autoSpin = false; lastInteractAt = performance.now();
   }, { passive: false });
 
   function selectNode(node) {
@@ -289,7 +321,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
     // the view away from the search hit within a second of arriving.
     targetYaw = flyTarget.yaw; targetPitch = flyTarget.pitch; targetDist = flyTarget.dist;
     flyAt = performance.now();
-    autoSpin = false;
+    autoSpin = false; lastInteractAt = performance.now();
     selectNode(node);
   }
 
@@ -306,7 +338,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
 
   // --- public API ---
   function loadData(data) {
-    nodes = (data.nodes || []).map((n) => ({ ...n, _hidden: false }));
+    nodes = (data.nodes || []).map((n, index) => ({ ...n, _hidden: false, _twinkle: (index * 1.7) % TAU }));
     edges = data.edges || [];
     // A real galaxy has a hundred stars: spread the cloud a little wider with the count, and
     // push apart any pair that landed too close, so stars keep a minimum distance. Small
@@ -327,7 +359,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
     open = true; root.classList.add("open");
     resize(); seedStars();
     frameId = requestAnimationFrame(drawFrame);
-    autoSpin = true; targetYaw = 0; targetPitch = 0.3; targetDist = 90;
+    autoSpin = true; lastInteractAt = performance.now(); targetYaw = 0; targetPitch = 0.3; targetDist = 90;
     act("galaxy_data", {});
     onOpenChange(true);
     window.addEventListener("resize", resize);

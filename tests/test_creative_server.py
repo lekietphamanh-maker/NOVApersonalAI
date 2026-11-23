@@ -187,5 +187,47 @@ class MediaPermissionTests(unittest.TestCase):
         self.assertEqual(len([key for key in camera if "127.0.0.1" in key]), 1)  # no duplicate grant
 
 
+class OpenWindowTests(unittest.TestCase):
+    """Opening Creative closes an already-open creative window first: a running Edge never
+    re-reads the Preferences file the camera grant is seeded into, so without this the
+    seed is silently ignored and the camera request pends on a prompt nobody sees."""
+
+    def _open_with_mocks(self, existing):
+        from unittest import mock
+        server = creative_mode.CreativeServer()
+        self.addCleanup(server.stop)
+        events: list[tuple] = []
+        patches = [
+            mock.patch.object(creative_mode, "find_edge", return_value=Path("msedge.exe")),
+            mock.patch.object(creative_mode, "find_window", return_value=existing),
+            mock.patch.object(creative_mode, "is_window", return_value=False),
+            mock.patch.object(creative_mode, "close_window",
+                              side_effect=lambda hwnd: events.append(("close", hwnd))),
+            mock.patch.object(creative_mode, "seed_media_permission",
+                              side_effect=lambda _profile, origin: events.append(("seed", origin))),
+            mock.patch.object(creative_mode, "bring_window_titled_to_front",
+                              side_effect=lambda *_args: None),
+            mock.patch.object(creative_mode.subprocess, "Popen",
+                              side_effect=lambda argv, **_k: events.append(("open", argv))),
+        ]
+        for patch in patches:
+            patch.start()
+            self.addCleanup(patch.stop)
+        server.open_window()
+        return events
+
+    def test_existing_window_is_closed_before_the_grant_is_seeded(self) -> None:
+        events = self._open_with_mocks(existing=1234)
+        self.assertEqual([kind for kind, _ in events], ["close", "seed", "open"])
+        self.assertEqual(events[0][1], 1234)
+        self.assertTrue(str(events[1][1]).startswith("http://127.0.0.1:"))
+        self.assertIn("--user-data-dir=", " ".join(str(part) for part in events[2][1]))
+        self.assertIn("creative-browser", " ".join(str(part) for part in events[2][1]))
+
+    def test_no_existing_window_means_no_close_just_seed_and_open(self) -> None:
+        events = self._open_with_mocks(existing=None)
+        self.assertEqual([kind for kind, _ in events], ["seed", "open"])
+
+
 if __name__ == "__main__":
     unittest.main()
