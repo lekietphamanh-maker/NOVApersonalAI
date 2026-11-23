@@ -164,6 +164,53 @@ class _Handler(SimpleHTTPRequestHandler):
         pass  # the windowed app has no console; stderr may be None
 
 
+def creative_profile_dir() -> Path:
+    """A browser profile of Nova's own for the standalone creative window, so nothing about
+    it leaks into the owner's own browser profile."""
+    return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Alfred" / "creative-browser"
+
+
+def _origin(url: str) -> str:
+    from urllib.parse import urlsplit
+    parts = urlsplit(url)
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def seed_media_permission(profile_dir: Path, origin: str) -> None:
+    """Grant camera + mic to exactly one origin in this profile — the same store Edge's own
+    Allow button writes (profile.content_settings.exceptions) — so every other site still
+    gets the normal prompt. Best effort: if the grant doesn't stick, the page falls back to
+    the normal prompt instead of failing silently."""
+    prefs_path = Path(profile_dir) / "Preferences"
+    try:
+        prefs = json.loads(prefs_path.read_text(encoding="utf-8")) if prefs_path.exists() else {}
+    except (OSError, ValueError):
+        prefs = {}
+    if not isinstance(prefs, dict):
+        prefs = {}
+    profile = prefs.get("profile")
+    if not isinstance(profile, dict):
+        profile = prefs["profile"] = {}
+    content = profile.get("content_settings")
+    if not isinstance(content, dict):
+        content = profile["content_settings"] = {}
+    exceptions = content.get("exceptions")
+    if not isinstance(exceptions, dict):
+        exceptions = content["exceptions"] = {}
+    # Chrome timestamps: microseconds since 1601-01-01, as a string.
+    now = str(int((time.time() + 11644473600) * 1_000_000))
+    for kind in ("media_stream_camera", "media_stream_mic"):
+        grants = exceptions.get(kind)
+        if not isinstance(grants, dict):
+            grants = exceptions[kind] = {}
+        grants[f"{origin},*"] = {"expiration": "0", "last_modified": now, "model": 0, "setting": 1}
+    try:
+        prefs_path.parent.mkdir(parents=True, exist_ok=True)
+        prefs_path.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
+    except OSError:
+        pass  # the grant didn't stick; the page falls back to the normal prompt
+
+
 class CreativeServer:
     def __init__(self) -> None:
         self._commands: list[dict] = []
@@ -286,9 +333,13 @@ class CreativeServer:
             return url
         edge = find_edge()
         if edge is not None:
-            # Same as Nova's own window: the camera prompt is answered once and for all, so the
-            # permission question can never hide behind Nova (or be answered "block" by mistake).
-            subprocess.Popen([str(edge), f"--app={url}", "--start-maximized", "--use-fake-ui-for-media-stream"])
+            # No process-wide media bypass: this window runs in a profile of Nova's own, and
+            # only the creative page's own loopback origin is granted the camera and mic there
+            # (seeded into that profile before launch). Any other site still gets the prompt.
+            profile = creative_profile_dir()
+            seed_media_permission(profile, _origin(url))
+            subprocess.Popen([str(edge), f"--app={url}", f"--user-data-dir={profile}", "--no-first-run",
+                              "--no-default-browser-check", "--start-maximized"])
             # The creative window is Nova's too: lift it above the HUD once it appears.
             bring_window_titled_to_front("Nova · Creative Mode")
         else:

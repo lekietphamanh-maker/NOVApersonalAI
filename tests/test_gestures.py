@@ -114,37 +114,92 @@ class OwnGesturesTest(unittest.TestCase):
 
 
 class CameraHandoffTest(unittest.TestCase):
-    """Pausing the gesture reader really lets go of the webcam, so Creative mode can open it."""
+    """Pausing the gesture reader really lets go of the webcam, so Creative mode can open it.
+
+    The capture is a stub that never runs out of frames, so end-of-file cleanup can never
+    satisfy the check — only pause() calling release() can. The stubs stand in for cv2 and
+    MediaPipe, which are not installed in this VM; on Windows CI the real ones are used.
+    """
 
     @staticmethod
-    def _long_video(path: str, seconds: float = 10) -> None:
-        """A long still video, so the reader is still holding it when the test pauses it."""
-        import cv2
-        frame = cv2.imread(str(FIXTURES / "thumbs_up.jpg"))
-        writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"MJPG"), 10, (640, 480))
-        for _ in range(int(seconds * 10)):
-            writer.write(cv2.resize(frame, (640, 480)))
-        writer.release()
+    def _stub_video_modules() -> dict:
+        import sys, types
+        from types import SimpleNamespace
+        captures: list = []
+
+        class FakeCapture:
+            def __init__(self, source, backend=None):
+                self.released = 0
+                captures.append(self)
+
+            def isOpened(self) -> bool:
+                return True
+
+            def read(self):
+                return True, object()  # endless frames: this capture never reaches EOF
+
+            def get(self, _prop):
+                return 0.0
+
+            def release(self) -> None:
+                self.released += 1
+
+        fake_cv2 = types.ModuleType("cv2")
+        fake_cv2.VideoCapture = FakeCapture
+        fake_cv2.CAP_DSHOW = 700
+        fake_cv2.CAP_ANY = 0
+        fake_cv2.CAP_PROP_POS_MSEC = 0
+        fake_cv2.COLOR_BGR2RGB = 4
+        fake_cv2.cvtColor = lambda frame, _code: frame
+
+        class FakeRecognizer:
+            @staticmethod
+            def create_from_options(_options):
+                return FakeRecognizer()
+
+            def recognize_for_video(self, _image, _timestamp):
+                return SimpleNamespace(hand_landmarks=[], gestures=[])
+
+            def close(self) -> None:
+                pass
+
+        fake_vision = types.ModuleType("mediapipe.tasks.python.vision")
+        fake_vision.GestureRecognizer = FakeRecognizer
+        fake_vision.GestureRecognizerOptions = lambda **kwargs: object()
+        fake_vision.RunningMode = SimpleNamespace(VIDEO=0)
+        fake_core = types.ModuleType("mediapipe.tasks.python.core")
+        fake_base = types.ModuleType("mediapipe.tasks.python.core.base_options")
+        fake_base.BaseOptions = lambda **kwargs: object()
+        fake_python = types.ModuleType("mediapipe.tasks.python")
+        fake_tasks = types.ModuleType("mediapipe.tasks")
+        fake_mp = types.ModuleType("mediapipe")
+        fake_mp.Image = lambda **kwargs: object()
+        fake_mp.ImageFormat = SimpleNamespace(SRGB=0)
+        modules = {"cv2": fake_cv2, "mediapipe": fake_mp, "mediapipe.tasks": fake_tasks,
+                   "mediapipe.tasks.python": fake_python, "mediapipe.tasks.python.core": fake_core,
+                   "mediapipe.tasks.python.vision": fake_vision,
+                   "mediapipe.tasks.python.core.base_options": fake_base}
+        return {"modules": modules, "captures": captures}
 
     def test_pause_releases_the_camera(self) -> None:
-        import time
+        import sys, time
+        from unittest import mock
+        stub = self._stub_video_modules()
+        control = GestureControl(lambda _action: None, lambda _message: None, source=0)
         try:
-            import cv2  # noqa: F401
-            import mediapipe  # noqa: F401
-        except ImportError as exc:
-            self.skipTest(f"needs OpenCV and MediaPipe: {exc}")
-        video = Path(tempfile.mkdtemp()) / "hands.avi"
-        self._long_video(str(video))
-        control = GestureControl(lambda _action: None, lambda _message: None, source=str(video))
-        try:
-            self.assertTrue(control.wait_camera_free(1), "nothing is held before it starts")
-            control.start()
-            deadline = time.monotonic() + 15
-            while control.wait_camera_free(0) and time.monotonic() < deadline:
-                time.sleep(0.05)
-            self.assertFalse(control.wait_camera_free(0), "the reader should be holding the video")
-            control.pause(True)
-            self.assertTrue(control.wait_camera_free(5), "pausing should release the camera")
+            with mock.patch.dict(sys.modules, stub["modules"]):
+                control.start()
+                deadline = time.monotonic() + 10
+                while control.wait_camera_free(0) and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                self.assertFalse(control.wait_camera_free(0),
+                                 "the reader should be holding the camera before the pause")
+                control.pause(True)
+                self.assertTrue(control.wait_camera_free(5),
+                                "pausing should free the camera for Creative mode")
+                self.assertEqual(len(stub["captures"]), 1)
+                self.assertGreaterEqual(stub["captures"][0].released, 1,
+                                        "pause must call release() on the capture")
         finally:
             control.stop()
 

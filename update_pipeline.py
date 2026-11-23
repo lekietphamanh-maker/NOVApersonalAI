@@ -39,9 +39,9 @@ def valid_repo(value: Any) -> str | None:
     return text if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", text) else None
 
 
-def token_set(settings: dict[str, Any]) -> bool:
+def token_set(token: str | None) -> bool:
     """Whether a GitHub token is stored. The token itself is never returned or logged."""
-    return bool(str(settings.get("github_token") or "").strip())
+    return bool(str(token or "").strip())
 
 
 # ---------- the fixes: what "Update now" applies ----------
@@ -102,10 +102,11 @@ def build_test_fix_task(failures: str, target: str) -> str:
 
 # ---------- the recheck: make the code concise, delete dead code ----------
 
-def find_unused_imports(path: Path) -> list[tuple[int, str]]:
+def find_unused_imports(path: Path, used_elsewhere: set[str] | None = None) -> list[tuple[int, str]]:
     """(line, name) for imports a file never uses. Conservative: __init__.py files are skipped
     (their imports are the public surface), and a name counts as used when it appears anywhere
-    as a name or an attribute root."""
+    as a name or an attribute root. Names in `used_elsewhere` — imported from this file by
+    another module, or used as this module's attribute there — count as used too."""
     if path.name == "__init__.py":
         return []
     try:
@@ -123,7 +124,7 @@ def find_unused_imports(path: Path) -> list[tuple[int, str]]:
                     imported[alias.asname or alias.name] = node.lineno
     if not imported:
         return []
-    used: set[str] = set()
+    used: set[str] = set(used_elsewhere or ())
     for node in ast.walk(tree):
         if isinstance(node, ast.Name):
             used.add(node.id)
@@ -141,21 +142,123 @@ def find_unused_imports(path: Path) -> list[tuple[int, str]]:
     return sorted((line, name) for name, line in imported.items() if name not in used)
 
 
-def remove_unused_imports(root: Path) -> list[dict[str, Any]]:
-    """Delete the unused imports under root (Python files only, skipping .venv and hidden folders).
-    Returns what changed: one entry per file, with the names removed. A file is only rewritten
-    when every unused import on a line can go; a line shared with a used import is left alone."""
-    removed: list[dict[str, Any]] = []
-    for path in sorted(root.rglob("*.py")):
-        if ".venv" in path.parts or any(part.startswith(".") for part in path.relative_to(root).parts[:-1]):
+# Folders the recheck never rewrites: virtual environments, installed packages, generated output.
+SKIP_DIRS = {".venv", "venv", "env", "node_modules", "build", "dist", "__pycache__"}
+
+
+def _module_name(root: Path, path: Path) -> str:
+    """The dotted name a file is imported under (a.py -> "a", pkg/mod.py -> "pkg.mod")."""
+    relative = path.relative_to(root).with_suffix("")
+    return ".".join(relative.parts)
+
+
+def _names_used_from_elsewhere(root: Path, files: list[Path]) -> dict[str, set[str]]:
+    """For each file, the names other files take from it: `from a import json` or `a.json`
+    in another file means a.py's `import json` is not dead, even though a.py never uses it.
+    A star import (`from a import *`) keeps every name in that file."""
+    used: dict[str, set[str]] = {}
+    parsed: dict[Path, Any] = {}
+    for path in files:
+        try:
+            parsed[path] = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, SyntaxError):
             continue
-        unused = find_unused_imports(path)
+    for path, tree in parsed.items():
+        module = _module_name(root, path)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module == module:
+                if any(alias.name == "*" for alias in node.names):
+                    used.setdefault(module, set()).add("*")  # star import: every name may be used there
+                else:
+                    used.setdefault(module, set()).update(alias.asname or alias.name for alias in node.names)
+            elif isinstance(node, ast.Attribute):
+                # a.json.dumps in another file means a.py's `import json` is not dead.
+                dotted: list[str] = []
+                value: Any = node
+                while isinstance(value, ast.Attribute):
+                    dotted.append(value.attr)
+                    value = value.value
+                if isinstance(value, ast.Name):
+                    dotted.append(value.id)
+                    dotted.reverse()
+                    full = ".".join(dotted)
+                    if full.startswith(module + "."):
+                        used.setdefault(module, set()).add(dotted[len(module.split("."))])
+    return used
+
+
+def _sole_statement_lines(tree: Any) -> set[int]:
+    """Lines whose import is the only statement in its block. Removing one would leave an
+    empty block — `try: import readline / except ImportError: pass` becomes a SyntaxError,
+    and so would an `if TYPE_CHECKING:` block. Those imports stay."""
+    sole: set[int] = set()
+    for node in ast.walk(tree):
+        for field in ("body", "orelse", "finalbody"):
+            stmts = getattr(node, field, None)
+            if isinstance(stmts, list) and len(stmts) == 1 and isinstance(stmts[0], (ast.Import, ast.ImportFrom)):
+                sole.add(stmts[0].lineno)
+    return sole
+
+
+def _git_changed_files(root: Path, runner: Callable[..., Any] = subprocess.run) -> list[Path] | None:
+    """Python files git reports as changed (modified, staged, untracked), or None when git
+    can't tell — a target that isn't a checkout. Renames report the new path."""
+    try:
+        done = runner(["git", "status", "--porcelain", "--", "*.py"], cwd=str(root), capture_output=True,
+                      text=True, encoding="utf-8", errors="replace", timeout=30)
+    except Exception:  # noqa: BLE001 - no git means no list, not a crash
+        return None
+    if (done.returncode or 0) != 0:
+        return None
+    files: list[Path] = []
+    for line in (done.stdout or "").splitlines():
+        path = line[3:] if len(line) > 3 else ""
+        if " -> " in path:
+            path = path.rsplit(" -> ", 1)[-1]
+        path = path.strip().strip('"')
+        if path.endswith(".py"):
+            files.append(root / path)
+    return files
+
+
+def remove_unused_imports(root: Path, runner: Callable[..., Any] = subprocess.run) -> list[dict[str, Any]]:
+    """Delete the unused imports under root (Python files only). Only files git reports as
+    changed are rewritten — the fixes just applied, plus anything already uncommitted — and
+    virtual environments, installed packages and generated folders are never touched. When git
+    can't tell (not a checkout), the whole tree is scanned with the same exclusions.
+    Returns what changed: one entry per file, with the names removed. A file is only rewritten
+    when every unused import on a line can go; a line shared with a used import is left alone,
+    and an import that is the only statement in its block is left alone too."""
+    git_changed = _git_changed_files(root, runner)
+    if git_changed is None:
+        files = [path for path in sorted(root.rglob("*.py"))
+                 if not (set(path.relative_to(root).parts[:-1]) & SKIP_DIRS)
+                 and not any(part.startswith(".") for part in path.relative_to(root).parts[:-1])]
+    else:
+        files = [path for path in sorted(set(git_changed))
+                 if path.is_file() and path.suffix == ".py"
+                 and not (set(path.relative_to(root).parts[:-1]) & SKIP_DIRS)]
+    used_elsewhere = _names_used_from_elsewhere(root, files)
+    removed: list[dict[str, Any]] = []
+    for path in files:
+        names = used_elsewhere.get(_module_name(root, path))
+        if names and "*" in names:
+            continue  # another file star-imports this one: every name may be used there
+        unused = find_unused_imports(path, names)
+        if not unused:
+            continue
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except (OSError, SyntaxError):
+            continue
+        sole = _sole_statement_lines(tree)
+        unused = [(line, name) for line, name in unused if line not in sole]
         if not unused:
             continue
         try:
             lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
-        except OSError:
-            continue
+        except (OSError, UnicodeError):
+            continue  # one unreadable file must not kill the recheck
         by_line: dict[int, list[str]] = {}
         for line, name in unused:
             by_line.setdefault(line, []).append(name)
@@ -179,7 +282,10 @@ def remove_unused_imports(root: Path) -> list[dict[str, Any]]:
                     continue
             new_lines.append(line)  # a shared line we can't safely trim: leave it
         if changed:
-            path.write_text("".join(new_lines), encoding="utf-8")
+            try:
+                path.write_text("".join(new_lines), encoding="utf-8")
+            except (OSError, UnicodeError):
+                continue  # one unwritable file must not kill the recheck
             removed.append({"file": str(path.relative_to(root)), "names": sorted(set(sum(changed.values(), [])))})
     return removed
 
@@ -236,7 +342,10 @@ def run_tests(repo_dir: Path, runner: Callable[..., Any] = subprocess.run,
                                    "tail": "\n".join(output.strip().splitlines()[-25:])}
         results["passed"] += passed
         results["failed"] += failed + errored
-    results["ok"] = results["failed"] == 0 and not results.get("error")
+    suites = results["suites"].values()
+    results["ok"] = bool(results["suites"]) and all(suite["ok"] for suite in suites) and not results.get("error")
+    if not results["ok"] and results["failed"] == 0:
+        results["failed"] = sum(1 for suite in suites if not suite["ok"])
     return results
 
 
@@ -278,6 +387,23 @@ def scrub(text: str, token: str) -> str:
     return text.replace(token, "[token]") if token else text
 
 
+def _unpushed_count(repo_dir: Path, branch: str, runner: Callable[..., Any] = subprocess.run) -> int | None:
+    """How many local commits the remote branch doesn't have yet, or None when git can't tell
+    (no remote branch yet, or no git at all). None means 'push anyway': pushing with nothing
+    new is harmless, and it is the only way the first push can happen."""
+    try:
+        done = runner(["git", "rev-list", "--count", f"origin/{branch}..HEAD"], cwd=str(repo_dir),
+                      capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+    except Exception:  # noqa: BLE001 - no count means no claim; push anyway
+        return None
+    if (done.returncode or 0) != 0:
+        return None
+    try:
+        return int((done.stdout or "").strip())
+    except ValueError:
+        return None
+
+
 def push_to_github(repo_dir: Path, repo: str, token: str, branch: str = DEFAULT_BRANCH,
                    runner: Callable[..., Any] = subprocess.run) -> dict[str, Any]:
     """Commit what's changed and push it to the owner's repo on branch. Refuses when the remote
@@ -305,7 +431,11 @@ def push_to_github(repo_dir: Path, repo: str, token: str, branch: str = DEFAULT_
                             cwd=str(repo_dir), capture_output=True, text=True,
                             encoding="utf-8", errors="replace", timeout=60)
             if "nothing to commit" in (commit.stdout or "") + (commit.stderr or ""):
-                return {"ok": True, "pushed": False, "message": "Nothing changed, so there was nothing to push."}
+                # A failed push last time leaves its commit local; "nothing new" must not
+                # report the update as done while that commit is still unpushed.
+                unpushed = _unpushed_count(repo_dir, branch, runner)
+                if unpushed == 0:
+                    return {"ok": True, "pushed": False, "message": "Nothing changed, so there was nothing to push."}
             pushed = runner(["git", "-c", f"credential.helper={helper}", "push", "origin", branch],
                             cwd=str(repo_dir), capture_output=True, text=True,
                             encoding="utf-8", errors="replace", timeout=5 * 60)

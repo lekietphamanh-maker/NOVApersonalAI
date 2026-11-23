@@ -20,9 +20,10 @@ class RepoTests(unittest.TestCase):
         self.assertIsNone(update_pipeline.valid_repo(""))
 
     def test_token_set_never_returns_the_token(self) -> None:
-        self.assertTrue(update_pipeline.token_set({"github_token": "ghp_secret"}))
-        self.assertFalse(update_pipeline.token_set({}))
-        self.assertFalse(update_pipeline.token_set({"github_token": "  "}))
+        self.assertTrue(update_pipeline.token_set("ghp_secret"))
+        self.assertFalse(update_pipeline.token_set(""))
+        self.assertFalse(update_pipeline.token_set("  "))
+        self.assertFalse(update_pipeline.token_set(None))
 
 
 class FixesTests(unittest.TestCase):
@@ -96,6 +97,47 @@ class DeadCodeTests(unittest.TestCase):
         self.assertEqual((self.root / "a.py").read_text(encoding="utf-8"),
                          "import os\nfrom pathlib import Path\n\nprint(os.getcwd())\nprint(Path('.'))\n")
 
+    def test_a_sole_import_in_a_block_is_left_alone(self) -> None:
+        # Removing the only import in a try/except or TYPE_CHECKING block would leave an
+        # empty block behind — a SyntaxError, not a cleanup.
+        (self.root / "a.py").write_text("try:\n    import readline\nexcept ImportError:\n    pass\n", encoding="utf-8")
+        (self.root / "b.py").write_text("from typing import TYPE_CHECKING\n\nif TYPE_CHECKING:\n    import json\n", encoding="utf-8")
+        self.assertEqual(update_pipeline.remove_unused_imports(self.root), [])
+        self.assertIn("import readline", (self.root / "a.py").read_text(encoding="utf-8"))
+        self.assertIn("import json", (self.root / "b.py").read_text(encoding="utf-8"))
+
+    def test_names_used_by_other_modules_are_kept(self) -> None:
+        (self.root / "a.py").write_text("import json\n", encoding="utf-8")
+        (self.root / "b.py").write_text("from a import json\n\nprint(json.dumps({}))\n", encoding="utf-8")
+        (self.root / "c.py").write_text("import a\n\nprint(a.json.dumps({}))\n", encoding="utf-8")
+        self.assertEqual(update_pipeline.remove_unused_imports(self.root), [])
+        (self.root / "d.py").write_text("from a import *\n", encoding="utf-8")
+        self.assertEqual(update_pipeline.remove_unused_imports(self.root), [])
+
+    def test_only_git_changed_files_are_rewritten(self) -> None:
+        (self.root / "a.py").write_text("import os\nimport json\n\nprint(os.getcwd())\n", encoding="utf-8")
+        (self.root / "b.py").write_text("import os\nimport json\n\nprint(os.getcwd())\n", encoding="utf-8")
+
+        def fake_runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+            return subprocess.CompletedProcess(command, 0, stdout=" M a.py\n")
+
+        removed = update_pipeline.remove_unused_imports(self.root, runner=fake_runner)
+        self.assertEqual(removed, [{"file": "a.py", "names": ["json"]}])
+        self.assertIn("import json", (self.root / "b.py").read_text(encoding="utf-8"))
+
+    def test_generated_and_venv_folders_are_never_rewritten(self) -> None:
+        for folder in ("venv", "env", "node_modules", "build", "dist", ".venv", ".hidden"):
+            path = self.root / folder / "x.py"
+            path.parent.mkdir(parents=True)
+            path.write_text("import os\nimport json\n\nprint(os.getcwd())\n", encoding="utf-8")
+        self.assertEqual(update_pipeline.remove_unused_imports(self.root), [])
+
+    def test_an_unreadable_file_does_not_kill_the_recheck(self) -> None:
+        (self.root / "bad.py").write_bytes(b"import os\n\xff\xfe not utf-8\n")
+        (self.root / "a.py").write_text("import os\nimport json\n\nprint(os.getcwd())\n", encoding="utf-8")
+        removed = update_pipeline.remove_unused_imports(self.root)
+        self.assertEqual(removed, [{"file": "a.py", "names": ["json"]}])
+
 
 class PytestSummaryTests(unittest.TestCase):
     def test_both_orders(self) -> None:
@@ -104,6 +146,29 @@ class PytestSummaryTests(unittest.TestCase):
         self.assertEqual(update_pipeline.parse_pytest_summary("15 failed, 660 passed, 15 errors, 39 skipped"),
                          (660, 15, 15))
         self.assertIsNone(update_pipeline.parse_pytest_summary("collecting..."))
+
+
+class RunTestsTests(unittest.TestCase):
+    def test_a_suite_that_exits_nonzero_without_counts_still_fails(self) -> None:
+        # pytest exiting 4 (no tests folder) with empty output must not count as green.
+        def fake_runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+            return subprocess.CompletedProcess(command, 4, stdout="", stderr="")
+
+        results = update_pipeline.run_tests(Path("."), runner=fake_runner)
+        self.assertFalse(results["ok"])
+        self.assertGreaterEqual(results["failed"], 1)
+        self.assertEqual(results["passed"], 0)
+
+    def test_a_green_run_counts(self) -> None:
+        def fake_runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+            if "pytest" in command:
+                return subprocess.CompletedProcess(command, 0, stdout="2 passed in 1s\n")
+            return subprocess.CompletedProcess(command, 0, stdout="pass 2\nfail 0\n")
+
+        results = update_pipeline.run_tests(Path("."), runner=fake_runner)
+        self.assertTrue(results["ok"])
+        self.assertEqual(results["passed"], 4)
+        self.assertEqual(results["failed"], 0)
 
 
 class PushTests(unittest.TestCase):
@@ -156,6 +221,8 @@ class PushTests(unittest.TestCase):
                     stdout="https://github.com/lekietphamanh-maker/NOVApersonalAI.git\n")
             if command[:2] == ["git", "commit"]:
                 return subprocess.CompletedProcess(command, 0, stdout="nothing to commit")
+            if command[:2] == ["git", "rev-list"]:
+                return subprocess.CompletedProcess(command, 0, stdout="0\n")
             return subprocess.CompletedProcess(command, 0, stdout="")
 
         result = update_pipeline.push_to_github(self.root, update_pipeline.DEFAULT_REPO, "ghp_secret_token",
@@ -164,6 +231,29 @@ class PushTests(unittest.TestCase):
         self.assertFalse(result["pushed"])  # nothing changed
         self.assertNotIn("ghp_secret_token", " ".join(seen))
         self.assertEqual([call for call in seen if "push" in call], [])  # nothing to push, no push ran
+
+    def test_nothing_to_commit_with_an_unpushed_commit_still_pushes(self) -> None:
+        (self.root / ".git").mkdir()
+        calls: list[list[str]] = []
+
+        def fake_runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess:
+            calls.append(command)
+            if command[:3] == ["git", "remote", "get-url"]:
+                return subprocess.CompletedProcess(command, 0,
+                    stdout="https://github.com/lekietphamanh-maker/NOVApersonalAI.git\n")
+            if command[:2] == ["git", "commit"]:
+                return subprocess.CompletedProcess(command, 0, stdout="nothing to commit")
+            if command[:2] == ["git", "rev-list"]:
+                return subprocess.CompletedProcess(command, 0, stdout="1\n")
+            return subprocess.CompletedProcess(command, 0, stdout="")
+
+        result = update_pipeline.push_to_github(self.root, update_pipeline.DEFAULT_REPO, "ghp_x",
+                                                runner=fake_runner)
+        self.assertTrue(result["ok"])
+        self.assertTrue(result["pushed"])
+        pushes = [call for call in calls if "push" in call]
+        self.assertEqual(len(pushes), 1)
+        self.assertEqual(pushes[0][-2:], ["origin", "main"])
 
     def test_scrub_removes_the_token(self) -> None:
         self.assertEqual(update_pipeline.scrub("failed with ghp_abc inside", "ghp_abc"),

@@ -500,7 +500,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                          "mini_orb": self.settings.get("mini_orb", True),
                          "soul": self.settings.get("soul", agent_module.DEFAULT_SOUL),
                          "node_path": self.settings.get("node_path", ""), **self._advance_settings(),
-                         "github_token_set": update_pipeline.token_set(self.settings),
+                         "github_token_set": update_pipeline.token_set(self._github_token()),
                          "github_repo": self.settings.get("github_repo", update_pipeline.DEFAULT_REPO)},
             "brief": None,
             "brief_loading": False,
@@ -3487,17 +3487,39 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     # ---------- the full report on screen, and "Update now" ----------
 
+    def _github_token(self) -> str:
+        """The stored GitHub token, from the sealed store (Windows DPAPI, Mac Keychain).
+        A plaintext one left in settings by an earlier build is moved into the store once
+        and removed from the settings, so the settings file never holds it again."""
+        token = secret_store.load("github_token") or ""
+        legacy = str(self.settings.pop("github_token", None) or "").strip()
+        if legacy:
+            if not token:
+                try:
+                    secret_store.save("github_token", legacy)
+                except OSError:
+                    pass  # the sealed store is unavailable; the token still works this session
+                else:
+                    token = legacy
+            self._save_setting("github_repo", str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO))
+        return token
+
     def _act_github_token(self, args: dict[str, Any]) -> dict[str, Any]:
-        """The token for pushing to GitHub: saved on this PC only, never sent back to the page.
+        """The token for pushing to GitHub: sealed on this PC only, never sent back to the page.
         The page only ever learns whether one is set (state.settings.github_token_set)."""
         token = str(args.get("token") or "").strip()[:200]
         repo = update_pipeline.valid_repo(args.get("repo")) or update_pipeline.DEFAULT_REPO
         if token:
-            self._save_setting("github_token", token)
+            try:
+                secret_store.save("github_token", token)
+            except OSError:
+                return {"ok": False, "error": "The token couldn't be saved on this PC."}
+        self.settings.pop("github_token", None)  # never in the plaintext settings file again
         self._save_setting("github_repo", repo)
-        self._update(settings={"github_token_set": update_pipeline.token_set(self.settings),
+        token_is_set = update_pipeline.token_set(self._github_token())
+        self._update(settings={"github_token_set": token_is_set,
                                "github_repo": repo})
-        return {"ok": True, "token_set": update_pipeline.token_set(self.settings), "repo": repo}
+        return {"ok": True, "token_set": token_is_set, "repo": repo}
 
     def _report_text(self, job: dict[str, Any]) -> dict[str, Any]:
         """The full report as text, for the panel inside the HUD — not a file to chase."""
@@ -3540,8 +3562,12 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                         "error": "Updating needs Claude Code on this PC (claude.com/product/claude-code)."}
             repo = str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO)
             self.pipeline = update_pipeline.Pipeline(source, fixes, str(target), repo)
-        threading.Thread(target=self._run_pipeline, args=(self.pipeline,), name="NovaSelfUpdate", daemon=True).start()
-        return {"ok": True, "started": True, "token_set": update_pipeline.token_set(self.settings),
+            # Reserve it before the lock is released: the pipeline starts idle, and the guard
+            # only sees a running one, so a second "Update now" could otherwise slip in while
+            # the first worker is still checking the tree. _run_pipeline re-marks the stage.
+            self.pipeline.start_stage("apply", "Starting…")
+        threading.Thread(target=self._run_pipeline_safe, args=(self.pipeline,), name="NovaSelfUpdate", daemon=True).start()
+        return {"ok": True, "started": True, "token_set": update_pipeline.token_set(self._github_token()),
                 "fixes": len(fixes), "target": str(target)}
 
     def _act_rea_update_now(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -3575,6 +3601,16 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                     "error": "", "summary": ""}
         return self.pipeline.state()
 
+    def _run_pipeline_safe(self, pipe: update_pipeline.Pipeline) -> None:
+        """The worker wrapper: any unexpected failure still ends the pipeline instead of
+        leaving it 'running' in the UI until Nova restarts."""
+        try:
+            self._run_pipeline(pipe)
+        except Exception as exc:  # noqa: BLE001 - a failed update is a failed update, not a crash
+            pipe.fail(pipe.stage if pipe.stage not in ("idle", "done", "failed") else "apply",
+                      f"Update failed: {exc}")
+            self.ui.emit({"type": "self_update", "state": pipe.state()})
+
     def _run_pipeline(self, pipe: update_pipeline.Pipeline) -> None:
         """Apply -> recheck -> test -> (fix, test, up to 3 rounds) -> push -> done. Never pushes
         unless the tests are green; never installs anything from GitHub."""
@@ -3602,7 +3638,12 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         emit()
         pipe.start_stage("recheck", "Removing dead code")
         emit()
-        removed = update_pipeline.remove_unused_imports(target)
+        try:
+            removed = update_pipeline.remove_unused_imports(target)
+        except Exception as exc:  # noqa: BLE001 - a failed recheck is a failed update, not a crash
+            pipe.fail("recheck", f"Couldn't remove unused imports: {exc}")
+            emit()
+            return
         gone = sum(len(entry["names"]) for entry in removed)
         pipe.finish_stage("recheck",
                           f"Removed {gone} unused import{'s' if gone != 1 else ''} from {len(removed)} file{'s' if len(removed) != 1 else ''}"
@@ -3639,7 +3680,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             emit()
         pipe.start_stage("push", f"Pushing to {pipe.repo}")
         emit()
-        token = str(self.settings.get("github_token") or "")
+        token = self._github_token()
         pushed = update_pipeline.push_to_github(target, pipe.repo, token)
         if not pushed["ok"]:
             pipe.fail("push", str(pushed["error"]))

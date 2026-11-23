@@ -192,16 +192,17 @@ class GestureControl:
                     continue
                 if camera is None:
                     backend = cv2.CAP_DSHOW if sys.platform == "win32" and not from_file else cv2.CAP_ANY
+                    self._camera_free.clear()  # reserve the webcam before opening it
                     camera = cv2.VideoCapture(self.source, backend)
                     if not camera.isOpened():
                         camera = None
+                        self._camera_free.set()
                         if not reported:
                             self.on_error("The webcam is not available. Check that it is connected and allowed in "
                                           "Windows Settings > Privacy > Camera.")
                             reported = True
                         time.sleep(3)
                         continue
-                    self._camera_free.clear()
                     reported = False
                 ok, frame = camera.read()
                 if not ok:
@@ -233,5 +234,5 @@ class GestureControl:
         finally:
             if camera is not None:
                 camera.release()
-                self._camera_free.set()
+            self._camera_free.set()
             recognizer.close()

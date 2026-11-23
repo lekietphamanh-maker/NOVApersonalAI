@@ -162,25 +162,26 @@ export function createRea(root, { act, onOpenChange }) {
 
   // ---------- the full report on screen, and "Update now" below it ----------
   async function openFullReport() {
-    const result = await act("rea_report_text", { id: job.id });
-    const upgrades = job?.fit?.length || 0;
+    const reportJob = job; // the report's own job: a new job event must not retarget this panel's update
+    const result = await act("rea_report_text", { id: reportJob.id });
+    const upgrades = reportJob?.fit?.length || 0;
     const progress = h("p", { class: "report-progress", hidden: true });
     const note = h("p", { class: "report-note" });
     const updateButton = upgrades ? h("button", { class: "box small on", type: "button" },
       `Update now (${upgrades} upgrade${upgrades === 1 ? "" : "s"})`) : null;
-    if (updateButton) updateButton.onclick = () => startUpdate(updateButton, progress, note);
+    if (updateButton) updateButton.onclick = () => startUpdate(updateButton, progress, note, reportJob.id);
     openReportPanel(root, {
-      title: job?.title || "Full report",
+      title: reportJob?.title || "Full report",
       text: result.ok ? result.text : (result.error || "The report isn't there any more."),
       footer: result.ok ? [updateButton, progress, note].filter(Boolean) : [],
     });
   }
 
-  async function startUpdate(button, progress, note) {
+  async function startUpdate(button, progress, note, jobId) {
     button.disabled = true;
     progress.hidden = false;
     progress.textContent = "Starting the update…";
-    const started = await act("rea_update_now", { id: job.id });
+    const started = await act("rea_update_now", { id: jobId });
     if (!started?.ok) {
       progress.textContent = started?.error || "The update didn't start.";
       button.disabled = false;
