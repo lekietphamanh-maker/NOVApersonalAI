@@ -1,3 +1,14 @@
+## New in v2.15.4
+
+- **Galaxy is a constellation now**: the Galaxy tab shows your tabs and tools as small glowing stars joined by faint lines, like a constellation. Hover a star to see its name, or switch labels on with the **Labels** toggle.
+- **Trading has a chart**: the Trading tab now opens with a real price chart for the ticker you're looking at, plus quick-pick chips for the big names. You can type a company name — "coca-cola" finds KO — instead of having to know the ticker.
+- **Network has a chart too**: the Network tab plots your measured download and upload speeds over time, from the speed tests you've actually run — nothing invented.
+- **Windows Nova opens stay on top**: windows Nova opens for you now come to the front of your screen instead of hiding behind Nova.
+- **Full reports on your screen**: asking for a full report now shows the whole report as a panel inside Nova, instead of a short summary. In the Library, each item is a simple one-click card with a Back button and a wider search box. Below a Rea report there's an **Update now** button that applies all its recommendations, and Shannon's **Simulate attack** now has its own **Update now** that fixes what it finds.
+- **Nova can update herself**: Settings has a **Self-update · GitHub** section. Paste a GitHub token once (it's sealed in Windows' own vault, never written in plain text) and Nova will apply fixes, recheck the code, run the tests, fix failures until they pass, and push to GitHub — one click, nothing else to do behind the scenes.
+- **Creative mode camera fixed**: if the camera couldn't start, Nova's own gesture reader was still holding it and the page never retried — it now waits for the camera to be free, tries up to six times, and asks for a sharper picture (up to 1920×1080) with graceful fallback. If it still can't start, the screen says plainly what went wrong and what to check, instead of a black view. The old browser-wide camera bypass is gone: the camera is now granted only to Nova's own pages.
+- **Cleaned up**: the whole codebase was rechecked again before this release — dead code, bugs and slow paths — with the full test suite run on the merged version, and all eleven review comments from the code reviewer fixed, including the sealed GitHub token, the self-update pipeline no longer stalling or letting two updates run at once, and the dead-code cleanup only touching Nova's own changed files.
+
 ## New in v2.15.3
 
 - **Hand Music fixes**: the left/right/centre sound positions were swapped between two of the zones — the right zone played through the centre speaker and the centre zone through the right. They now match where the zones sit on screen. A zone could also get stuck lit forever if your hand vanished while inside it; losing the hand now clears the zone properly. And the left zone's note is D4, not D3 as it was labelled.
