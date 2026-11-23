@@ -10,6 +10,7 @@ import {
   ringPositions, rollAngle, smooth, twoHandChange, videoToScreen,
 } from "./gestures.js";
 import { LENSES, LENS_NAMES, createKissCam, createLensRenderer } from "./lenses.js";
+import { describeCameraError, requestCamera } from "./camera.js";
 import { VOICES, createHandMusicInstrument, createZoneEngine } from "./handmusic.js";
 import { HandMusicSynth } from "./handmusic-audio.js";
 
@@ -362,18 +363,38 @@ async function createLandmarker(Task, options, cpuOnly = false) {
   }
 }
 
+function stopCamera() {
+  video.srcObject?.getTracks?.().forEach((track) => track.stop());
+  video.srcObject = null;
+}
+
+// The camera error is a panel in the middle of the screen, not just the small status line at the
+// bottom: when the camera fails, that is the whole point of this page, and the fix belongs next to it.
+function showCameraError(problem) {
+  const panel = document.getElementById("camera-error");
+  if (!problem) { panel.hidden = true; return; }
+  document.getElementById("camera-error-title").textContent = problem.title;
+  document.getElementById("camera-error-detail").textContent = problem.detail;
+  panel.hidden = false;
+}
+
 async function startTracking() {
+  showCameraError(null);
+  stopCamera(); // a retry must not leave the old stream holding the camera
   setStatus("Starting camera…");
+  let camera;
   try {
-    video.srcObject = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" }, audio: false });
-    await video.play();
+    // 1080p first, stepping down if the camera can't do it; a camera that is briefly busy
+    // (Nova's gesture reader letting go, another app holding it) is retried, not given up on.
+    camera = await requestCamera(video, (constraints) => navigator.mediaDevices.getUserMedia(constraints));
   } catch (error) {
-    setStatus(`Camera unavailable (${error.name}). Allow the camera for this page, or use the mouse.`);
-    window.creative.trackingError = error.name;
+    const problem = describeCameraError(error);
+    setStatus(`Camera unavailable (${error?.name || "unknown"}).`);
+    showCameraError(problem);
+    window.creative.trackingError = error?.name || String(error);
     return;
   }
-  setStatus("Loading hand and face tracking…");
+  setStatus(`Camera ${camera.width}×${camera.height} · Loading hand and face tracking…`);
   try {
     // A higher tracking bar than the default keeps landmarks steady; detection stays quick to find a hand.
     [handLandmarker, faceLandmarker] = await Promise.all([
@@ -1108,6 +1129,7 @@ addEventListener("keydown", (event) => {
   else if (event.key.toLowerCase() === "m") setHandMusic(!handMusic.on);
 });
 document.getElementById("photo").addEventListener("click", startPhoto);
+document.getElementById("camera-retry").addEventListener("click", () => startTracking());
 document.getElementById("lens-button").addEventListener("click", () => setLens(LENSES[(LENSES.indexOf(lens) + 1) % LENSES.length]));
 document.getElementById("kisscam").addEventListener("click", () => setKissCam(!kissCamOn));
 document.getElementById("handmusic-button").addEventListener("click", () => setHandMusic(!handMusic.on));

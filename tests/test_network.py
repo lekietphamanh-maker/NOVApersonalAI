@@ -3,7 +3,6 @@ The parsers are tested against fixed command output, the speed maths against a f
 itself against a fake runner and fetcher — no real ping, download or scan ever runs in a test."""
 from __future__ import annotations
 
-import json
 import tempfile
 import unittest
 from pathlib import Path

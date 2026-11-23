@@ -1,6 +1,7 @@
 """Creative mode's server: the control orb's presses and the objects the camera sees reach Nova; other pages can't."""
 import json
 import unittest
+from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -155,6 +156,35 @@ class PhotoTests(unittest.TestCase):
         threading.Event().wait(0.4)
         self.assertEqual([command for command in seen if command["action"] != "photo"],
                          [{"action": "lens", "lens": "ascii"}, {"action": "kiss_cam", "on": True}, {"action": "kiss_cam", "on": False}])
+
+
+class MediaPermissionTests(unittest.TestCase):
+    """Seeding a profile grants the camera to Nova's own loopback origin — and nothing else."""
+
+    def test_seeding_grants_only_novas_origin(self) -> None:
+        import tempfile
+        profile = Path(tempfile.mkdtemp()) / "creative-browser"
+        creative_mode.seed_media_permission(profile, "http://127.0.0.1:54321")
+        prefs = json.loads((profile / "Preferences").read_text(encoding="utf-8"))
+        grants = prefs["profile"]["content_settings"]["exceptions"]["media_stream_camera"]
+        self.assertEqual(list(grants), ["http://127.0.0.1:54321,*"])
+        self.assertEqual(grants["http://127.0.0.1:54321,*"]["setting"], 1)
+        self.assertEqual(prefs["profile"]["content_settings"]["exceptions"]["media_stream_mic"]["http://127.0.0.1:54321,*"]["setting"], 1)
+
+    def test_other_origins_keep_their_settings_and_reseeding_is_safe(self) -> None:
+        import tempfile
+        profile = Path(tempfile.mkdtemp()) / "creative-browser"
+        profile.mkdir(parents=True)
+        existing = {"profile": {"content_settings": {"exceptions": {
+            "media_stream_camera": {"https://example.com,*": {"setting": 2, "last_modified": "1"}},
+            "media_stream_mic": {}}}}}
+        (profile / "Preferences").write_text(json.dumps(existing), encoding="utf-8")
+        creative_mode.seed_media_permission(profile, "http://127.0.0.1:54321")
+        creative_mode.seed_media_permission(profile, "http://127.0.0.1:54321")
+        prefs = json.loads((profile / "Preferences").read_text(encoding="utf-8"))
+        camera = prefs["profile"]["content_settings"]["exceptions"]["media_stream_camera"]
+        self.assertEqual(camera["https://example.com,*"]["setting"], 2)  # the other site still blocked
+        self.assertEqual(len([key for key in camera if "127.0.0.1" in key]), 1)  # no duplicate grant
 
 
 if __name__ == "__main__":
