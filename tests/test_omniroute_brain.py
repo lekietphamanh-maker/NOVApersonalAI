@@ -159,6 +159,28 @@ class GatewayDownTests(unittest.TestCase):
         reply = brain.turn([], [{"role": "user", "content": "hi"}], [], said.append)
         self.assertEqual(("".join(said), reply.stop_reason), ("Hi.", "end_turn"))
 
+    def test_a_server_that_answers_html_at_models_still_works(self) -> None:
+        def html_server(request, timeout):
+            if request.full_url.endswith("/models"):
+                return Stream(b"<html><body>not an api</body></html>")
+            return Stream(sse({"choices": [{"delta": {"content": "Hi."}, "finish_reason": "stop"}]}))
+
+        said: list[str] = []
+        brain = api_brains.OpenAIBrain(GATEWAY, "", "auto", "OmniRoute · auto", html_server)
+        reply = brain.turn([], [{"role": "user", "content": "hi"}], [], said.append)
+        self.assertEqual(("".join(said), reply.stop_reason), ("Hi.", "end_turn"))
+
+    def test_a_server_that_answers_a_json_array_at_models_still_works(self) -> None:
+        def array_server(request, timeout):
+            if request.full_url.endswith("/models"):
+                return Stream(json.dumps([{"id": "auto"}]).encode())
+            return Stream(sse({"choices": [{"delta": {"content": "Hi."}, "finish_reason": "stop"}]}))
+
+        said: list[str] = []
+        brain = api_brains.OpenAIBrain(GATEWAY, "", "auto", "OmniRoute · auto", array_server)
+        reply = brain.turn([], [{"role": "user", "content": "hi"}], [], said.append)
+        self.assertEqual(("".join(said), reply.stop_reason), ("Hi.", "end_turn"))
+
     def test_a_remote_brain_is_not_probed(self) -> None:
         calls: list = []
 

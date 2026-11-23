@@ -123,6 +123,21 @@ def _problem(exc: Exception, name: str, url: str = "") -> Unavailable:
     return Unavailable("this PC is offline, or the provider's address doesn't answer", offline=True)
 
 
+def _reachable(base_url: str, key: str, opener: Callable[..., Any] = urlopen, timeout: float = 20) -> bool:
+    """Transport reachability only: True when the server answers at all on /models — any HTTP response,
+    including an error status or an HTML page, means it is up. Only a connection failure (refused, DNS,
+    timeout) means it is down. A valid model list is not required: some working servers have no /models
+    endpoint at all, and that must not stop the chat that follows."""
+    try:
+        with opener(_request(f"{base_url.rstrip('/')}/models", key), timeout=timeout):
+            pass
+    except HTTPError:
+        return True  # answered with an error status: the server is up (HTTPError is a URLError, so check first)
+    except (URLError, OSError):
+        return False
+    return True
+
+
 def list_models(base_url: str, key: str, opener: Callable[..., Any] = urlopen, timeout: float = 20) -> list[str]:
     """The models the key can use (the OpenAI-format /models list most providers have)."""
     try:
@@ -130,6 +145,8 @@ def list_models(base_url: str, key: str, opener: Callable[..., Any] = urlopen, t
             data = json.loads(response.read())
     except (HTTPError, URLError, OSError, ValueError) as exc:
         raise _problem(exc, "The provider", base_url) from exc
+    if not isinstance(data, dict):
+        return []  # a JSON array (or other non-object) is not a model list — no ids to offer, no crash
     ids = [str(item.get("id")) for item in data.get("data", []) if isinstance(item, dict) and item.get("id")]
     return sorted(set(ids))[:400]
 
@@ -197,13 +214,10 @@ class OpenAIBrain:
     def _prove(self) -> None:
         """The first connection attempt to a server on this PC: a short timeout, so a gateway that isn't running
         fails fast with a plain message instead of stalling the turn. A server that answers at all (even with an
-        error for /models) is up, so only a connection failure stops the turn."""
-        try:
-            list_models(self.base_url, self.key, opener=self.opener, timeout=self.probe_timeout)
-        except Unavailable as exc:
-            if exc.offline:
-                raise Unavailable(f"{self.label} isn't answering — nothing is running at {self.base_url} on this "
-                                  "PC. Start it and try again.", offline=True) from exc
+        error for /models, or HTML instead of a model list) is up, so only a connection failure stops the turn."""
+        if not _reachable(self.base_url, self.key, opener=self.opener, timeout=self.probe_timeout):
+            raise Unavailable(f"{self.label} isn't answering — nothing is running at {self.base_url} on this "
+                              "PC. Start it and try again.", offline=True)
         self._proved = True
 
     def turn(self, system: Any, messages: list[dict[str, Any]], tools: list[dict[str, Any]],

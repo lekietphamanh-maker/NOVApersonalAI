@@ -77,6 +77,11 @@ class FormatTests(unittest.TestCase):
             {"data": [{"id": "b"}, {"id": "a"}, {"id": "a"}]}).encode()))
         self.assertEqual(models, ["a", "b"])
 
+    def test_a_non_object_model_list_is_empty_not_a_crash(self) -> None:
+        models = api_brains.list_models("https://x/v1", "k", lambda request, timeout: Stream(json.dumps(
+            [{"id": "a"}]).encode()))
+        self.assertEqual(models, [])
+
     def test_entries_need_a_model_and_an_address(self) -> None:
         entry = api_brains.Entry.new("groq", "llama-x")
         self.assertEqual((entry.base_url, entry.label), ("https://api.groq.com/openai/v1", "Groq · llama-x"))

@@ -14,6 +14,7 @@ import { h } from "./lab.js";
 import { createAdvance } from "./advance.js";
 import { createWorkplace } from "./workplace.js";
 import { createGalaxy } from "./galaxy.js";
+import { nextModelValue } from "./api_model.js";
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -715,6 +716,10 @@ function renderClaude() {
     : `${activeAgent.label} isn't on this PC yet: Install, then Connect account and sign in.`) : "";
 }
 
+// The model the page last filled in by itself (a provider's default), so a provider change can
+// replace it with the next provider's default instead of leaving the wrong model in the field.
+let autoModel = "";
+
 function providerChanged() {
   const providers = (state.claude?.api?.providers) || [];
   const chosen = providers.find((item) => item.key === $("#api-provider").value) || providers[0];
@@ -723,7 +728,9 @@ function providerChanged() {
   $("#api-base").hidden = chosen.kind === "anthropic";
   $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-...)" : `API key${chosen.key_optional ? " (optional)" : ""}`;
   $("#api-hint").textContent = chosen.hint ? `Key from: ${chosen.hint}` : "";
-  if (!$("#api-model").value && chosen.default_model) $("#api-model").value = chosen.default_model;
+  const modelField = $("#api-model");
+  modelField.value = nextModelValue(modelField.value, autoModel, chosen.default_model);
+  autoModel = chosen.default_model || "";
   const note = $("#api-note");
   if (note) note.replaceChildren(...(chosen.note ? [chosen.note + " ",
     h("a", { href: "https://www.omniroute.online/", target: "_blank", rel: "noopener" }, "omniroute.online")] : []));
@@ -1815,7 +1822,7 @@ $("#api-load-models").onclick = async () => {
 $("#api-add-save").onclick = async () => {
   const result = await act("api_brain_add", { provider: $("#api-provider").value, base_url: $("#api-base").value,
     key: $("#api-key").value, model: $("#api-model").value });
-  if (result && result.ok !== false) { $("#api-key").value = ""; $("#api-model").value = ""; $("#api-add").open = false; }
+  if (result && result.ok !== false) { $("#api-key").value = ""; $("#api-model").value = ""; autoModel = ""; $("#api-add").open = false; }
 };
 $("#free-cloud-signin").onclick = () => act("free_cloud_signin");
 $("#free-cloud-save").onclick = () => act("free_cloud_settings", { model: $("#free-cloud-model").value });
