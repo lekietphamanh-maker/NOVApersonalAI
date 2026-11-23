@@ -709,7 +709,7 @@ function renderClaude() {
   const activeAgent = cloud.agents.find((agent) => agent.key === cloud.agent);
   $("#claude-info").textContent = claude.usb ? "The USB Edition stays fully offline."
     : activeEntry ? `${activeEntry.label}: billed per question to your account with that provider.${claude.on && !onPlan ? " It's answering now." : " Choose API brain above to use it."}` + (!onPlan ? lastAnswer : "")
-    : "Any AI with an API key: Claude, OpenAI, Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, or your own server.";
+    : "Any AI with an API key: Claude, OpenAI, Gemini, OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, or your own server — or OmniRoute, a free gateway on this PC that needs no key.";
   $("#cloud-info").textContent = claude.usb ? "" : activeAgent ? (activeAgent.installed
     ? `${activeAgent.label} on ${activeAgent.account}: no API key, it counts toward that account's usage.${claude.on && onPlan ? " It's answering now." : " Choose Cloud brain above to use it."}` + (onPlan ? lastAnswer : "")
     : `${activeAgent.label} isn't on this PC yet: Install, then Connect account and sign in.`) : "";
@@ -721,8 +721,12 @@ function providerChanged() {
   if (!chosen) return;
   $("#api-base").value = chosen.base_url;
   $("#api-base").hidden = chosen.kind === "anthropic";
-  $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-...)" : `API key${chosen.key === "custom" ? " (if the server needs one)" : ""}`;
+  $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-...)" : `API key${chosen.key_optional ? " (optional)" : ""}`;
   $("#api-hint").textContent = chosen.hint ? `Key from: ${chosen.hint}` : "";
+  if (!$("#api-model").value && chosen.default_model) $("#api-model").value = chosen.default_model;
+  const note = $("#api-note");
+  if (note) note.replaceChildren(...(chosen.note ? [chosen.note + " ",
+    h("a", { href: "https://www.omniroute.online/", target: "_blank", rel: "noopener" }, "omniroute.online")] : []));
   $("#api-models").replaceChildren(...(chosen.kind === "anthropic" ? Object.keys(state.claude?.models || {}) : []).map((id) => new Option(id, id)));
 }
 

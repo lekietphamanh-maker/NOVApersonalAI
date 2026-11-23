@@ -36,7 +36,8 @@ CATALOG: tuple[Entry, ...] = (
     Entry("Brains", "Ask Claude", "A hard question goes to Claude; personal ones stay on this PC unless you say yes.",
           ("ask Claude to explain transformers simply",), ("ask_claude",), "claude", "SETTINGS → Model → Claude"),
     Entry("Brains", "API brain", "Any AI with your API key answers: Claude, OpenAI, Gemini, OpenRouter, Groq, DeepSeek, "
-          "Mistral, xAI, Together or your own server. Add several and pick one.", needs="api",
+          "Mistral, xAI, Together or your own server — or OmniRoute, a free gateway on this PC that needs no key. "
+          "Add several and pick one.", needs="api",
           where="SETTINGS → Model → API brain → Add an API brain"),
     Entry("Brains", "Cloud brain", "An AI you sign in to with an account, no key: Claude Code (Claude plan, uses Nova's "
           "tools), Codex (ChatGPT plan) or Gemini CLI (Google account).", needs="cloud_brain",

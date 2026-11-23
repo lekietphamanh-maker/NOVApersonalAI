@@ -1807,11 +1807,13 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         return "plan" if claude_code.find() else "key"
 
     def _claude_ready(self) -> bool:
-        """The online brain the owner chose can answer: the Cloud brain's agent is installed, or the API brain has a key."""
+        """The online brain the owner chose can answer: the Cloud brain's agent is installed, the API brain has a key,
+        or the API brain needs none (OmniRoute on this PC, or a server that takes none)."""
         if self._claude_via() == "plan":
             return cloud_agents.find(self._cloud_agent()) is not None
         entry = self._api_entry()
-        return entry is not None and self._api_key(entry) is not None
+        return entry is not None and (self._api_key(entry) is not None
+                                      or api_brains.provider(entry.provider).key_optional)
 
     # ---------- the API brain (any provider's key) and the Cloud brain (an agent signed in with an account) ----------
 
@@ -1841,7 +1843,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                     "entries": [{**entry.as_dict(), "has_key": self._api_key(entry) is not None,
                                  "provider_label": api_brains.provider(entry.provider).label} for entry in self._api_entries()],
                     "providers": [{"key": item.key, "label": item.label, "base_url": item.base_url, "kind": item.kind,
-                                   "hint": item.hint} for item in api_brains.PROVIDERS],
+                                   "hint": item.hint, "key_optional": item.key_optional,
+                                   "default_model": item.default_model, "note": item.note} for item in api_brains.PROVIDERS],
                     "claude_models": cloud_brain.MODELS},
             "cloud": {"agent": self._cloud_agent().key,
                       "agents": [{"key": item.key, "label": item.label, "account": item.account, "full": item.full,
@@ -1862,7 +1865,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         else:
             entry = api_brains.Entry.new(found.key, str(args.get("model") or ""), str(args.get("base_url") or ""),
                                          str(args.get("label") or ""))
-            if not key and found.key != "custom":
+            if not key and not found.key_optional:
                 return {"ok": False, "error": f"Paste your {found.label.split(' (')[0]} API key ({found.hint})."}
             if key:
                 secret_store.save(f"api_key_{entry.id}", key)
