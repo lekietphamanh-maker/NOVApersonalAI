@@ -286,7 +286,9 @@ class CreativeServer:
             return url
         edge = find_edge()
         if edge is not None:
-            subprocess.Popen([str(edge), f"--app={url}", "--start-maximized"])
+            # Same as Nova's own window: the camera prompt is answered once and for all, so the
+            # permission question can never hide behind Nova (or be answered "block" by mistake).
+            subprocess.Popen([str(edge), f"--app={url}", "--start-maximized", "--use-fake-ui-for-media-stream"])
             # The creative window is Nova's too: lift it above the HUD once it appears.
             bring_window_titled_to_front("Nova · Creative Mode")
         else:

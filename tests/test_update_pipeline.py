@@ -3,8 +3,6 @@ all without Windows, a network, Claude Code or git."""
 from __future__ import annotations
 
 import json
-import os
-import stat
 import subprocess
 import tempfile
 import unittest

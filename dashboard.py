@@ -23,7 +23,6 @@ import time
 import tkinter as tk
 import uuid
 import urllib.request
-import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable
@@ -3960,6 +3959,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             self.gestures.pause(True)
             self.creative_has_camera_since = time.monotonic()
             self.events.put(("creative_opened", None))
+            # Wait until the reader has actually let go (usually a fraction of a second, at most 2 s),
+            # so the page's first camera request doesn't hit a webcam that is still busy.
+            self.gestures.wait_camera_free(2.0)
 
     def _watch_creative(self) -> None:
         if self.closing or self.creative_has_camera_since is None:

@@ -113,6 +113,42 @@ class OwnGesturesTest(unittest.TestCase):
         self.assertIsNone(control._recording)
 
 
+class CameraHandoffTest(unittest.TestCase):
+    """Pausing the gesture reader really lets go of the webcam, so Creative mode can open it."""
+
+    @staticmethod
+    def _long_video(path: str, seconds: float = 10) -> None:
+        """A long still video, so the reader is still holding it when the test pauses it."""
+        import cv2
+        frame = cv2.imread(str(FIXTURES / "thumbs_up.jpg"))
+        writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"MJPG"), 10, (640, 480))
+        for _ in range(int(seconds * 10)):
+            writer.write(cv2.resize(frame, (640, 480)))
+        writer.release()
+
+    def test_pause_releases_the_camera(self) -> None:
+        import time
+        try:
+            import cv2  # noqa: F401
+            import mediapipe  # noqa: F401
+        except ImportError as exc:
+            self.skipTest(f"needs OpenCV and MediaPipe: {exc}")
+        video = Path(tempfile.mkdtemp()) / "hands.avi"
+        self._long_video(str(video))
+        control = GestureControl(lambda _action: None, lambda _message: None, source=str(video))
+        try:
+            self.assertTrue(control.wait_camera_free(1), "nothing is held before it starts")
+            control.start()
+            deadline = time.monotonic() + 15
+            while control.wait_camera_free(0) and time.monotonic() < deadline:
+                time.sleep(0.05)
+            self.assertFalse(control.wait_camera_free(0), "the reader should be holding the video")
+            control.pause(True)
+            self.assertTrue(control.wait_camera_free(5), "pausing should release the camera")
+        finally:
+            control.stop()
+
+
 class RecognizerVideoTest(unittest.TestCase):
     """The real MediaPipe model reading a video file, exactly as it reads the webcam."""
 

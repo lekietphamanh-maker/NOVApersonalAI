@@ -117,6 +117,8 @@ class GestureControl:
         self.source = source  # a camera index, or a video file for tests
         self._stop = threading.Event()
         self._paused = threading.Event()
+        self._camera_free = threading.Event()
+        self._camera_free.set()  # nothing held until the reader opens the webcam
         self._thread: threading.Thread | None = None
         self.custom: list[dict] = []  # the owner's own gestures: {"id", "pose"} or {"id", "samples": [features…]}
         self._recording: dict | None = None  # {"until", "skip_until", "samples", "done"} while one is recorded
@@ -135,6 +137,10 @@ class GestureControl:
         self._stop.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout=3)
+
+    def wait_camera_free(self, timeout: float) -> bool:
+        """True once the reader has let go of the webcam (already true when it never started)."""
+        return self._camera_free.wait(timeout)
 
     def pause(self, paused: bool) -> None:
         (self._paused.set if paused else self._paused.clear)()
@@ -181,6 +187,7 @@ class GestureControl:
                     if camera is not None:
                         camera.release()  # hand the webcam to creative mode
                         camera = None
+                        self._camera_free.set()
                     time.sleep(0.3)
                     continue
                 if camera is None:
@@ -194,6 +201,7 @@ class GestureControl:
                             reported = True
                         time.sleep(3)
                         continue
+                    self._camera_free.clear()
                     reported = False
                 ok, frame = camera.read()
                 if not ok:
@@ -201,6 +209,7 @@ class GestureControl:
                         break
                     camera.release()
                     camera = None
+                    self._camera_free.set()
                     continue
                 # Video files carry their own clock; a live camera uses wall time.
                 now = camera.get(cv2.CAP_PROP_POS_MSEC) / 1000 if from_file else time.monotonic()
@@ -224,4 +233,5 @@ class GestureControl:
         finally:
             if camera is not None:
                 camera.release()
+                self._camera_free.set()
             recognizer.close()
