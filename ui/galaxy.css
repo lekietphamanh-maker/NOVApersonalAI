@@ -6,6 +6,13 @@
 
 .galaxy-hud { position: absolute; inset: 0; pointer-events: none; }
 
+/* The "What I can do" panel is mounted into this HUD as its only in-flow child, so
+   without this it sits at the very top-left, printed over the KNOWLEDGE GALAXY title.
+   It lives below the title block (about 52px tall) instead, and gets its clicks back:
+   the HUD itself ignores pointer events. */
+.galaxy-hud .what-can-i-do { position: absolute; top: 76px; left: 24px;
+  width: min(340px, calc(100vw - 48px)); pointer-events: auto; }
+
 .galaxy-title { position: absolute; top: 18px; left: 24px;
   font: 700 16px/1 "Rajdhani", "Segoe UI", sans-serif; letter-spacing: 0.28em; color: var(--accent);
   text-shadow: 0 0 14px rgba(var(--accent-rgb), 0.6); text-transform: uppercase; }

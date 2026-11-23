@@ -16,7 +16,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from app_window import bring_window_titled_to_front, find_edge
+from app_window import bring_window_titled_to_front, close_window, find_edge, find_window, is_window
 
 # A fixed port keeps the page's origin stable, so the browser remembers the camera permission.
 PREFERRED_PORT = 8765
@@ -337,6 +337,16 @@ class CreativeServer:
             # only the creative page's own loopback origin is granted the camera and mic there
             # (seeded into that profile before launch). Any other site still gets the prompt.
             profile = creative_profile_dir()
+            # A running Edge never re-reads the Preferences file the grant is seeded into:
+            # when a creative window is already open, the seed is silently ignored, the page's
+            # camera request pends on a prompt nobody sees, and the screen stays black. Close
+            # that window first (it is Nova's own window) so the fresh launch reads the grant.
+            existing = find_window("Nova · Creative Mode")
+            if existing is not None:
+                close_window(existing)
+                deadline = time.monotonic() + 3
+                while is_window(existing) and time.monotonic() < deadline:
+                    time.sleep(0.2)
             seed_media_permission(profile, _origin(url))
             subprocess.Popen([str(edge), f"--app={url}", f"--user-data-dir={profile}", "--no-first-run",
                               "--no-default-browser-check", "--start-maximized"])
