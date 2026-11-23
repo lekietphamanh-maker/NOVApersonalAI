@@ -14,10 +14,44 @@ const CARDS = [
   { id: "alerts", title: "Alerts", what: "Speed well below your usual, or a device that was here last scan and isn't now." },
 ];
 
+// --- the hero speed chart: pure shaping, no DOM, so it is testable in node ---
+
+// The y-axis top for a list of {time, down, up} points, or null when there is nothing to draw.
+export function historyChartStats(points) {
+  if (!Array.isArray(points) || !points.length) return null;
+  return { max: Math.max(1, ...points.flatMap((point) => [point.down, point.up])) };
+}
+
+// An SVG chart with two series — download (amber) and upload (green) — as a string (innerHTML
+// parses SVG properly; createElement does not). "" when there is nothing to draw, so the caller
+// shows "run a speed test first" instead of a fake chart. One test draws two dots, honestly.
+export function historyChartSvg(points, width = 600, height = 180) {
+  const stats = historyChartStats(points);
+  if (!stats) return "";
+  const padL = 8, padR = 8, padT = 16, padB = 22;
+  const x = (i) => points.length === 1 ? width / 2
+    : padL + (i * (width - padL - padR)) / (points.length - 1);
+  const y = (value) => padT + (1 - value / stats.max) * (height - padT - padB);
+  const series = (key, color) => {
+    const line = points.map((point, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(point[key]).toFixed(1)}`).join(" ");
+    const dots = points.map((point, i) =>
+      `<circle cx="${x(i).toFixed(1)}" cy="${y(point[key]).toFixed(1)}" r="3.5" fill="${color}"/>`).join("");
+    return points.length === 1 ? dots : `<path d="${line}" fill="none" stroke="${color}" stroke-width="2"/>${dots}`;
+  };
+  const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  const first = points[0], last = points[points.length - 1];
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Speed history chart">`
+    + series("down", "#f5b942") + series("up", "#5be0a0")
+    + `<text x="${padL}" y="11" fill="#f5b942" font-size="10" font-family="monospace">— Download (Mbps)</text>`
+    + `<text x="150" y="11" fill="#5be0a0" font-size="10" font-family="monospace">— Upload (Mbps)</text>`
+    + `<text x="${padL}" y="${height - 8}" fill="#8a94a6" font-size="10" font-family="monospace">${esc(first.time)} → ${esc(last.time)}</text>`
+    + `</svg>`;
+}
+
 export function createNetwork(root, { act, onOpenChange }) {
   const view = screen(root, { onOpenChange });
   let built = false;
-  let cardsBox, setupBox, resultBoxes = [];
+  let cardsBox, setupBox, heroBox, resultBoxes = [];
 
   function build() {
     if (built) return;
@@ -32,6 +66,9 @@ export function createNetwork(root, { act, onOpenChange }) {
       + "If something can't be measured, Nova says so instead of guessing. Nothing about your network ever leaves this PC.");
     banner.style.cssText = "margin: 0 22px; padding: 10px 14px; border: 1px solid var(--warn); border-left: 3px solid var(--warn); "
       + "background: rgba(255, 181, 71, 0.07); color: var(--text); font: 500 13px/1.5 var(--sans);";
+    // The hero chart: your own measured speed history, download and upload. One test so far
+    // shows that one honestly; none says "run a speed test first" instead of drawing anything fake.
+    heroBox = h("section", { class: "network-hero", "aria-live": "polite" });
     cardsBox = h("div", { class: "skills-grid" },
       h("div", { class: "skill-cards" }, CARDS.map((card) => {
         const result = h("div", { class: "network-result" });
@@ -48,7 +85,34 @@ export function createNetwork(root, { act, onOpenChange }) {
       "Free local tools only (ping, ipconfig, arp, Cloudflare speed test) · No account, no key, nothing sent to a cloud · Esc");
     const helpWrap = h("div", { style: "padding: 0 22px;" });
     mountWhatCanIDo(helpWrap, "network", { onPhrase: runPhrase });
-    root.append(head, banner, cardsBox, setupBox, helpWrap, hint);
+    root.append(head, banner, heroBox, cardsBox, setupBox, helpWrap, hint);
+    loadHistoryChart();
+  }
+
+  async function loadHistoryChart() {
+    heroBox.replaceChildren(h("p", { class: "network-hero-note" }, "Loading your speed history…"));
+    const answer = await act("network", { action: "chart" });
+    if (!answer?.ok) {
+      heroBox.replaceChildren(h("p", { class: "network-hero-note" },
+        answer?.error || "Couldn't load your speed history — try again in a bit."));
+      return;
+    }
+    const svg = historyChartSvg(answer.points || []);
+    if (!svg) {
+      heroBox.replaceChildren(h("p", { class: "network-hero-note" },
+        "No speed tests saved yet — run a speed test first and the chart will fill in."));
+      return;
+    }
+    const latest = answer.latest || {};
+    const head = h("div", { class: "network-hero-head" },
+      h("b", {}, "Speed history"),
+      h("span", { class: "network-hero-latest" },
+        `Latest: ${Number(latest.down || 0).toFixed(0)} down / ${Number(latest.up || 0).toFixed(0)} up Mbps`
+        + (latest.ping != null ? ` · ${Number(latest.ping).toFixed(0)} ms ping` : "")),
+      h("span", { class: "network-hero-range" }, `${(answer.points || []).length} test${(answer.points || []).length === 1 ? "" : "s"}`));
+    const chart = h("div", { class: "network-hero-chart" });
+    chart.innerHTML = svg;
+    heroBox.replaceChildren(head, chart);
   }
 
   function showSetup(message) {
@@ -57,23 +121,7 @@ export function createNetwork(root, { act, onOpenChange }) {
     setupBox.textContent = message;
   }
 
-  function historyBars(history) {
-    // A small bar chart of saved downloads: one bar per test, the tallest bar is the fastest run.
-    if (!history || !history.length) return null;
-    const downs = history.map((row) => Number(row.down_mbps) || 0);
-    const best = Math.max(...downs, 1);
-    const bars = h("div", { style: "display: flex; align-items: flex-end; gap: 3px; height: 56px; margin: 6px 0 2px;" },
-      downs.slice(-20).map((value) => h("div", {
-        title: `${value} Mbps down`,
-        style: `flex: 1; min-width: 4px; height: ${Math.max(2, Math.round((value / best) * 52))}px; `
-          + "background: var(--accent); border-radius: 2px 2px 0 0; opacity: 0.85;",
-      })));
-    const caption = h("p", { class: "skill-note" },
-      `Last ${Math.min(downs.length, 20)} tests, oldest left, newest right — tallest bar is your fastest (${best} Mbps down).`);
-    return h("div", {}, bars, caption);
-  }
-
-  function renderResult(box, answer, action) {
+  function renderResult(box, answer) {
     if (!answer.ok) {
       box.replaceChildren(h("p", { class: "skill-note" },
         String(answer.error || "").includes("Unknown action")
@@ -86,12 +134,7 @@ export function createNetwork(root, { act, onOpenChange }) {
     }
     showSetup("");
     const lines = (answer.lines || []).map((line) => h("p", { class: "skill-note" }, line));
-    const extra = [];
-    if ((action === "speed" || action === "history") && answer.history?.length) {
-      const bars = historyBars(answer.history);
-      if (bars) extra.push(bars);
-    }
-    box.replaceChildren(...lines, ...extra);
+    box.replaceChildren(...lines);
   }
 
   async function run(action, resultBox, button) {
@@ -101,7 +144,8 @@ export function createNetwork(root, { act, onOpenChange }) {
     if (button) button.disabled = true;
     box.replaceChildren(h("p", { class: "skill-note" }, action === "devices" ? "Scanning your network…" : action === "speed" ? "Measuring — downloading, then uploading…" : "…"));
     const answer = await act("network", { action });
-    renderResult(box, answer || { ok: false }, action);
+    renderResult(box, answer || { ok: false });
+    if (action === "speed" && answer?.ok) loadHistoryChart(); // the new test belongs on the chart
     if (button) button.disabled = false;
   }
 

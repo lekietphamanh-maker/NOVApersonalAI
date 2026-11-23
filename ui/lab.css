@@ -33,6 +33,53 @@
 .lab-chip.running small { color: var(--accent); }
 .lab-chip.failed small { color: var(--warn); }
 
+/* The full report, read on screen: a panel over the HUD with the whole report text. */
+.report-panel { position: fixed; inset: 24px; z-index: 90; display: flex; flex-direction: column;
+  background: rgba(6, 10, 16, 0.97); border: 1px solid var(--accent); border-radius: 3px;
+  box-shadow: 0 0 60px rgba(0, 0, 0, 0.8); }
+.report-head { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 12px 18px; border-bottom: 1px solid var(--line-strong); }
+.report-head b { color: #fff; font: 600 15px/1.3 var(--mono); letter-spacing: 0.06em; }
+.report-body { flex: 1; overflow-y: auto; padding: 16px 22px; color: var(--text); font: 14px/1.65 var(--sans); }
+.report-body h2, .report-body h3, .report-body h4, .report-body h5 { color: var(--accent); margin: 18px 0 6px; font-family: var(--mono); }
+.report-body h2 { font-size: 17px; } .report-body h3 { font-size: 15px; } .report-body h4, .report-body h5 { font-size: 13px; }
+.report-body p { margin: 0 0 10px; }
+.report-body ul, .report-body ol { margin: 0 0 10px; padding-left: 22px; }
+.report-body li { margin-bottom: 4px; }
+.report-body pre { overflow-x: auto; padding: 10px 12px; background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line); font: 12px/1.5 var(--mono); }
+.report-body code { font-family: var(--mono); font-size: 12.5px; }
+.report-foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 18px;
+  border-top: 1px solid var(--line-strong); }
+.report-foot .report-note { color: var(--muted); font-size: 12.5px; }
+.report-foot .report-progress { color: var(--accent); font: 600 12px/1.5 var(--mono); }
+.report-foot .report-done { color: #5be0a0; font-size: 12.5px; }
+
+/* Network: the hero speed-history chart (same look as the trading hero) */
+.network-hero { margin: 12px 22px 0; padding: 12px 14px 6px; border: 1px solid var(--line-strong); background: rgba(10, 9, 6, 0.82); }
+.network-hero-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.network-hero-head b { color: #fff; font: 600 15px/1.2 var(--mono); letter-spacing: 0.08em; }
+.network-hero-latest { color: var(--text); font: 600 13px/1.2 var(--mono); }
+.network-hero-range { color: var(--muted); font: 600 11px/1.2 var(--mono); }
+.network-hero-chart svg { display: block; }
+.network-hero-note { margin: 0; padding: 6px 0; color: var(--muted); font-size: 12.5px; }
+
+/* Trading: quick-pick chips and the hero price chart */
+.trading-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 22px 0; }
+.trading-chips-label { color: var(--muted); font: 600 10px/1 var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+.trading-chip { padding: 5px 10px; border: 1px solid var(--line-strong); border-radius: 2px; background: rgba(255, 255, 255, 0.02);
+  color: var(--text); cursor: pointer; font: 600 11px/1 var(--mono); letter-spacing: 0.06em; }
+.trading-chip:hover, .trading-chip:focus-visible { border-color: var(--accent); background: rgba(var(--accent-rgb), 0.1); outline: none; }
+.trading-hero { margin: 12px 22px 0; padding: 12px 14px 6px; border: 1px solid var(--line-strong); background: rgba(10, 9, 6, 0.82); }
+.trading-hero-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+.trading-hero-head b { color: #fff; font: 600 15px/1.2 var(--mono); letter-spacing: 0.08em; }
+.trading-hero-price { color: var(--text); font: 600 15px/1.2 var(--mono); }
+.trading-hero-up { color: #5be0a0; font: 600 12px/1.2 var(--mono); }
+.trading-hero-down { color: #ff6e82; font: 600 12px/1.2 var(--mono); }
+.trading-hero-range { color: var(--muted); font: 600 11px/1.2 var(--mono); }
+.trading-hero-chart svg { display: block; }
+.trading-hero-note { margin: 0; padding: 6px 0; color: var(--muted); font-size: 12.5px; }
+
 /* Shannon: the stages and the cards */
 @keyframes shannon-pulse { to { box-shadow: 0 0 28px rgba(var(--accent-rgb), 1); background: var(--accent); } }
 

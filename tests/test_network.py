@@ -243,6 +243,35 @@ class PanelTests(unittest.TestCase):
         filled = panel.act("history", {})
         self.assertIn("Usual download: 100 Mbps", "\n".join(filled["lines"]))
 
+    def test_history_chart_points_skip_bad_rows(self) -> None:
+        rows = [{"time": "2026-11-01 10:00", "down_mbps": 100.0, "up_mbps": 20.0, "ping_ms": 12.0},
+                {"time": "2026-11-01 11:00", "down_mbps": "fast", "up_mbps": 20.0},  # not a number: skipped
+                {"time": "2026-11-01 12:00", "down_mbps": 80.0, "up_mbps": 15.0}]
+        points = network.history_chart_points(rows)
+        self.assertEqual(len(points), 2)
+        self.assertEqual(points[0], {"time": "2026-11-01 10:00", "down": 100.0, "up": 20.0, "ping": 12.0})
+        self.assertIsNone(points[1]["ping"])
+
+    def test_chart_action_empty_then_one_test_then_many(self) -> None:
+        panel = self.panel()
+        empty = panel.act("chart", {})
+        self.assertTrue(empty["ok"])
+        self.assertEqual(empty["points"], [])
+        self.assertIn("run a speed test first", empty["lines"][0])
+        panel.act("speed", {})
+        one = panel.act("chart", {})
+        self.assertEqual(len(one["points"]), 1)
+        self.assertEqual(one["latest"]["down"], 100.0)
+        self.assertEqual(one["latest"]["up"], 20.0)
+        self.assertEqual(one["latest"]["ping"], 12.0)
+        self.assertIn("Latest: 100 down / 20 up Mbps", one["lines"][1])
+        rows = [{"time": f"2026-11-0{i} 10:00", "down_mbps": 90.0 + i, "up_mbps": 18.0 + i}
+                for i in range(1, 6)]
+        panel._save_json("network_history.json", rows)
+        many = panel.act("chart", {})
+        self.assertEqual(len(many["points"]), 5)
+        self.assertEqual(many["latest"]["down"], 95.0)
+
     def test_history_file_caps_at_50(self) -> None:
         panel = self.panel()
         rows = [{"time": "2026-11-01", "down_mbps": 100.0, "up_mbps": 20.0} for _ in range(60)]

@@ -105,6 +105,7 @@ from building_actions import BuildingActions
 import building
 import trading
 import network
+import update_pipeline
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -316,6 +317,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.google_mcp = google_mcp.GoogleMcp(lambda: self.agent.gmail, lambda: self.agent.drive)  # for the owner's Claude apps
         self.updates = self_update.Updater(VERSION, self_update.default_folder())
         self.update_ready: Path | None = None  # a verified installer waiting for "Restart to update"
+        self.pipeline: update_pipeline.Pipeline | None = None  # the running self-update, if any
+        self._pipeline_lock = threading.Lock()
         self.telegram = telegram_remote.TelegramRemote(
             ask=self._ask_from_telegram, transcribe=self.voice_transcribe,
             load=lambda: dict(self.settings.get("telegram") or {}), save=lambda data: self._save_setting("telegram", data),
@@ -497,7 +500,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                          "keep_running": self.settings.get("keep_running", True),
                          "mini_orb": self.settings.get("mini_orb", True),
                          "soul": self.settings.get("soul", agent_module.DEFAULT_SOUL),
-                         "node_path": self.settings.get("node_path", ""), **self._advance_settings()},
+                         "node_path": self.settings.get("node_path", ""), **self._advance_settings(),
+                         "github_token_set": update_pipeline.token_set(self.settings),
+                         "github_repo": self.settings.get("github_repo", update_pipeline.DEFAULT_REPO)},
             "brief": None,
             "brief_loading": False,
             "notes": self._notes_state(),
@@ -796,7 +801,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report", "rea_fit_add", "rea_pick",
                "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
                "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
-               "shannon_fix", "shannon_simulate", "shannon_simulate_report", "shannon_pick", "galaxy_data", "update_now", "google_pick_client"}
+               "shannon_fix", "shannon_simulate", "shannon_simulate_report", "shannon_pick", "galaxy_data", "update_now", "google_pick_client",
+               "github_token", "rea_report_text", "shannon_report_text", "shannon_simulate_report_text",
+               "rea_update_now", "shannon_update_now", "self_update_status"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -1106,9 +1113,10 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_google_pick_client(self, _args: dict[str, Any]) -> dict[str, Any]:
         """Opens a file picker for the Google OAuth client JSON, copies it to the right place, then auto-connects."""
         from tkinter import filedialog
-        path = filedialog.askopenfilename(
-            title="Pick the Google OAuth client JSON you downloaded",
-            filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
+        with app_window.dialog_on_top(getattr(self, "root", None), getattr(self, "window_hwnd", None)):
+            path = filedialog.askopenfilename(
+                title="Pick the Google OAuth client JSON you downloaded",
+                filetypes=[("JSON files", "*.json"), ("All files", "*.*")])
         if not path:
             return {"ok": False, "picked": False}
         try:
@@ -2228,7 +2236,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         if not project.repo:
             return {"ok": False, "error": "No repo or folder saved for it yet: Edit to add one."}
         if urlsplit(project.repo).scheme in ("http", "https"):
-            webbrowser.open(project.repo)
+            app_window.open_browser(project.repo)
             return None
         if not Path(project.repo).is_dir():
             return {"ok": False, "error": f"{project.repo} isn't a folder on this PC."}
@@ -2840,7 +2848,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         url = str(args.get("url", ""))
         if urlsplit(url).scheme not in ("http", "https"):
             return {"ok": False, "error": "Only web links can be opened."}
-        webbrowser.open(url)  # the user's own browser, not the HUD window
+        app_window.open_browser(url)  # the user's own browser, not the HUD window
         return None
 
     def _act_heart(self, args: dict[str, Any]) -> None:
@@ -3349,11 +3357,12 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_rea_pick(self, args: dict[str, Any]) -> dict[str, Any]:
         """Opens the native file window so the owner clicks the file or folder to analyse instead of typing its path."""
         from tkinter import filedialog
-        if str(args.get("kind") or "file") == "folder":
-            path = filedialog.askdirectory(title="Pick a folder to analyse")
-        else:
-            path = filedialog.askopenfilename(title="Pick a file to analyse",
-                                              filetypes=[("All files", "*.*")])
+        with app_window.dialog_on_top(getattr(self, "root", None), getattr(self, "window_hwnd", None)):
+            if str(args.get("kind") or "file") == "folder":
+                path = filedialog.askdirectory(title="Pick a folder to analyse")
+            else:
+                path = filedialog.askopenfilename(title="Pick a file to analyse",
+                                                  filetypes=[("All files", "*.*")])
         return {"ok": True, "picked": bool(path), "path": path or ""}
 
     def _act_rea_open(self, args: dict[str, Any]) -> dict[str, Any]:
@@ -3466,15 +3475,184 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         from tkinter import filedialog
         projects = self.shannon.projects_folder
         start = projects if projects.is_dir() else Path.home()
-        if str(args.get("kind") or "file") == "app":
-            path = filedialog.askdirectory(title="Pick a project folder to simulate on", initialdir=str(start))
-        else:
-            path = filedialog.askopenfilename(title="Pick a file to simulate on", initialdir=str(Path.home()),
-                                              filetypes=[("All files", "*.*")])
+        with app_window.dialog_on_top(getattr(self, "root", None), getattr(self, "window_hwnd", None)):
+            if str(args.get("kind") or "file") == "app":
+                path = filedialog.askdirectory(title="Pick a project folder to simulate on", initialdir=str(start))
+            else:
+                path = filedialog.askopenfilename(title="Pick a file to simulate on", initialdir=str(Path.home()),
+                                                  filetypes=[("All files", "*.*")])
         return {"ok": True, "picked": bool(path), "path": path or ""}
 
     def _act_shannon_simulate_report(self, args: dict[str, Any]) -> None:
         self._open_file(str(self._lab_job(args, "shannon_simulate").get("report") or ""))
+
+    # ---------- the full report on screen, and "Update now" ----------
+
+    def _act_github_token(self, args: dict[str, Any]) -> dict[str, Any]:
+        """The token for pushing to GitHub: saved on this PC only, never sent back to the page.
+        The page only ever learns whether one is set (state.settings.github_token_set)."""
+        token = str(args.get("token") or "").strip()[:200]
+        repo = update_pipeline.valid_repo(args.get("repo")) or update_pipeline.DEFAULT_REPO
+        if token:
+            self._save_setting("github_token", token)
+        self._save_setting("github_repo", repo)
+        self._update(settings={"github_token_set": update_pipeline.token_set(self.settings),
+                               "github_repo": repo})
+        return {"ok": True, "token_set": update_pipeline.token_set(self.settings), "repo": repo}
+
+    def _report_text(self, job: dict[str, Any]) -> dict[str, Any]:
+        """The full report as text, for the panel inside the HUD — not a file to chase."""
+        return {"ok": True, "title": str(job.get("title") or "Report"),
+                "text": update_pipeline.read_report(str(job.get("report") or ""))}
+
+    def _act_rea_report_text(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self._report_text(self._lab_job(args, "rea"))
+
+    def _act_shannon_report_text(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self._report_text(self._lab_job(args, "shannon"))
+
+    def _act_shannon_simulate_report_text(self, args: dict[str, Any]) -> dict[str, Any]:
+        return self._report_text(self._lab_job(args, "shannon_simulate"))
+
+    def _nova_repo_dir(self) -> Path | None:
+        """Nova's own code, when this copy runs from a git checkout (the PC's repo)."""
+        root = Path(__file__).resolve().parent
+        return root if (root / ".git").is_dir() else None
+
+    def _shannon_target_dir(self, job: dict[str, Any]) -> Path | None:
+        """Where the simulated app's code lives: its project folder (App), the file's folder
+        (File), or nothing when the target was only a local address."""
+        path = Path(str(job.get("target") or ""))
+        if path.is_dir():
+            return path
+        if path.is_file():
+            return path.parent
+        return None
+
+    def _start_pipeline(self, source: str, fixes: list[dict[str, str]], target: Path) -> dict[str, Any]:
+        """One pipeline at a time; it runs on a worker thread and the screens poll its status."""
+        with self._pipeline_lock:
+            if self.pipeline is not None and self.pipeline.state()["running"]:
+                return {"ok": False, "error": "An update is already running — let it finish first."}
+            if not fixes:
+                return {"ok": False, "error": "Nothing to update in this report."}
+            if not self.deep_work.available:
+                return {"ok": False,
+                        "error": "Updating needs Claude Code on this PC (claude.com/product/claude-code)."}
+            repo = str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO)
+            self.pipeline = update_pipeline.Pipeline(source, fixes, str(target), repo)
+        threading.Thread(target=self._run_pipeline, args=(self.pipeline,), name="NovaSelfUpdate", daemon=True).start()
+        return {"ok": True, "started": True, "token_set": update_pipeline.token_set(self.settings),
+                "fixes": len(fixes), "target": str(target)}
+
+    def _act_rea_update_now(self, args: dict[str, Any]) -> dict[str, Any]:
+        """REA's upgrades go into Nova's own code: the report's fit findings, applied in one go."""
+        job = self._lab_job(args, "rea")
+        target = self._nova_repo_dir()
+        if target is None:
+            return {"ok": False,
+                    "error": "Nova's code isn't a git checkout on this PC, so there's nothing to update here."}
+        return self._start_pipeline("rea", update_pipeline.fixes_from_rea_job(job), target)
+
+    def _act_shannon_update_now(self, args: dict[str, Any]) -> dict[str, Any]:
+        """Shannon's open holes, fixed in the app they were found in."""
+        try:
+            job = self._lab_job(args, "shannon_simulate")
+        except ValueError:
+            job = self._lab_job(args, "shannon")
+        target = self._shannon_target_dir(job)
+        if target is None:
+            return {"ok": False,
+                    "error": "Nova doesn't know where that app's code lives — run Simulate attack on its "
+                             "project folder (App) and the fixes will go there."}
+        return self._start_pipeline("shannon", update_pipeline.fixes_from_shannon_job(job), target)
+
+    def _act_self_update_status(self, _args: dict[str, Any]) -> dict[str, Any]:
+        if self.pipeline is None:
+            return {"stage": "idle", "running": False, "fix_round": 0, "fixes": 0, "target": "",
+                    "repo": str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO),
+                    "steps": [{"stage": stage, "status": "waiting", "detail": ""}
+                              for stage in update_pipeline.STAGES],
+                    "error": "", "summary": ""}
+        return self.pipeline.state()
+
+    def _run_pipeline(self, pipe: update_pipeline.Pipeline) -> None:
+        """Apply -> recheck -> test -> (fix, test, up to 3 rounds) -> push -> done. Never pushes
+        unless the tests are green; never installs anything from GitHub."""
+        target = Path(pipe.target)
+        command = claude_code.find()
+        already_here = update_pipeline.dirty_files(target)  # uncommitted work from before: named, not swept in silently
+
+        def emit() -> None:
+            self.ui.emit({"type": "self_update", "state": pipe.state()})
+
+        pipe.start_stage("apply", f"{len(pipe.fixes)} fix{'es' if len(pipe.fixes) != 1 else ''} from the {pipe.source} report")
+        emit()
+        if command is None:
+            pipe.fail("apply", "Claude Code isn't installed on this PC.")
+            emit()
+            return
+        try:
+            applied = claude_code.run(update_pipeline.build_fix_task(pipe.fixes, str(target)), target,
+                                      command, building=True)
+            pipe.finish_stage("apply", applied[:300])
+        except Exception as exc:  # noqa: BLE001 - a failed apply is a failed update, not a crash
+            pipe.fail("apply", f"Claude Code couldn't apply the fixes: {exc}")
+            emit()
+            return
+        emit()
+        pipe.start_stage("recheck", "Removing dead code")
+        emit()
+        removed = update_pipeline.remove_unused_imports(target)
+        gone = sum(len(entry["names"]) for entry in removed)
+        pipe.finish_stage("recheck",
+                          f"Removed {gone} unused import{'s' if gone != 1 else ''} from {len(removed)} file{'s' if len(removed) != 1 else ''}"
+                          if gone else "No dead imports to remove")
+        emit()
+        while True:
+            pipe.start_stage("test", f"fix round {pipe.fix_round + 1}" if pipe.fix_round else "first run")
+            emit()
+            results = update_pipeline.run_tests(target)
+            if results.get("error"):
+                pipe.fail("test", str(results["error"]))
+                emit()
+                return
+            if results["ok"]:
+                pipe.finish_stage("test", f"{results['passed']} passed")
+                emit()
+                break
+            tails = "\n".join(str(suite.get("tail") or "") for suite in results["suites"].values() if not suite.get("ok"))
+            if not pipe.can_retry_tests():
+                pipe.fail("test", f"Tests still failing after {update_pipeline.MAX_FIX_ROUNDS} fix rounds:\n{tails[:600]}")
+                emit()
+                return
+            pipe.note_fix_round()
+            pipe.start_stage("fix", f"fix round {pipe.fix_round}")
+            emit()
+            try:
+                fixed = claude_code.run(update_pipeline.build_test_fix_task(tails, str(target)), target,
+                                        command, building=True)
+                pipe.finish_stage("fix", fixed[:300])
+            except Exception as exc:  # noqa: BLE001 - a failed fix round is a failed update, not a crash
+                pipe.fail("fix", f"Claude Code couldn't fix the test failures: {exc}")
+                emit()
+                return
+            emit()
+        pipe.start_stage("push", f"Pushing to {pipe.repo}")
+        emit()
+        token = str(self.settings.get("github_token") or "")
+        pushed = update_pipeline.push_to_github(target, pipe.repo, token)
+        if not pushed["ok"]:
+            pipe.fail("push", str(pushed["error"]))
+            emit()
+            return
+        pipe.finish_stage("push", str(pushed["message"]))
+        emit()
+        note = (f" (Note: {len(already_here)} uncommitted change{'s' if len(already_here) != 1 else ''} "
+                "that were already here went up with it.)" if already_here else "")
+        pipe.finish(f"Done: {len(pipe.fixes)} fix{'es' if len(pipe.fixes) != 1 else ''} applied, "
+                    f"the code rechecked, tests green, {pushed['message']}{note}")
+        emit()
 
     def _act_galaxy_data(self, _args: dict[str, Any]) -> None:
         vault_folder = self._vault_folder()
@@ -4097,7 +4275,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         elif event_type == "approval_closed":
             if (self.state["approval"] or {}).get("id") == payload:
                 self._update(approval=None)
-                app_window.keep_on_top(self.window_hwnd, False)
+            # Always drop the lift, even when the id doesn't match (a second approval can
+            # overwrite the first): a Nova left always-on-top hides every window it opens next.
+            app_window.keep_on_top(self.window_hwnd, False)
         elif event_type == "chat_done":
             reply, streamed, latency = payload
             self.live_reply = ""

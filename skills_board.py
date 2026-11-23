@@ -143,7 +143,7 @@ CATALOG: tuple[Entry, ...] = (
           needs="shannon", where="SHANNON screen; needs WSL2, Docker Desktop and an API key"),
     Entry("Labs", "Trading", "Paper trading only: scan the market for day-trade setups, check the news, time an entry, "
           "plan the exit, replay the odds, and size the trade to your budget. No order is ever placed without your "
-          "say-so.", ("scan the market for day trades", "what's the news on AAPL?", "is TSLA a good entry today?",
+          "say-so.", ("scan the market for day trades", "show me the chart for AAPL", "what's the news on AAPL?", "is TSLA a good entry today?",
                       "how much can I risk on one trade?", "what are the odds this setup worked before?"),
           ("trading",), where="TRADING in the top bar"),
     Entry("Labs", "Network", "Your home network in one place, measured on this PC: a real speed test, Wi-Fi and "

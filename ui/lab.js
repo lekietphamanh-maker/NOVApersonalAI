@@ -49,3 +49,86 @@ export function renderStrip(container, jobs, activeId, onPick, describe) {
     h("span", { class: "muted small" }, "Past reports show here. They're also in your Library."),
   ]));
 }
+
+// --- the full report, read on screen: plain Markdown-lite to safe HTML ---
+// The reports come from Claude Code, so every line is escaped first and only the report's own
+// structure is restored: # headings, - bullets, 1. numbered lines, ``` code blocks, the rest
+// plain paragraphs. No raw HTML from a report ever reaches the page.
+export function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+export function reportToHtml(text) {
+  const lines = String(text || "").split("\n");
+  const out = [];
+  let inCode = false, code = [], list = null;
+  const closeList = () => { if (list) { out.push(`</${list}>`); list = null; } };
+  const closeCode = () => { out.push(`<pre><code>${code.map(escapeHtml).join("\n")}</code></pre>`); code = []; };
+  for (const raw of lines) {
+    const line = raw.replace(/\s+$/, "");
+    if (line.trim().startsWith("```")) {
+      closeList();
+      if (inCode) closeCode();
+      inCode = !inCode;
+      continue;
+    }
+    if (inCode) { code.push(line); continue; }
+    const heading = line.match(/^(#{1,4})\s+(.*)$/);
+    if (heading) {
+      closeList();
+      const level = Math.min(4, heading[1].length) + 1; // # -> h2, so the panel title stays the only h1
+      out.push(`<h${level}>${escapeHtml(heading[2])}</h${level}>`);
+      continue;
+    }
+    const bullet = line.match(/^\s*[-*]\s+(.*)$/);
+    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
+    if (bullet || numbered) {
+      const tag = bullet ? "ul" : "ol";
+      if (list !== tag) { closeList(); out.push(`<${tag}>`); list = tag; }
+      out.push(`<li>${escapeHtml((bullet || numbered)[1])}</li>`);
+      continue;
+    }
+    closeList();
+    if (line.trim()) out.push(`<p>${escapeHtml(line.trim())}</p>`);
+  }
+  closeList();
+  if (inCode) closeCode();
+  return out.join("\n");
+}
+
+// --- "Update now": one click, progress shown, a summary afterwards ---
+export const UPDATE_STAGE_LABELS = {
+  apply: "Applying the fixes", recheck: "Rechecking the code", test: "Running the tests",
+  fix: "Fixing the test failures", push: "Pushing to GitHub", done: "Done", failed: "Stopped",
+};
+
+// Poll the pipeline's status until it is done or failed, calling onState with each state.
+// Returns a stop() for the caller. The pipeline runs on Nova's side; this only watches.
+export function pollSelfUpdate(act, onState, intervalMs = 2000) {
+  const timer = setInterval(async () => {
+    const state = await act("self_update_status");
+    if (!state) return;
+    onState(state);
+    if (state.stage === "done" || state.stage === "failed") clearInterval(timer);
+  }, intervalMs);
+  return () => clearInterval(timer);
+}
+
+// A full report as a readable panel inside the HUD, on top of the screen that opened it: the
+// whole text (not a summary, not a link), scrollable, with a footer for the caller's buttons
+// ("Update now", …). Returns a close() that removes it. Esc closes it too.
+export function openReportPanel(root, { title, text, footer = [] }) {
+  const close = () => panel.remove();
+  const body = h("div", { class: "report-body" });
+  body.innerHTML = reportToHtml(text);
+  const panel = h("div", { class: "report-panel", role: "dialog", "aria-label": title },
+    h("header", { class: "report-head" },
+      h("b", {}, title),
+      h("button", { class: "box small", type: "button", onclick: close }, "Close")),
+    body,
+    h("footer", { class: "report-foot" }, ...footer));
+  root.append(panel);
+  panel.querySelector("button").focus();
+  panel.addEventListener("keydown", (event) => { if (event.key === "Escape") { event.stopPropagation(); close(); } });
+  return close;
+}

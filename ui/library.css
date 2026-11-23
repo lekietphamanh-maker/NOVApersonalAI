@@ -18,9 +18,12 @@
 .lib-shelves { display: flex; gap: 6px; margin-left: 8px; }
 .lib-shelves .box.on { color: #fff; border-color: var(--accent); background: rgba(var(--accent-rgb), 0.16); }
 #lib-needs-count:not(:empty) { margin-left: 6px; padding: 1px 5px; color: #120c02; background: var(--accent); border-radius: 2px; }
-.lib-search { display: flex; align-items: center; gap: 8px; margin-left: auto; padding: 6px 10px; min-width: 180px; max-width: 280px; flex: 1;
+.lib-search { display: flex; align-items: center; gap: 8px; margin-left: auto; padding: 6px 10px; min-width: 220px; max-width: 340px; flex: 1;
   border: 1px solid var(--line-strong); background: rgba(0, 0, 0, 0.35); color: var(--muted); }
-.lib-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; }
+.lib-search:focus-within { border-color: var(--accent); box-shadow: 0 0 10px rgba(var(--accent-rgb), 0.2); }
+.lib-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; font: 500 12px/1 var(--mono); letter-spacing: 0.06em; }
+.lib-search-clear { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+.lib-search-clear:hover { color: #fff; }
 .lib-counter { font: 600 10.5px/1 var(--mono); letter-spacing: 0.16em; color: var(--dim); white-space: nowrap; }
 
 .lib-stage { position: relative; min-height: 0; touch-action: pan-y; user-select: none; container-type: size; }

@@ -359,6 +359,11 @@ function render() {
   $("#mini-orb").checked = (state.settings || {}).mini_orb !== false;
   if (document.activeElement?.id !== "owner-name") $("#owner-name").value = (state.settings || {}).owner_name || "";
   if (document.activeElement?.id !== "nova-soul") $("#nova-soul").value = (state.settings || {}).soul || "";
+  // The token itself is never shown: only whether one is set, and which repo it pushes to.
+  const tokenSet = Boolean((state.settings || {}).github_token_set);
+  $("#need-self-update-state").textContent = tokenSet ? "SET" : "NOT SET";
+  $("#github-token-status").textContent = tokenSet ? "Token saved on this PC — “Update now” can push." : "No token yet — “Update now” still fixes and tests, but can't push.";
+  if (document.activeElement?.id !== "github-repo") $("#github-repo").value = (state.settings || {}).github_repo || "";
   $("#send").disabled = Boolean(state.busy);
 }
 
@@ -1885,6 +1890,12 @@ $("#knowledge-sizes").onclick = () => { toast("Asking Kiwix's library for the si
 $("#notes-index").onclick = () => act("notes_index");
 $("#keep-city-save").onclick = () => { toast("Downloading the roads; it can take a few minutes for a big city.", "info"); act("keep_city", { city: $("#keep-city").value }); };
 $("#node-path-save").onclick = () => act("node_path", { path: $("#node-path").value });
+$("#github-token-save").onclick = () => {
+  act("github_token", { token: $("#github-token").value, repo: $("#github-repo").value });
+  $("#github-token").value = ""; // never leave it sitting in the field
+  toast("Saved on this PC.", "ok");
+};
+$("#github-token").addEventListener("keydown", (event) => { if (event.key === "Enter") $("#github-token-save").click(); });
 $("#drive-connect").onclick = () => {
   toast("Google opens in your browser: allow Drive too. If it says the Drive API is off, enable it in Google Cloud Console for your project first.", "info");
   act("gmail", { drive: true });

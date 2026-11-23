@@ -61,6 +61,35 @@ def clean_symbol(value: Any) -> str | None:
     return symbol if _SYMBOL.fullmatch(symbol) and any(char.isalnum() for char in symbol) else None
 
 
+# Well-known company names -> tickers, so typing "coca-cola" works instead of needing KO.
+# Keys are the name lower-cased with every non-alphanumeric stripped ("Coca-Cola" -> "cocacola").
+COMPANY_NAMES = {
+    "apple": "AAPL", "microsoft": "MSFT", "nvidia": "NVDA", "tesla": "TSLA",
+    "amazon": "AMZN", "alphabet": "GOOGL", "google": "GOOGL", "meta": "META", "facebook": "META",
+    "amd": "AMD", "netflix": "NFLX", "cocacola": "KO", "cocacolacompany": "KO",
+    "pepsi": "PEP", "pepsico": "PEP", "walmart": "WMT", "disney": "DIS", "nike": "NKE",
+    "mcdonalds": "MCD", "starbucks": "SBUX", "intel": "INTC", "costco": "COST",
+    "berkshire": "BRK-B", "berkshirehathaway": "BRK-B",
+    "jpmorgan": "JPM", "jpmorganchase": "JPM", "chase": "JPM", "bankofamerica": "BAC",
+    "visa": "V", "mastercard": "MA", "paypal": "PYPL", "uber": "UBER", "airbnb": "ABNB",
+    "spotify": "SPOT", "cisco": "CSCO", "oracle": "ORCL", "adobe": "ADBE", "salesforce": "CRM",
+    "ford": "F", "generalmotors": "GM", "exxon": "XOM", "exxonmobil": "XOM", "chevron": "CVX",
+    "pfizer": "PFE", "johnsonjohnson": "JNJ", "jj": "JNJ", "proctergamble": "PG",
+    "palantir": "PLTR", "coinbase": "COIN", "gamestop": "GME",
+}
+
+
+def resolve_symbol(value: Any) -> str | None:
+    """A ticker from a ticker or a company name ("coca-cola" -> KO, "apple" -> AAPL), or None."""
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    key = re.sub(r"[^a-z0-9]", "", raw.lower())
+    if key in COMPANY_NAMES:
+        return COMPANY_NAMES[key]
+    return clean_symbol(raw)
+
+
 def _money(value: Any, default: float) -> float:
     try:
         number = float(value)
@@ -255,6 +284,9 @@ class TradingDesk:
         try:
             data = self._fetch(url)
         except Exception as error:  # noqa: BLE001 - any network failure is a sentence for the UI
+            if isinstance(error, urllib.error.HTTPError) and error.code == 404:
+                return None, (f"No such symbol as {symbol} on Yahoo Finance — try a ticker like AAPL, "
+                              "or a company name like Coca-Cola.")
             return None, (f"Couldn't reach Yahoo Finance for {symbol} ({_short_error(error)}). "
                           "Check Nova is online and try again.")
         bars = _bars_from_chart(data)
@@ -318,7 +350,7 @@ class TradingDesk:
     def _symbols(self, arguments: dict[str, Any]) -> tuple[list[str], str]:
         raw = arguments.get("symbols") or arguments.get("symbol") or ""
         wanted = [item.strip() for item in str(raw).split(",") if item.strip()] or list(DEFAULT_WATCHLIST)
-        symbols = [symbol for symbol in (clean_symbol(item) for item in wanted[:MAX_SYMBOLS]) if symbol]
+        symbols = [symbol for symbol in (resolve_symbol(item) for item in wanted[:MAX_SYMBOLS]) if symbol]
         if not symbols:
             return [], "Give a symbol, e.g. AAPL — or a few, comma-separated."
         return symbols, ""
@@ -332,7 +364,7 @@ class TradingDesk:
             if target <= 0:
                 target = entry + (entry - stop)
             return {"entry": entry, "stop": stop, "target": target, "triggered": True}, "", ""
-        symbol = clean_symbol(arguments.get("symbol"))
+        symbol = resolve_symbol(arguments.get("symbol"))
         if symbol is None:
             return None, "", "Give a symbol, e.g. AAPL — or an entry and a stop."
         bars, problem = self._chart(symbol, "6mo")
@@ -361,7 +393,7 @@ class TradingDesk:
         return {"ok": True, "title": "Scan", "lines": lines}
 
     def _act_news(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        symbol = clean_symbol(arguments.get("symbol"))
+        symbol = resolve_symbol(arguments.get("symbol"))
         if symbol is None:
             return {"ok": False, "error": "Give a symbol, e.g. AAPL."}
         items, problem = self._news(symbol)
@@ -378,7 +410,7 @@ class TradingDesk:
                                    "source": "House Clerk", "when": "", "link": CLERK_URL}]}
 
     def _act_entry(self, arguments: dict[str, Any]) -> dict[str, Any]:
-        symbol = clean_symbol(arguments.get("symbol"))
+        symbol = resolve_symbol(arguments.get("symbol"))
         if symbol is None:
             return {"ok": False, "error": "Give a symbol, e.g. AAPL."}
         bars, problem = self._chart(symbol, "6mo")
@@ -413,7 +445,7 @@ class TradingDesk:
         plan, symbol, problem = self._plan(arguments)
         if plan is None:
             return {"ok": False, "error": problem}
-        symbol = symbol or clean_symbol(arguments.get("symbol"))
+        symbol = symbol or resolve_symbol(arguments.get("symbol"))
         if symbol is None:
             return {"ok": False, "error": "Give a symbol, e.g. AAPL, so the odds have a history to replay."}
         bars, error = self._chart(symbol, "2y")
@@ -484,14 +516,32 @@ class TradingDesk:
             return str(result["error"])
         return "\n".join([str(result.get("title") or "Trading")] + [str(line) for line in result.get("lines", [])])
 
+    def _act_chart(self, arguments: dict[str, Any]) -> dict[str, Any]:
+        """The hero chart's data: the symbol's recent daily closes, straight from Yahoo Finance."""
+        symbol = resolve_symbol(arguments.get("symbol"))
+        if symbol is None:
+            return {"ok": False, "error": "Type a symbol or a company name, e.g. AAPL or Coca-Cola."}
+        bars, problem = self._chart(symbol, "3mo")
+        if bars is None:
+            return {"ok": False, "error": problem}
+        points = [{"date": bar["date"], "close": round(bar["close"], 2)} for bar in bars[-60:]]
+        last = bars[-1]["close"]
+        prev = bars[-2]["close"] if len(bars) > 1 else last
+        change = 100 * (last / prev - 1) if prev else 0
+        return {"ok": True, "title": f"{symbol} — last {len(points)} closes",
+                "symbol": symbol, "points": points, "last": round(last, 2),
+                "change_pct": round(change, 1),
+                "lines": [f"{symbol} last {_dollars(last)} ({change:+.1f}% on the day) — "
+                          f"{len(points)} closes, {points[0]['date']} to {points[-1]['date']}."]}
+
     def act(self, action: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """One card's answer: scan, news, entry, exit, odds, risk or budget. Never places an order."""
         handler = {"scan": self._act_scan, "news": self._act_news, "entry": self._act_entry,
                    "exit": self._act_exit, "odds": self._act_odds, "risk": self._act_risk,
-                   "budget": self._act_budget}.get(str(action or "").strip().lower())
+                   "budget": self._act_budget, "chart": self._act_chart}.get(str(action or "").strip().lower())
         if handler is None:
             return {"ok": False,
-                    "error": "Not done: the action is scan, news, entry, exit, odds, risk or budget."}
+                    "error": "Not done: the action is scan, news, entry, exit, odds, risk, budget or chart."}
         try:
             return handler(arguments if isinstance(arguments, dict) else {})
         except Exception as error:  # noqa: BLE001 - a card must answer, even when something unexpected breaks

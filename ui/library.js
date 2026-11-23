@@ -177,6 +177,7 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
     }, cards.length <= 24 || number % 5 === 0 || number === cards.length - 1 ? h("span", {}, pad(number + 1)) : null)));
     root.querySelectorAll("[data-shelf]").forEach((button) => button.classList.toggle("on", button.dataset.shelf === shelf));
     $("#lib-needs-count").textContent = (data.needs || []).length ? String(data.needs.length) : "";
+    $("#lib-search-clear").hidden = !query;
     $("#lib-crumb").textContent = shelf === "topic" ? ` / ${topic.name}` : ` / ${SHELVES[shelf]}`;
     const color = accent();
     elements.forEach((element) => requestAnimationFrame(() => drawCloud(element.querySelector(".lib-field"), element.points, 0.6, color, false)));
@@ -305,7 +306,7 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
   function pick(number) {
     if (number < 1 || number > cards.length) { flash(`No card ${number}`); return; }
     go(number - 1);
-    if (cards[index].kind === "topic") enter();
+    enter();  // one click opens it, by voice too
   }
 
   function goto(target) {
@@ -378,10 +379,13 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
 
   // ---------- mouse, wheel, touch and keys ----------
   track.addEventListener("click", (event) => {
+    // One click opens it: the card comes to the front and opens (a topic opens, a project
+    // shows its notes, a new card opens the form). No second click, no dead end.
     const element = event.target.closest(".lib-card");
     if (!element || dragged) return;
     const number = Number(element.dataset.index);
-    if (number === index) enter(); else go(number);
+    go(number);
+    enter();
   });
   let wheel = 0, wheelAt = 0;
   $("#lib-stage").addEventListener("wheel", (event) => {
@@ -400,6 +404,8 @@ export function createLibrary(root, { act, toast, confirm, onOpenChange }) {
   $("#lib-prev").addEventListener("click", () => move(-1));
   $("#lib-next").addEventListener("click", () => move(1));
   $("#lib-close").addEventListener("click", () => close());
+  $("#lib-back").addEventListener("click", () => back());
+  $("#lib-search-clear").addEventListener("click", () => { clearSearch(); build(); search.focus(); });
   $("#lib-add").addEventListener("click", () => openForm(null, { status: shelf === "projects" ? "building" : "idea", topic: shelf === "topic" ? topic.name : "" }));
   root.querySelectorAll("[data-shelf]").forEach((tab) => tab.addEventListener("click", () => setShelf(tab.dataset.shelf)));
   search.addEventListener("input", () => { query = search.value.trim(); index = 0; build(); });
