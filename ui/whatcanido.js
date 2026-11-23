@@ -64,7 +64,7 @@ export const WHAT_CAN_I_DO = {
   trading: {
     name: "Trading",
     what: "Paper trading only: scan the market for day-trade setups, check the news, time an entry, plan the exit, replay the odds, and size the trade to your budget. No order is ever placed without your say-so.",
-    say: ["scan the market for day trades", "what's the news on AAPL?", "is TSLA a good entry today?",
+    say: ["scan the market for day trades", "show me the chart for AAPL", "what's the news on AAPL?", "is TSLA a good entry today?",
           "plan my exit from TSLA", "how big should this trade be?",
           "how much can I risk on one trade?", "what are the odds this setup worked before?"],
   },

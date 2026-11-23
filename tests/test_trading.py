@@ -58,6 +58,22 @@ class SymbolTests(unittest.TestCase):
         self.assertEqual(trading.clean_symbol("^GSPC"), "^GSPC")
         self.assertIsNone(trading.clean_symbol(""))
         self.assertIsNone(trading.clean_symbol("AAPL; DROP TABLE"))
+
+    def test_resolve_symbol_maps_company_names(self) -> None:
+        # Keith typed "coca-cola" and got a 404 for COCA-COLA; a name must resolve to its ticker.
+        self.assertEqual(trading.resolve_symbol("coca-cola"), "KO")
+        self.assertEqual(trading.resolve_symbol("Coca-Cola"), "KO")
+        self.assertEqual(trading.resolve_symbol("coca cola"), "KO")
+        self.assertEqual(trading.resolve_symbol("apple"), "AAPL")
+        self.assertEqual(trading.resolve_symbol("tesla"), "TSLA")
+        self.assertEqual(trading.resolve_symbol("berkshire hathaway"), "BRK-B")
+        self.assertEqual(trading.resolve_symbol("mcdonald's"), "MCD")
+
+    def test_resolve_symbol_still_takes_tickers(self) -> None:
+        self.assertEqual(trading.resolve_symbol("aapl"), "AAPL")
+        self.assertEqual(trading.resolve_symbol(" BRK-B "), "BRK-B")
+        self.assertIsNone(trading.resolve_symbol(""))
+        self.assertIsNone(trading.resolve_symbol("not a company xyz"))
         self.assertIsNone(trading.clean_symbol("waytoolongticker"))
 
 
@@ -110,6 +126,20 @@ class MathTests(unittest.TestCase):
         self.assertEqual(first["target_pct"], 100.0)  # a steady climb hits the target first
         self.assertEqual(first["fired"], 15)
         self.assertEqual(first["past_target"] + first["past_stop"] + first["past_open"], first["fired"])
+
+
+def any_chart_fetch(url: str) -> Any:
+    """Any v8 chart request returns the breakout series, whatever the symbol — for name resolution."""
+    if "v8/finance/chart" in url:
+        return chart_json(BREAKOUT)
+    raise urllib.error.URLError("no network in tests")
+
+
+def not_found_fetch(url: str) -> Any:
+    """Yahoo Finance answers 404 for the chart — an unknown symbol."""
+    if "v8/finance/chart" in url:
+        raise urllib.error.HTTPError(url, 404, "Not Found", {}, None)
+    raise urllib.error.URLError("no network in tests")
 
 
 class DeskTests(unittest.TestCase):
@@ -182,6 +212,42 @@ class DeskTests(unittest.TestCase):
         self.assertIn("AAPL $112.00", text)
         offline = trading.TradingDesk(offline_fetch).answer("entry", {"symbol": "AAPL"})
         self.assertIn("Couldn't reach Yahoo Finance", offline)
+
+    def test_scan_resolves_company_names(self) -> None:
+        desk = trading.TradingDesk(any_chart_fetch)
+        answer = desk.act("scan", {"symbol": "coca-cola"})
+        self.assertTrue(answer["ok"])
+        self.assertIn("KO $112.00", answer["lines"][0])
+
+    def test_scan_unknown_symbol_names_a_ticker_to_try(self) -> None:
+        desk = trading.TradingDesk(not_found_fetch)
+        answer = desk.act("scan", {"symbol": "ZZZZ"})
+        self.assertTrue(answer["ok"])
+        self.assertIn("No such symbol as ZZZZ", answer["lines"][0])
+        self.assertIn("try a ticker like AAPL", answer["lines"][0])
+
+    def test_chart_action_returns_recent_closes(self) -> None:
+        desk = trading.TradingDesk(any_chart_fetch)
+        answer = desk.act("chart", {"symbol": "coca-cola"})
+        self.assertTrue(answer["ok"])
+        self.assertEqual(answer["symbol"], "KO")
+        self.assertEqual(len(answer["points"]), 30)
+        self.assertEqual(answer["points"][-1]["close"], 112.0)
+        self.assertEqual(answer["last"], 112.0)
+        self.assertIn("KO last $112.00", answer["lines"][0])
+
+    def test_chart_action_with_no_network_says_so(self) -> None:
+        desk = trading.TradingDesk(offline_fetch)
+        answer = desk.act("chart", {"symbol": "AAPL"})
+        self.assertFalse(answer["ok"])
+        self.assertIn("Couldn't reach Yahoo Finance", answer["error"])
+
+    def test_chart_action_with_unknown_symbol_names_a_ticker_to_try(self) -> None:
+        desk = trading.TradingDesk(not_found_fetch)
+        answer = desk.act("chart", {"symbol": "ZZZZ"})
+        self.assertFalse(answer["ok"])
+        self.assertIn("No such symbol as ZZZZ", answer["error"])
+        self.assertIn("Coca-Cola", answer["error"])
 
     def test_there_is_no_live_order_code_path(self) -> None:
         desk = trading.TradingDesk(fake_fetch)

@@ -48,7 +48,7 @@ const labelsDrawn = [];
 const ctx = {
   fillText(text) { labelsDrawn.push(text); },
   clearRect() {}, beginPath() {}, arc() {}, fill() {}, stroke() {},
-  moveTo() {}, lineTo() {}, setTransform() {},
+  moveTo() {}, lineTo() {}, closePath() {}, setTransform() {},
   createRadialGradient: () => ({ addColorStop() {} }),
 };
 const canvas = makeEl("canvas");
@@ -56,17 +56,19 @@ canvas.getContext = () => ctx;
 const info = makeEl("div");
 info._q = { h3: makeEl("h3"), ".kind": makeEl("div"), p: makeEl("p") };
 const searchEl = makeEl("input");
+const labelsBtn = makeEl("button");
 const root = makeEl("section");
 root._q = {
   canvas,
   ".galaxy-info": info,
   ".galaxy-search input": searchEl,
+  ".galaxy-labels": labelsBtn,
   ".galaxy-hud": makeEl("div"),
   ".galaxy-title small": makeEl("small"),
   ".galaxy-close": makeEl("button"),
 };
 
-const { createGalaxy } = await import("../ui/galaxy.js");
+const { createGalaxy, relaxGalaxyNodes } = await import("../ui/galaxy.js");
 const galaxy = createGalaxy(root, { act: () => {}, onOpenChange: () => {} });
 galaxy.loadData({ nodes: [
   { id: "rust", label: "Rust", kind: "wiki", excerpt: "systems language", x: -20, y: 0, z: 20, size: 1 },
@@ -76,9 +78,35 @@ galaxy.loadData({ nodes: [
 galaxy.open();
 const frame = () => { const cb = rafCb; rafCb = null; cb(0); };
 
-test("search hides non-matching stars and they stop being hoverable", () => {
+test("labels stay hidden until a star is hovered or selected", () => {
+  frame();
+  assert.deepEqual(labelsDrawn, []);
+  labelsDrawn.length = 0;
+
+  // Rust projects to sx≈253, sy≈343 at the default camera; hovering it shows only its label.
+  for (const fn of canvas.listeners.pointermove) fn({ clientX: 253, clientY: 343 });
+  assert.equal(canvas.style.cursor, "pointer");
+  frame();
+  assert.deepEqual(labelsDrawn, ["Rust"]);
+  labelsDrawn.length = 0;
+
+  // Moving away hides it again.
+  for (const fn of canvas.listeners.pointermove) fn({ clientX: 0, clientY: 0 });
+  frame();
+  assert.deepEqual(labelsDrawn, []);
+});
+
+test("the Labels toggle shows every visible star's label", () => {
+  for (const fn of labelsBtn.listeners.click) fn();
   frame();
   assert.deepEqual([...labelsDrawn].sort(), ["Go", "Python", "Rust"]);
+  labelsDrawn.length = 0;
+  for (const fn of labelsBtn.listeners.click) fn();
+  frame();
+  assert.deepEqual(labelsDrawn, []);
+});
+
+test("search hides non-matching stars and they stop being hoverable", () => {
   labelsDrawn.length = 0;
 
   searchEl.value = "rust"; // Rust matches; Python + Go become hidden
@@ -98,5 +126,21 @@ test("clearing the search brings every star back", () => {
   searchEl.value = "";
   for (const fn of searchEl.listeners.input) fn();
   frame();
-  assert.deepEqual([...labelsDrawn].sort(), ["Go", "Python", "Rust"]);
+  // Hovering Python's spot finds it again (cursor turns to "pointer").
+  for (const fn of canvas.listeners.pointermove) fn({ clientX: 852, clientY: 300 });
+  assert.equal(canvas.style.cursor, "pointer");
+});
+
+test("relaxGalaxyNodes spreads a clump and keeps every star on its sphere", () => {
+  const nodes = Array.from({ length: 30 }, (_, i) => ({
+    x: 40 + (i % 5) * 0.5, y: (i % 3) * 0.5, z: 0.5,
+  }));
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+  const minBefore = Math.min(...nodes.flatMap((a, i) => nodes.slice(i + 1).map((b) => dist(a, b))));
+  relaxGalaxyNodes(nodes, 40);
+  const minAfter = Math.min(...nodes.flatMap((a, i) => nodes.slice(i + 1).map((b) => dist(a, b))));
+  assert.ok(minAfter > minBefore * 3, `min distance ${minBefore} -> ${minAfter}`);
+  for (const node of nodes) {
+    assert.ok(Math.abs(Math.hypot(node.x, node.y, node.z) - 40) < 0.01);
+  }
 });

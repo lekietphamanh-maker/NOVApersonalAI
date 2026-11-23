@@ -18,10 +18,80 @@ const CARDS = [
 ];
 const SYMBOL = /^[A-Za-z][A-Za-z0-9.\-^]{0,11}$/;
 
+// Well-known company names -> tickers, mirroring trading.py's COMPANY_NAMES so typing
+// "coca-cola" works in the box instead of needing KO. Keys are the name lower-cased with
+// every non-alphanumeric stripped.
+export const COMPANY_NAMES = {
+  apple: "AAPL", microsoft: "MSFT", nvidia: "NVDA", tesla: "TSLA",
+  amazon: "AMZN", alphabet: "GOOGL", google: "GOOGL", meta: "META", facebook: "META",
+  amd: "AMD", netflix: "NFLX", cocacola: "KO", cocacolacompany: "KO",
+  pepsi: "PEP", pepsico: "PEP", walmart: "WMT", disney: "DIS", nike: "NKE",
+  mcdonalds: "MCD", starbucks: "SBUX", intel: "INTC", costco: "COST",
+  berkshire: "BRK-B", berkshirehathaway: "BRK-B",
+  jpmorgan: "JPM", jpmorganchase: "JPM", chase: "JPM", bankofamerica: "BAC",
+  visa: "V", mastercard: "MA", paypal: "PYPL", uber: "UBER", airbnb: "ABNB",
+  spotify: "SPOT", cisco: "CSCO", oracle: "ORCL", adobe: "ADBE", salesforce: "CRM",
+  ford: "F", generalmotors: "GM", exxon: "XOM", exxonmobil: "XOM", chevron: "CVX",
+  pfizer: "PFE", johnsonjohnson: "JNJ", jj: "JNJ", proctergamble: "PG",
+  palantir: "PLTR", coinbase: "COIN", gamestop: "GME",
+};
+
+export function resolveTradingSymbol(text) {
+  const raw = String(text || "").trim();
+  if (!raw) return null;
+  const key = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (COMPANY_NAMES[key]) return COMPANY_NAMES[key];
+  return SYMBOL.test(raw) ? raw.toUpperCase() : null;
+}
+
+// One-tap picks under the search box: the names Keith reaches for most.
+export const QUICK_PICKS = [
+  ["AAPL", "Apple"], ["MSFT", "Microsoft"], ["NVDA", "Nvidia"], ["TSLA", "Tesla"],
+  ["AMZN", "Amazon"], ["GOOGL", "Alphabet"], ["META", "Meta"], ["KO", "Coca-Cola"],
+];
+
+// --- the hero price chart: pure shaping, no DOM, so it is testable in node ---
+
+// Stats for a list of {date, close} points, or null when there is nothing to draw.
+export function chartStats(points) {
+  if (!Array.isArray(points) || points.length < 2) return null;
+  const closes = points.map((point) => point.close);
+  const first = closes[0], last = closes[closes.length - 1];
+  return {
+    min: Math.min(...closes), max: Math.max(...closes), first, last,
+    changePct: first ? +(((last / first) - 1) * 100).toFixed(1) : 0,
+  };
+}
+
+// An SVG line chart for the points, as a string (innerHTML parses SVG properly; createElement
+// does not). "" when there is nothing to draw — the caller shows a plain message instead.
+export function chartSvg(points, width = 600, height = 180) {
+  const stats = chartStats(points);
+  if (!stats) return "";
+  const padL = 8, padR = 8, padT = 16, padB = 22;
+  const range = stats.max - stats.min || 1;
+  const x = (i) => padL + (i * (width - padL - padR)) / (points.length - 1);
+  const y = (value) => padT + (1 - (value - stats.min) / range) * (height - padT - padB);
+  const line = points.map((point, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(point.close).toFixed(1)}`).join(" ");
+  const area = `${line} L${x(points.length - 1).toFixed(1)},${height - padB} L${padL},${height - padB} Z`;
+  const last = points[points.length - 1];
+  const up = last.close >= points[0].close;
+  const color = up ? "#5be0a0" : "#ff6e82";
+  const esc = (text) => String(text).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  return `<svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Price chart">`
+    + `<path d="${area}" fill="${color}" opacity="0.10"/>`
+    + `<path d="${line}" fill="none" stroke="${color}" stroke-width="2"/>`
+    + `<circle cx="${x(points.length - 1).toFixed(1)}" cy="${y(last.close).toFixed(1)}" r="3.5" fill="${color}"/>`
+    + `<text x="${padL}" y="11" fill="#8a94a6" font-size="10" font-family="monospace">$${stats.max.toFixed(2)}</text>`
+    + `<text x="${padL}" y="${height - 8}" fill="#8a94a6" font-size="10" font-family="monospace">${esc(points[0].date)} → ${esc(last.date)}</text>`
+    + `</svg>`;
+}
+
 export function createTrading(root, { act, onOpenChange }) {
   const view = screen(root, { onOpenChange });
   let built = false;
-  let symbolBox, accountBox, cardsBox, setupBox, resultBoxes = [];
+  let symbolBox, accountBox, cardsBox, setupBox, heroBox, resultBoxes = [];
+  let chartSymbol = "";
 
   function build() {
     if (built) return;
@@ -31,7 +101,7 @@ export function createTrading(root, { act, onOpenChange }) {
       h("div", { class: "lib-title" }, h("span", { class: "lib-mark", "aria-hidden": "true" }),
         h("b", {}, "TRADING"), h("span", { class: "lib-crumb" }, "paper trading only")),
       h("form", { class: "route-form", autocomplete: "off" },
-        symbolBox = h("input", { class: "field", name: "symbol", placeholder: "Symbol, e.g. AAPL", maxlength: "12", "aria-label": "Symbol" }),
+        symbolBox = h("input", { class: "field", name: "symbol", placeholder: "Symbol or company, e.g. AAPL or Coca-Cola", maxlength: "24", "aria-label": "Symbol or company name" }),
         accountBox = h("input", { class: "field", name: "account", placeholder: "Account $ (e.g. 5000)", maxlength: "12", inputmode: "decimal", "aria-label": "Account size in dollars" }),
         h("button", { class: "box small on", type: "submit" }, "Scan")),
       h("button", { class: "box small", type: "button", title: "Esc" }, "Close"));
@@ -42,6 +112,16 @@ export function createTrading(root, { act, onOpenChange }) {
       + "and any order needs your explicit say-so first.");
     banner.style.cssText = "margin: 0 22px; padding: 10px 14px; border: 1px solid var(--warn); border-left: 3px solid var(--warn); "
       + "background: rgba(255, 181, 71, 0.07); color: var(--text); font: 500 13px/1.5 var(--sans);";
+    // Quick picks: tap a name instead of typing a ticker.
+    const chips = h("div", { class: "trading-chips" },
+      h("span", { class: "trading-chips-label" }, "Quick picks:"),
+      ...QUICK_PICKS.map(([ticker, name]) => h("button", {
+        type: "button", class: "trading-chip", title: `${name} (${ticker})`,
+        onclick: () => { symbolBox.value = ticker; loadChart(ticker); run("scan"); },
+      }, ticker)));
+    // The hero chart: the current symbol's recent closes, or a plain message when the
+    // data can't be fetched — never invented numbers.
+    heroBox = h("section", { class: "trading-hero", "aria-live": "polite" });
     cardsBox = h("div", { class: "skills-grid" },
       h("div", { class: "skill-cards" }, CARDS.map((card) => {
         const result = h("div", { class: "trading-result" });
@@ -58,12 +138,41 @@ export function createTrading(root, { act, onOpenChange }) {
       "Free public data only (Yahoo Finance, SEC EDGAR, House Clerk) · Not financial advice — most people who day trade lose money · Esc");
     const helpWrap = h("div", { style: "padding: 0 22px;" });
     mountWhatCanIDo(helpWrap, "trading", { onPhrase: runPhrase });
-    root.append(head, banner, cardsBox, setupBox, helpWrap, hint);
+    root.append(head, banner, chips, heroBox, cardsBox, setupBox, helpWrap, hint);
+    loadChart(symbol() || "AAPL");
   }
 
   function symbol() {
-    const value = (symbolBox?.value || "").trim().toUpperCase();
-    return SYMBOL.test(value) ? value : "";
+    return resolveTradingSymbol(symbolBox?.value || "") || "";
+  }
+
+  async function loadChart(ticker) {
+    // One chart at a time: a slower earlier reply must not overwrite a newer one.
+    chartSymbol = ticker;
+    heroBox.replaceChildren(h("p", { class: "trading-hero-note" }, `Loading ${ticker} chart…`));
+    const answer = await act("trading", { action: "chart", symbol: ticker });
+    if (chartSymbol !== ticker) return;
+    if (!answer?.ok) {
+      heroBox.replaceChildren(h("p", { class: "trading-hero-note" },
+        answer?.error || `Couldn't load the ${ticker} chart — the data didn't come back.`));
+      return;
+    }
+    const svg = chartSvg(answer.points || []);
+    if (!svg) {
+      heroBox.replaceChildren(h("p", { class: "trading-hero-note" },
+        `No price history for ${ticker} yet — try again in a bit.`));
+      return;
+    }
+    const change = answer.change_pct ?? 0;
+    const head = h("div", { class: "trading-hero-head" },
+      h("b", {}, answer.symbol || ticker),
+      h("span", { class: "trading-hero-price" }, `$${Number(answer.last || 0).toFixed(2)}`),
+      h("span", { class: change >= 0 ? "trading-hero-up" : "trading-hero-down" },
+        `${change >= 0 ? "+" : ""}${change.toFixed(1)}% today`),
+      h("span", { class: "trading-hero-range" }, `${(answer.points || []).length} closes`));
+    const chart = h("div", { class: "trading-hero-chart" });
+    chart.innerHTML = svg;
+    heroBox.replaceChildren(head, chart);
   }
 
   function account() {
@@ -101,14 +210,23 @@ export function createTrading(root, { act, onOpenChange }) {
     build();
     const card = CARDS.find((entry) => entry.id === action) || CARDS[0];
     const box = resultBox || resultBoxes[CARDS.indexOf(card)];
-    if (action !== "scan" && !symbol()) {
+    const raw = (symbolBox?.value || "").trim();
+    const resolved = symbol();
+    if (raw && !resolved) {
+      box.replaceChildren(h("p", { class: "skill-note" },
+        `Couldn't find "${raw}" as a symbol — try a ticker like KO for Coca-Cola, or tap one of the quick picks above.`));
+      symbolBox.focus();
+      return;
+    }
+    if (resolved && resolved !== chartSymbol) loadChart(resolved);
+    if (action !== "scan" && !resolved) {
       box.replaceChildren(h("p", { class: "skill-note" }, "Type a symbol first, e.g. AAPL."));
       symbolBox.focus();
       return;
     }
     if (button) button.disabled = true;
     box.replaceChildren(h("p", { class: "skill-note" }, "…"));
-    const args = { action, symbol: symbol() || undefined, account: account() };
+    const args = { action, symbol: resolved || undefined, account: account() };
     const answer = await act("trading", args);
     renderResult(box, answer || { ok: false });
     if (button) button.disabled = false;
@@ -116,7 +234,15 @@ export function createTrading(root, { act, onOpenChange }) {
 
   function runPhrase(phrase) {
     // A "What I can do" phrase runs the card it names, with the symbol box as it stands.
+    build();
     const lower = phrase.toLowerCase();
+    if (lower.includes("chart")) {
+      const tokens = phrase.replace(/[?.!]/g, "").split(/\s+/).filter(Boolean);
+      const pick = resolveTradingSymbol(tokens[tokens.length - 1] || "");
+      if (pick) { symbolBox.value = pick; loadChart(pick); }
+      else if (symbol()) loadChart(symbol());
+      return;
+    }
     const action = lower.includes("news") ? "news"
       : lower.includes("entry") ? "entry"
       : lower.includes("exit") ? "exit"
