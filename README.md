@@ -49,6 +49,4 @@ run.bat
 
 Releases are built by the `build` workflow (Actions → build → Run workflow with a version).
 
-## Credits
 
-Speech-while-writing, the remember/forget guard and walkthroughs are adapted from [plip](https://github.com/hussainn7/plip-oss) (MIT). Camera lenses and the photo booth follow ideas from [Curious Machines](https://github.com/tigrisli/curious-machines). Reverse engineering: [REA](https://github.com/morluto/rea); pentesting: [Shannon](https://github.com/KeygraphHQ/shannon) (both run as their own pinned packages). Map outlines: Natural Earth (public domain) via world-atlas. 3D: three.js; hands and faces: MediaPipe.
