@@ -169,6 +169,20 @@ def network_prefix(ipv4: str, mask: str) -> str | None:
     return ".".join(parts[:3]) + "."
 
 
+def history_chart_points(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The hero chart's points from saved history: only rows with real down/up numbers, in saved order."""
+    points: list[dict[str, Any]] = []
+    for row in rows:
+        down, up = row.get("down_mbps"), row.get("up_mbps")
+        if not isinstance(down, (int, float)) or not isinstance(up, (int, float)):
+            continue
+        ping = row.get("ping_ms")
+        points.append({"time": str(row.get("time") or ""), "down": round(float(down), 1),
+                       "up": round(float(up), 1),
+                       "ping": round(float(ping), 1) if isinstance(ping, (int, float)) else None})
+    return points
+
+
 def speed_alert(history: list[dict[str, Any]], latest_down: float | None) -> str:
     """"Much slower than usual" when the latest download is under half the median of the tests before it.
     Needs at least 3 earlier tests, so one slow day never cries wolf on its own."""
@@ -425,6 +439,18 @@ class NetworkPanel:
                          + (f" · {row.get('ping_ms')} ms ping" if row.get("ping_ms") is not None else "") + ".")
         return {"ok": True, "title": "Speed history", "lines": lines, "history": rows}
 
+    def _act_chart(self, _arguments: dict[str, Any]) -> dict[str, Any]:
+        """The hero chart's data: the PC's own measured speed-test history, nothing invented."""
+        points = history_chart_points(self.history)
+        if not points:
+            return {"ok": True, "title": "Speed history", "points": [], "latest": None,
+                    "lines": ["No speed tests saved yet — run a speed test first and the chart will fill in."]}
+        latest = points[-1]
+        lines = [f"{len(points)} test{'s' if len(points) != 1 else ''} saved on this PC.",
+                 f"Latest: {latest['down']:.0f} down / {latest['up']:.0f} up Mbps"
+                 + (f" · {latest['ping']:.0f} ms ping" if latest["ping"] is not None else "") + "."]
+        return {"ok": True, "title": "Speed history", "points": points, "latest": latest, "lines": lines}
+
     def _act_alerts(self, _arguments: dict[str, Any]) -> dict[str, Any]:
         rows = self.history
         alerts: list[str] = []
@@ -453,10 +479,11 @@ class NetworkPanel:
     def act(self, action: str, arguments: dict[str, Any]) -> dict[str, Any]:
         """One card's answer: status, speed, devices, history or alerts. Never invents a number."""
         handler = {"status": self._act_status, "speed": self._act_speed, "devices": self._act_devices,
-                   "history": self._act_history, "alerts": self._act_alerts}.get(str(action or "").strip().lower())
+                   "history": self._act_history, "alerts": self._act_alerts,
+                   "chart": self._act_chart}.get(str(action or "").strip().lower())
         if handler is None:
             return {"ok": False,
-                    "error": "Not done: the action is status, speed, devices, history or alerts."}
+                    "error": "Not done: the action is status, speed, devices, history, alerts or chart."}
         try:
             return handler(arguments if isinstance(arguments, dict) else {})
         except Exception as error:  # noqa: BLE001 - a card must answer, even when something unexpected breaks

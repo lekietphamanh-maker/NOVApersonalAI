@@ -16,7 +16,7 @@ from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from app_window import find_edge
+from app_window import bring_window_titled_to_front, find_edge
 
 # A fixed port keeps the page's origin stable, so the browser remembers the camera permission.
 PREFERRED_PORT = 8765
@@ -287,6 +287,8 @@ class CreativeServer:
         edge = find_edge()
         if edge is not None:
             subprocess.Popen([str(edge), f"--app={url}", "--start-maximized"])
+            # The creative window is Nova's too: lift it above the HUD once it appears.
+            bring_window_titled_to_front("Nova · Creative Mode")
         else:
             webbrowser.open(url)
         return url

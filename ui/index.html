@@ -209,13 +209,14 @@
 <section id="library" class="library" hidden aria-label="Library">
   <header class="lib-head">
     <div class="lib-title"><span class="lib-mark" aria-hidden="true"></span><b>LIBRARY</b><span id="lib-crumb" class="lib-crumb"></span></div>
+    <button class="box small" id="lib-back" type="button" title="Back (Esc)">← Back</button>
     <nav class="lib-shelves" aria-label="Shelves">
       <button class="box small" data-shelf="topics" type="button">Topics</button>
       <button class="box small" data-shelf="projects" type="button">Projects</button>
       <button class="box small" data-shelf="ideas" type="button">Ideas</button>
       <button class="box small" data-shelf="needs" type="button">Needs you<span id="lib-needs-count"></span></button>
     </nav>
-    <label class="lib-search"><span aria-hidden="true">⌕</span><input id="lib-search" placeholder="SEARCH THE LIBRARY" maxlength="80" autocomplete="off" spellcheck="false"></label>
+    <label class="lib-search"><span aria-hidden="true">⌕</span><input id="lib-search" placeholder="Search your library…" maxlength="80" autocomplete="off" spellcheck="false"><button class="lib-search-clear" id="lib-search-clear" type="button" title="Clear search" hidden>×</button></label>
     <span id="lib-counter" class="lib-counter"></span>
     <button class="box small on" id="lib-add" type="button">+ New</button>
     <button class="box small" id="lib-close" type="button" title="Esc">Close</button>
@@ -229,7 +230,7 @@
   </div>
   <nav class="lib-ruler" id="lib-ruler" aria-label="Cards"></nav>
   <section class="lib-detail" id="lib-detail" aria-live="polite"></section>
-  <p class="lib-hint">✋ swipe: next · previous &nbsp;·&nbsp; ✊ hold: open &nbsp;·&nbsp; 👎 hold: back &nbsp;·&nbsp; ✌ hold: close &nbsp;·&nbsp; say “next”, “open 3”, “open robotics”, “back” &nbsp;·&nbsp; ← → Enter Esc</p>
+  <p class="lib-hint">Click any card to open it · Search above to find anything · ← Back to go back · + New to add a project or an idea · Say “open robotics” or “open 3”</p>
   <form class="lib-form" id="lib-form" hidden autocomplete="off">
     <h3 id="lib-form-title">New project</h3>
     <label class="field-label" for="lib-f-title">Title</label>
@@ -342,6 +343,7 @@
   <div class="galaxy-hud">
     <div class="galaxy-title">KNOWLEDGE GALAXY<small></small></div>
     <div class="galaxy-search"><input type="search" placeholder="Search knowledge…" aria-label="Search knowledge"></div>
+    <button class="galaxy-labels" aria-pressed="false" title="Show every star's label">Labels</button>
     <button class="galaxy-close">Close</button>
     <div class="galaxy-legend">
       <span><i class="wiki"></i>Topic</span>
@@ -656,6 +658,18 @@
           <li>Settings → Updates: tick <b>Check for new versions…</b>. Nova downloads new versions itself, checks their SHA-256 and waits for you to click <b>Restart to update</b>.</li>
           <li>Something wrong after an update? <b>Install the previous version</b> rolls back.</li>
         </ol>
+      </details>
+      <details class="sub" id="need-self-update">
+        <summary><span class="folder" aria-hidden="true"></span>Self-update · GitHub <span class="need-state" id="need-self-update-state"></span></summary>
+        <ol class="need-steps">
+          <li>“Update now” (under a REA or Shannon full report) applies the fixes to Nova's code, rechecks it, runs the tests until they're green, then pushes to GitHub.</li>
+          <li>The push needs a token: <b>github.com/settings/tokens → Generate new token (classic)</b> → tick <b>repo</b> → <b>Generate token</b>, and copy it.</li>
+          <li>Paste it below (and the repo if yours isn't the usual one) and click <b>Save</b>. It stays on this PC only — Nova never shows it again.</li>
+        </ol>
+        <div class="row"><input id="github-token" class="field" type="password" maxlength="200" autocomplete="off" spellcheck="false" placeholder="GitHub token (classic, repo scope)">
+          <input id="github-repo" class="field" maxlength="120" autocomplete="off" spellcheck="false" placeholder="owner/repo">
+          <button class="box" id="github-token-save">Save</button></div>
+        <p id="github-token-status" class="status-line"></p>
       </details>
       <details class="sub" id="need-discover">
         <summary><span class="folder" aria-hidden="true"></span>Discover · GitHub picks</summary>

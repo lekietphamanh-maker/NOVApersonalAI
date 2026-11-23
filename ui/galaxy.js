@@ -13,6 +13,33 @@ const STAR_COUNT = 280;
 const FLY_MS = 1200;
 const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// Spread a node cloud on its sphere so no two stars sit on top of each other: a few
+// repulsion passes, each pushing too-close pairs apart, then back onto the sphere.
+// Exported for tests; the galaxy calls it for real clouds (20+ nodes) on load.
+export function relaxGalaxyNodes(nodes, radius, iterations = 10) {
+  const count = nodes.length;
+  if (count < 2 || radius <= 0) return nodes;
+  const minDist = 0.75 * radius * Math.sqrt((4 * Math.PI) / count);
+  for (let step = 0; step < iterations; step++) {
+    for (let i = 0; i < count; i++) {
+      for (let j = i + 1; j < count; j++) {
+        const a = nodes[i], b = nodes[j];
+        const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+        const d = Math.hypot(dx, dy, dz);
+        if (d >= minDist || d === 0) continue;
+        const push = (minDist - d) / 2 / d;
+        a.x -= dx * push; a.y -= dy * push; a.z -= dz * push;
+        b.x += dx * push; b.y += dy * push; b.z += dz * push;
+      }
+    }
+    for (const node of nodes) {
+      const len = Math.hypot(node.x, node.y, node.z) || 1;
+      node.x = (node.x / len) * radius; node.y = (node.y / len) * radius; node.z = (node.z / len) * radius;
+    }
+  }
+  return nodes;
+}
+
 export function createGalaxy(root, { act, onOpenChange }) {
   const canvas = root.querySelector("canvas");
   const ctx = canvas.getContext("2d");
@@ -21,13 +48,22 @@ export function createGalaxy(root, { act, onOpenChange }) {
   const infoKind = info.querySelector(".kind");
   const infoBody = info.querySelector("p");
   const search = root.querySelector(".galaxy-search input");
+  const labelsBtn = root.querySelector(".galaxy-labels");
   mountWhatCanIDo(root.querySelector(".galaxy-hud"), "galaxy", { onPhrase: askPhrase });
   const countEl = root.querySelector(".galaxy-title small");
   let open = false, nodes = [], edges = [], accent = "255, 176, 64";
   let camYaw = 0, camPitch = 0.3, camDist = 90, targetYaw = 0, targetPitch = 0.3, targetDist = 90;
   let dragStart = null, dragYaw = 0, dragPitch = 0, autoSpin = true;
   let selected = null, hovered = null, flyTarget = null, flyFrom = null, flyAt = 0;
-  let bgStars = [], w = 0, h = 0, ratio = 1, frameId = 0;
+  let showLabels = false, bgStars = [], w = 0, h = 0, ratio = 1, frameId = 0;
+
+  if (labelsBtn) {
+    labelsBtn.addEventListener("click", () => {
+      showLabels = !showLabels;
+      labelsBtn.setAttribute("aria-pressed", String(showLabels));
+      labelsBtn.classList.toggle("on", showLabels);
+    });
+  }
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -60,6 +96,31 @@ export function createGalaxy(root, { act, onOpenChange }) {
   }
 
   // --- drawing ---
+  // A star is a small 4-point sparkle, not a big filled disc: the old circles (up to ~50px
+  // across) overlapped into one unreadable blob. Radius is capped so even the most important
+  // topic stays a star, not a moon.
+  function starRadius(node, scale) {
+    return Math.min(8, Math.max(1.5, node.size * 0.9 * scale));
+  }
+
+  function drawStar(cx, cy, r, color, alpha) {
+    const inner = r * 0.32;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const rad = i % 2 === 0 ? r : inner;
+      const angle = (i / 8) * TAU - Math.PI / 2;
+      const x = cx + Math.cos(angle) * rad, y = cy + Math.sin(angle) * rad;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = `rgba(${color}, ${alpha})`;
+    ctx.fill();
+    // bright core so the star reads at a glance
+    ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.9, alpha + 0.15)})`;
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0.7, r * 0.25), 0, TAU); ctx.fill();
+  }
+
   function drawFrame() {
     if (!open) return;
     frameId = requestAnimationFrame(drawFrame);
@@ -120,24 +181,31 @@ export function createGalaxy(root, { act, onOpenChange }) {
     }
     projected.sort((a, b) => b.z - a.z);
 
+    // Labels are off by default: showing all 113 at once was the unreadable part. A label
+    // appears for the hovered star and the selected one; the Labels button shows them all,
+    // with near-duplicates skipped so neighbours don't print on top of each other.
+    const labeled = [];
+    function labelClear(sx, sy) {
+      return !labeled.some((at) => Math.abs(at.sx - sx) < 30 && Math.abs(at.sy - sy) < 14);
+    }
+
     for (const { node, sx, sy, scale, z } of projected) {
-      const r = Math.max(1.5, node.size * 3.5 * scale);
+      const r = starRadius(node, scale);
       const color = COLORS[node.kind] || accent;
       const isSelected = selected === node.id;
       const isHovered = hovered === node.id;
 
       // glow
       if (r > 2) {
-        const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 3);
-        glow.addColorStop(0, `rgba(${color}, ${isSelected ? 0.5 : 0.2})`);
+        const glow = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 2.5);
+        glow.addColorStop(0, `rgba(${color}, ${isSelected ? 0.45 : 0.18})`);
         glow.addColorStop(1, `rgba(${color}, 0)`);
         ctx.fillStyle = glow;
-        ctx.beginPath(); ctx.arc(sx, sy, r * 3, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(sx, sy, r * 2.5, 0, TAU); ctx.fill();
       }
 
-      // core
-      ctx.fillStyle = `rgba(${color}, ${isSelected ? 1 : 0.85})`;
-      ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill();
+      // star
+      drawStar(sx, sy, r, color, isSelected ? 1 : 0.85);
 
       // ring on selected/hovered
       if (isSelected || isHovered) {
@@ -147,7 +215,9 @@ export function createGalaxy(root, { act, onOpenChange }) {
       }
 
       // label
-      if (r > 3 || isSelected || isHovered) {
+      const showLabel = isSelected || isHovered || (showLabels && labelClear(sx, sy));
+      if (showLabel) {
+        labeled.push({ sx, sy });
         const fontSize = Math.max(8, Math.min(12, 10 * scale));
         ctx.font = `600 ${fontSize}px "Segoe UI", system-ui, sans-serif`;
         ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(0.9, scale * 1.2)})`;
@@ -165,7 +235,7 @@ export function createGalaxy(root, { act, onOpenChange }) {
       const p = project(node.x, node.y, node.z);
       if (!p) continue;
       const d = Math.hypot(p.sx - mx, p.sy - my);
-      const r = Math.max(6, node.size * 3.5 * p.scale + 8);
+      const r = Math.max(8, starRadius(node, p.scale) + 6);
       if (d < r && d < bestDist) { best = node; bestDist = d; }
     }
     return best;
@@ -215,6 +285,9 @@ export function createGalaxy(root, { act, onOpenChange }) {
     const yz = Math.sqrt(node.x * node.x + node.z * node.z);
     flyFrom = { yaw: camYaw, pitch: camPitch, dist: camDist };
     flyTarget = { yaw: Math.atan2(node.x, node.z), pitch: Math.atan2(node.y, yz) * 0.5, dist: 50 };
+    // The camera stays where it flew to: without this the ease-back below would drift
+    // the view away from the search hit within a second of arriving.
+    targetYaw = flyTarget.yaw; targetPitch = flyTarget.pitch; targetDist = flyTarget.dist;
     flyAt = performance.now();
     autoSpin = false;
     selectNode(node);
@@ -235,6 +308,17 @@ export function createGalaxy(root, { act, onOpenChange }) {
   function loadData(data) {
     nodes = (data.nodes || []).map((n) => ({ ...n, _hidden: false }));
     edges = data.edges || [];
+    // A real galaxy has a hundred stars: spread the cloud a little wider with the count, and
+    // push apart any pair that landed too close, so stars keep a minimum distance. Small
+    // test sets keep their exact positions (the regression test relies on them).
+    if (nodes.length >= 20) {
+      const radius = 40 * Math.max(1, Math.min(1.6, Math.sqrt(nodes.length / 60)));
+      for (const node of nodes) {
+        const len = Math.hypot(node.x, node.y, node.z) || 1;
+        node.x = (node.x / len) * radius; node.y = (node.y / len) * radius; node.z = (node.z / len) * radius;
+      }
+      relaxGalaxyNodes(nodes, radius);
+    }
     countEl.textContent = `${nodes.length} nodes · ${edges.length} connections`;
   }
 
