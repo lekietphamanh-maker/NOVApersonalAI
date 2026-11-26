@@ -3,8 +3,7 @@
 // Adapted from the *patterns* in ewanqian/performable-music, spatial-playground/hand-osc-lab/
 // (engine.mjs + instrument-gesture.mjs) — no code copied verbatim, and the input is different:
 // that lab reads 25-joint WebXR hands from a headset; Nova reads MediaPipe's 21 landmarks from a
-// webcam (wrist 0, thumb 1-4, index 5-8, middle 9-12, ring 13-16, pinky 17-20). The lab's extra
-// four metacarpals don't exist here, so those angles are dropped.
+// webcam (wrist 0, thumb 1-4, index 5-8, middle 9-12, ring 13-16, pinky 17-20).
 //
 // Two deliberate differences from the lab, both because a webcam is noisier than a headset:
 //  - Distances are measured in *palm units* (gap / wrist-to-middle-knuckle), not metres. A palm is
@@ -12,13 +11,7 @@
 //    Nova's creative mode already uses for pinch (gestures.js: 0.35 / 0.5).
 //  - Zones live in screen fractions (the fingertip you see on screen), not metres in XR space.
 
-export const ZONE_NOTES = Object.freeze([
-  { id: "A", name: "LEFT FIELD", freq: 293.66, pan: -0.4 },  // D4, left
-  { id: "B", name: "RIGHT FIELD", freq: 392.0, pan: 0.4 },  // G4, right
-  { id: "C", name: "CENTER TRIGGER", freq: 440.0, pan: 0 }, // A4, centre
-]);
-
-/** Default zones: centre x/y as fractions of screen width/height, radius as a fraction of screen height. */
+/** Default zones (their notes and pans are ZONE_PINGS in handmusic-audio.js): centre x/y as fractions of screen width/height, radius as a fraction of screen height. */
 export function defaultZones() {
   return [
     { id: "A", name: "LEFT FIELD", cx: 0.2, cy: 0.42, r: 0.16 },
@@ -28,30 +21,6 @@ export function defaultZones() {
 }
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, Number.isFinite(v) ? v : a));
-
-/** Geometric bend of a-b-c in degrees: 0 is a straight chain, 180 is fully folded back. */
-export function bendDeg(a, b, c) {
-  if (!a || !b || !c) return null;
-  const x = [a.x - b.x, a.y - b.y, (a.z ?? 0) - (b.z ?? 0)];
-  const y = [c.x - b.x, c.y - b.y, (c.z ?? 0) - (b.z ?? 0)];
-  const n = Math.hypot(...x) * Math.hypot(...y);
-  if (n < 1e-8) return null;
-  const cos = Math.max(-1, Math.min(1, x.reduce((s, v, i) => s + v * y[i], 0) / n));
-  return 180 - (Math.acos(cos) * 180) / Math.PI;
-}
-
-/** Finger bends from 21 MediaPipe landmarks. No metacarpals: those angles are dropped, not faked. */
-export function handBends(landmarks) {
-  if (!Array.isArray(landmarks) || landmarks.length < 21) return {};
-  const at = (a, b, c) => bendDeg(landmarks[a], landmarks[b], landmarks[c]);
-  return {
-    "thumb-proximal": at(1, 2, 3), "thumb-distal": at(2, 3, 4),
-    "index-mcp": at(5, 6, 7), "index-pip": at(6, 7, 8),
-    "middle-mcp": at(9, 10, 11), "middle-pip": at(10, 11, 12),
-    "ring-mcp": at(13, 14, 15), "ring-pip": at(14, 15, 16),
-    "pinky-mcp": at(17, 18, 19), "pinky-pip": at(18, 19, 20),
-  };
-}
 
 /** Distance between two landmarks, in palm units (1 palm = wrist to middle knuckle). */
 export function palmDistance(landmarks, a, b) {
@@ -120,27 +89,19 @@ export function createZoneEngine(zones = defaultZones(), options = {}) {
 //  - thumb-middle distance = resonance, thumb-ring = delay wet, thumb-pinky = drive
 //  - distance between the two index tips = stereo spread
 //  - wrist height = energy/volume (hand raised = louder)
-//  - both pinches held >= 260 ms = HOLD latch toggle; index tip touching middle PIP = next voice
+//  - index tip touching middle PIP = next voice
 // Continuous values are exponentially smoothed (45 ms time constant, as in the lab) so the sound
 // doesn't jitter with the webcam.
 const PINCH_ON = 0.35;  // palm units: same as Nova's pinch in gestures.js, and ~28 mm on a real hand
 const PINCH_OFF = 0.5;  // ~43 mm: the release edge, so a pinch doesn't flutter
+const INITIAL = { gate: false, leftPinch: false, rightPinch: false, lastTimbre: -Infinity, timbre: 0, lastTime: null,
+  cutoff: 0.45, wet: 0.14, spread: 0.5, energy: 0.25, drive: 0.12, resonance: 0.3 };
 
 export function createHandMusicInstrument(options = {}) {
-  const holdMs = options.holdMs ?? 260;
   const cooldownMs = options.cooldownMs ?? 380;
   const timeConstantMs = options.timeConstantMs ?? 45;
-  const state = {
-    gate: false, leftPinch: false, rightPinch: false, hold: false,
-    candidate: null, comboReady: true, lastTimbre: -Infinity, timbre: 0, lastTime: null,
-    cutoff: 0.45, wet: 0.14, spread: 0.5, energy: 0.25, drive: 0.12, resonance: 0.3,
-  };
-  const reset = () => {
-    state.gate = false; state.leftPinch = false; state.rightPinch = false; state.hold = false;
-    state.candidate = null; state.comboReady = true; state.lastTimbre = -Infinity; state.timbre = 0;
-    state.lastTime = null; state.cutoff = 0.45; state.wet = 0.14; state.spread = 0.5;
-    state.energy = 0.25; state.drive = 0.12; state.resonance = 0.3;
-  };
+  const state = { ...INITIAL };
+  const reset = () => Object.assign(state, INITIAL);
   return {
     get state() { return { ...state }; },
     setTimbre(value) { state.timbre = Math.round(Math.min(2, Math.max(0, Number(value) || 0))); },
@@ -154,18 +115,7 @@ export function createHandMusicInstrument(options = {}) {
       };
       state.leftPinch = pinch(left, state.leftPinch);
       state.rightPinch = pinch(right, state.rightPinch);
-      const both = state.leftPinch && state.rightPinch;
-      if (!both) { state.candidate = null; state.comboReady = true; }
-      else if (state.comboReady) {
-        if (state.candidate === null) state.candidate = now;
-        if (now - state.candidate >= holdMs) {
-          state.hold = !state.hold; state.comboReady = false; state.candidate = null;
-          events.push({ type: "HOLD_TOGGLE", value: state.hold ? 1 : 0, t_ms: now });
-        }
-      }
-      const tracked = Boolean(left || right);
-      state.gate = tracked && (state.rightPinch || (!right && state.leftPinch) || state.hold);
-      if (!tracked && state.hold) { state.hold = false; events.push({ type: "HOLD_RELEASE", t_ms: now }); }
+      state.gate = state.rightPinch || (!right && state.leftPinch);
       const controlling = right || left;
       const finger = (tip) => (controlling ? palmDistance(controlling, 4, tip) : null);
       const contact = (dist) => (dist === null ? 0 : clamp((0.65 - dist) / 0.45));
@@ -204,14 +154,9 @@ export function createHandMusicInstrument(options = {}) {
         params: {
           gate: state.gate ? 1 : 0, cutoff: clamp(state.cutoff), wet: clamp(state.wet),
           spread: clamp(state.spread), energy: clamp(state.energy), drive: clamp(state.drive),
-          resonance: clamp(state.resonance), hold: state.hold ? 1 : 0, timbre: state.timbre,
+          resonance: clamp(state.resonance), timbre: state.timbre,
         },
         events,
-        diagnostics: {
-          leftPinch: state.leftPinch, rightPinch: state.rightPinch, thumbIndexPalm: indexGap,
-          middlePalm: finger(12), ringPalm: finger(16), pinkyPalm: finger(20), crossPalm: cross,
-          spreadPalm: spreadGap, trackedHands: Number(Boolean(left)) + Number(Boolean(right)),
-        },
       };
     },
   };

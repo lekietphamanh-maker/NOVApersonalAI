@@ -18,6 +18,10 @@ class AssistError(RuntimeError):
     """The screen helper failed, timed out or is not running."""
 
 
+# The owner's stop hotkey, sent with every request: the helper is its own process and can't read Nova's settings.
+STOP_KEYS = [0x1B]
+
+
 class ScreenAssist:
     """Owns the assist_helper process. Requests are serialized; a hung helper is killed and restarted."""
 
@@ -49,7 +53,7 @@ class ScreenAssist:
             try:
                 if self._process is None or self._process.poll() is not None:
                     self._start()
-                self._process.stdin.write(json.dumps(payload) + "\n")
+                self._process.stdin.write(json.dumps({**payload, "stop_keys": STOP_KEYS}) + "\n")
                 self._process.stdin.flush()
                 line = self._responses.get(timeout=timeout)
             except queue.Empty:
@@ -125,8 +129,10 @@ _CREDENTIAL_FIELD = re.compile(
     r"\b(password|passcode|passphrase|card number|credit card|debit card|cvv|cvc|security code|iban|routing number|"
     r"account number|ssn|social security|pin)\b", re.IGNORECASE)
 _MONEY_PAGE = re.compile(r"\b(paypal|bank|banking|checkout|payment|billing|wallet|venmo|stripe)\b", re.IGNORECASE)
-_RUNS_A_SCRIPT = re.compile(r"(\.(ps1|bat|cmd|vbs|vbe|js|jse|wsf|hta|reg)\b|^\s*(powershell|pwsh|cmd|wscript|cscript|mshta|regedit)\b)",
-                            re.IGNORECASE)
+# Scripts, installers and programs given by path, network shares and the Windows tools that run other code.
+_RUNS_A_SCRIPT = re.compile(r"(\.(ps1|bat|cmd|vbs|vbe|js|jse|wsf|hta|reg|exe|msi|msp|scr|com|pif|cpl|msc|lnk|jar|"
+                            r"appref-ms|application)\b|^\s*(\\\\|file:)|^\s*(powershell|pwsh|cmd|wscript|cscript|mshta|"
+                            r"regedit|rundll32|regsvr32|certutil|bitsadmin)\b)", re.IGNORECASE)
 
 
 def risky_step(name: str, summary: str) -> str:
@@ -141,7 +147,8 @@ def risky_step(name: str, summary: str) -> str:
         return "This field takes a password, card or account number"
     if name == "press_keys" and re.search(r"\b(shift\+delete|alt\+f4)\b", head, re.IGNORECASE):
         return "This could delete for good or close a program with unsaved work"
-    if name == "open_app" and _RUNS_A_SCRIPT.search(head.removeprefix("Open ")):
+    target = head.removeprefix("Open ").strip()
+    if name == "open_app" and not re.match(r"https?://", target, re.IGNORECASE) and _RUNS_A_SCRIPT.search(target):
         return "This would run a script or a command shell"
     return ""
 
@@ -215,6 +222,9 @@ class ScreenSession:
         title, pages = "", 0
         try:
             while pages < MAX_READ_PAGES and not self.cancel.is_set():
+                if pages:  # page down before each read after the first, so every exit has pressed it pages-1 times
+                    self.assist.request({"cmd": "keys", "hwnd": hwnd, "keys": "{PGDN}"})
+                    time.sleep(0.4)
                 response = self.assist.request({"cmd": "text", "hwnd": hwnd, "limit": 8000}, timeout=15)
                 title = response["window_title"]
                 lines = [line for line in response["text"].split("\n") if line]
@@ -226,8 +236,6 @@ class ScreenSession:
                 pages += 1
                 if sum(map(len, collected)) > 40_000:
                     break
-                self.assist.request({"cmd": "keys", "hwnd": hwnd, "keys": "{PGDN}"})
-                time.sleep(0.4)
             for _ in range(max(0, pages - 1)):  # back up, so the owner's page is where they left it
                 self.assist.request({"cmd": "keys", "hwnd": hwnd, "keys": "{PGUP}"})
         except AssistError as exc:

@@ -4,22 +4,7 @@ from __future__ import annotations
 import asyncio
 import ctypes
 import io
-import site
-import sys
-from pathlib import Path
 from typing import Any
-
-
-def _prepare_pywin32_dev_path() -> None:
-    """Load pywin32's .pth hooks from the job-local test/install target when developing."""
-    if getattr(sys, "_MEIPASS", None):
-        return
-    candidate = Path(__file__).resolve().parents[2] / "tmp" / "deps"
-    if candidate.is_dir():
-        site.addsitedir(str(candidate))
-
-
-_prepare_pywin32_dev_path()
 
 MAX_TEXT = 6000
 

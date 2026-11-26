@@ -1,17 +1,24 @@
-"""OmniRoute as an optional Nova brain: the provider entry (default address and model, no key needed),
+"""OmniRoute as an optional Nova brain: the provider entry (default address and model, key optional),
 adding it without a key, and a gateway that isn't running failing fast so the local model answers instead."""
 from __future__ import annotations
 
 import io
 import json
 import os
+import sys
 import tempfile
 import types
 import unittest
+from unittest import mock
 from urllib.error import HTTPError, URLError
 
+try:
+    import tkinter  # noqa: F401
+except ImportError:  # a Python without Tk (Linux CI): the dashboard only needs the names
+    sys.modules["tkinter"] = types.SimpleNamespace(Tk=object, TclError=Exception)
+
 import api_brains
-import dashboard
+import dashboard  # noqa: E402
 from cloud_brain import Unavailable
 
 GATEWAY = "http://localhost:20128/v1"
@@ -58,8 +65,7 @@ def fake_app(**extra: object) -> types.SimpleNamespace:
     )
     for key, value in extra.items():
         setattr(app, key, value)
-    # The actions call the app's own helpers; a fake app needs them bound, the way
-    # test_dashboard_self_update.py binds its helpers onto its fake.
+    # The actions call the app's own helpers; a fake app needs them bound.
     for name in ("_api_entries", "_api_entry", "_api_key", "_claude_via", "_claude_ready", "_cloud_agent",
                  "_brains_state"):
         method = getattr(dashboard.AlfredApp, name)
@@ -68,6 +74,12 @@ def fake_app(**extra: object) -> types.SimpleNamespace:
 
 
 class DashboardTests(unittest.TestCase):
+    def setUp(self) -> None:
+        # The sealed store lives under LOCALAPPDATA: a folder of the test's own, never the owner's real keys.
+        patcher = mock.patch.dict(os.environ, {"LOCALAPPDATA": tempfile.mkdtemp()})
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_adding_omniroute_needs_no_key(self) -> None:
         app = fake_app()
         result = dashboard.AlfredApp._act_api_brain_add(app, {"provider": "omniroute", "model": "", "key": ""})
@@ -156,6 +168,28 @@ class GatewayDownTests(unittest.TestCase):
 
         said: list[str] = []
         brain = api_brains.OpenAIBrain(GATEWAY, "", "auto", "OmniRoute · auto", minimal)
+        reply = brain.turn([], [{"role": "user", "content": "hi"}], [], said.append)
+        self.assertEqual(("".join(said), reply.stop_reason), ("Hi.", "end_turn"))
+
+    def test_a_server_that_answers_html_at_models_still_works(self) -> None:
+        def html_server(request, timeout):
+            if request.full_url.endswith("/models"):
+                return Stream(b"<html><body>not an api</body></html>")
+            return Stream(sse({"choices": [{"delta": {"content": "Hi."}, "finish_reason": "stop"}]}))
+
+        said: list[str] = []
+        brain = api_brains.OpenAIBrain(GATEWAY, "", "auto", "OmniRoute · auto", html_server)
+        reply = brain.turn([], [{"role": "user", "content": "hi"}], [], said.append)
+        self.assertEqual(("".join(said), reply.stop_reason), ("Hi.", "end_turn"))
+
+    def test_a_server_that_answers_a_json_array_at_models_still_works(self) -> None:
+        def array_server(request, timeout):
+            if request.full_url.endswith("/models"):
+                return Stream(json.dumps([{"id": "auto"}]).encode())
+            return Stream(sse({"choices": [{"delta": {"content": "Hi."}, "finish_reason": "stop"}]}))
+
+        said: list[str] = []
+        brain = api_brains.OpenAIBrain(GATEWAY, "", "auto", "OmniRoute · auto", array_server)
         reply = brain.turn([], [{"role": "user", "content": "hi"}], [], said.append)
         self.assertEqual(("".join(said), reply.stop_reason), ("Hi.", "end_turn"))
 

@@ -1,7 +1,6 @@
 """Creative mode's server: the control orb's presses and the objects the camera sees reach Nova; other pages can't."""
 import json
 import unittest
-from pathlib import Path
 from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
@@ -158,75 +157,42 @@ class PhotoTests(unittest.TestCase):
                          [{"action": "lens", "lens": "ascii"}, {"action": "kiss_cam", "on": True}, {"action": "kiss_cam", "on": False}])
 
 
-class MediaPermissionTests(unittest.TestCase):
-    """Seeding a profile grants the camera to Nova's own loopback origin — and nothing else."""
-
-    def test_seeding_grants_only_novas_origin(self) -> None:
-        import tempfile
-        profile = Path(tempfile.mkdtemp()) / "creative-browser"
-        creative_mode.seed_media_permission(profile, "http://127.0.0.1:54321")
-        prefs = json.loads((profile / "Preferences").read_text(encoding="utf-8"))
-        grants = prefs["profile"]["content_settings"]["exceptions"]["media_stream_camera"]
-        self.assertEqual(list(grants), ["http://127.0.0.1:54321,*"])
-        self.assertEqual(grants["http://127.0.0.1:54321,*"]["setting"], 1)
-        self.assertEqual(prefs["profile"]["content_settings"]["exceptions"]["media_stream_mic"]["http://127.0.0.1:54321,*"]["setting"], 1)
-
-    def test_other_origins_keep_their_settings_and_reseeding_is_safe(self) -> None:
-        import tempfile
-        profile = Path(tempfile.mkdtemp()) / "creative-browser"
-        profile.mkdir(parents=True)
-        existing = {"profile": {"content_settings": {"exceptions": {
-            "media_stream_camera": {"https://example.com,*": {"setting": 2, "last_modified": "1"}},
-            "media_stream_mic": {}}}}}
-        (profile / "Preferences").write_text(json.dumps(existing), encoding="utf-8")
-        creative_mode.seed_media_permission(profile, "http://127.0.0.1:54321")
-        creative_mode.seed_media_permission(profile, "http://127.0.0.1:54321")
-        prefs = json.loads((profile / "Preferences").read_text(encoding="utf-8"))
-        camera = prefs["profile"]["content_settings"]["exceptions"]["media_stream_camera"]
-        self.assertEqual(camera["https://example.com,*"]["setting"], 2)  # the other site still blocked
-        self.assertEqual(len([key for key in camera if "127.0.0.1" in key]), 1)  # no duplicate grant
-
-
 class OpenWindowTests(unittest.TestCase):
-    """Opening Creative closes an already-open creative window first: a running Edge never
-    re-reads the Preferences file the camera grant is seeded into, so without this the
-    seed is silently ignored and the camera request pends on a prompt nobody sees."""
+    """Creative mode shows inside Nova's window when it can, else in an app window of its own, and the hand_music
+    switch reaches the page (opening it first when it is closed)."""
 
-    def _open_with_mocks(self, existing):
+    def setUp(self) -> None:
         from unittest import mock
-        server = creative_mode.CreativeServer()
-        self.addCleanup(server.stop)
-        events: list[tuple] = []
-        patches = [
-            mock.patch.object(creative_mode, "find_edge", return_value=Path("msedge.exe")),
-            mock.patch.object(creative_mode, "find_window", return_value=existing),
-            mock.patch.object(creative_mode, "is_window", return_value=False),
-            mock.patch.object(creative_mode, "close_window",
-                              side_effect=lambda hwnd: events.append(("close", hwnd))),
-            mock.patch.object(creative_mode, "seed_media_permission",
-                              side_effect=lambda _profile, origin: events.append(("seed", origin))),
-            mock.patch.object(creative_mode, "bring_window_titled_to_front",
-                              side_effect=lambda *_args: None),
-            mock.patch.object(creative_mode.subprocess, "Popen",
-                              side_effect=lambda argv, **_k: events.append(("open", argv))),
-        ]
-        for patch in patches:
-            patch.start()
-            self.addCleanup(patch.stop)
-        server.open_window()
-        return events
+        self.server = creative_mode.CreativeServer()
+        self.addCleanup(self.server.stop)
+        self.launched: list[tuple] = []
+        patch = mock.patch.object(creative_mode.app_window, "open_window",
+                                  side_effect=lambda url, profile, title: self.launched.append((url, profile, title)))
+        patch.start()
+        self.addCleanup(patch.stop)
 
-    def test_existing_window_is_closed_before_the_grant_is_seeded(self) -> None:
-        events = self._open_with_mocks(existing=1234)
-        self.assertEqual([kind for kind, _ in events], ["close", "seed", "open"])
-        self.assertEqual(events[0][1], 1234)
-        self.assertTrue(str(events[1][1]).startswith("http://127.0.0.1:"))
-        self.assertIn("--user-data-dir=", " ".join(str(part) for part in events[2][1]))
-        self.assertIn("creative-browser", " ".join(str(part) for part in events[2][1]))
+    def test_inside_novas_window_when_it_is_open(self) -> None:
+        shown: list[str] = []
+        self.server.open_in_app = lambda url: shown.append(url) or True
+        url = self.server.open_window()
+        self.assertEqual(shown, [url])
+        self.assertEqual(self.launched, [])
 
-    def test_no_existing_window_means_no_close_just_seed_and_open(self) -> None:
-        events = self._open_with_mocks(existing=None)
-        self.assertEqual([kind for kind, _ in events], ["seed", "open"])
+    def test_else_an_app_window_with_novas_own_profile(self) -> None:
+        url = self.server.open_window()
+        self.assertEqual(len(self.launched), 1)
+        launched_url, profile, title = self.launched[0]
+        self.assertEqual(launched_url, url)
+        self.assertEqual(profile.name, "creative-browser")
+        self.assertEqual(title, "Nova · Creative Mode")  # creative/index.html's <title>, so the window is lifted
+
+    def test_hand_music_opens_creative_mode_and_turns_on(self) -> None:
+        reply = creative_mode.run_tool(self.server, {"action": "hand_music"})
+        self.assertIn("Hand music is on", reply)
+        self.assertEqual(len(self.launched), 1)  # creative mode was closed: it opens first
+        self.assertEqual(creative_mode.run_tool(self.server, {"action": "hand_music", "on": False}), "Hand music is off.")
+        self.assertEqual(len(self.launched), 1)  # turning it off never opens a window
+        self.assertEqual(self.server.take_commands(), [{"action": "hand_music", "on": True}, {"action": "hand_music", "on": False}])
 
 
 if __name__ == "__main__":

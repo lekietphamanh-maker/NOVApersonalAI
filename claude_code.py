@@ -14,9 +14,10 @@ from pathlib import Path
 from typing import Callable
 
 ALLOWED_TOOLS = "Read,Glob,Grep,WebSearch,WebFetch"
-# Build mode: write and edit files in the project's own folder, plus git. No other command: an interpreter or a package
-# manager (python, node, npm, pip) can run anything at all, so allowing one would be allowing every command.
-BUILD_TOOLS = ALLOWED_TOOLS + ",Write,Edit,Bash(git init),Bash(git add:*),Bash(git commit:*),Bash(git status)"
+# Build mode: write and edit files in the project's own folder, plus git init/status. No other command: an interpreter
+# or a package manager (python, node, npm, pip) can run anything at all, so allowing one would be allowing every
+# command. Not git commit either: it runs .git/hooks, which build mode could have just written.
+BUILD_TOOLS = ALLOWED_TOOLS + ",Write,Edit,Bash(git init),Bash(git status)"
 BUILD_INSTRUCTIONS = ("You are building something for Nova's owner in the current folder, their project folder. Write and "
                       "edit the files here only; you can't run commands other than git. Make it work as it is: a website as "
                       "plain HTML, CSS and JavaScript with index.html at the top (no build step), a script with a short "

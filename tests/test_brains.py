@@ -77,6 +77,11 @@ class FormatTests(unittest.TestCase):
             {"data": [{"id": "b"}, {"id": "a"}, {"id": "a"}]}).encode()))
         self.assertEqual(models, ["a", "b"])
 
+    def test_a_non_object_model_list_is_empty_not_a_crash(self) -> None:
+        models = api_brains.list_models("https://x/v1", "k", lambda request, timeout: Stream(json.dumps(
+            [{"id": "a"}]).encode()))
+        self.assertEqual(models, [])
+
     def test_entries_need_a_model_and_an_address(self) -> None:
         entry = api_brains.Entry.new("groq", "llama-x")
         self.assertEqual((entry.base_url, entry.label), ("https://api.groq.com/openai/v1", "Groq · llama-x"))
@@ -186,3 +191,17 @@ class AgentLoopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LocalAddressTests(unittest.TestCase):
+    """Nova only ever talks to the Ollama on this PC, also when Ollama is shared on the LAN (it listens everywhere)."""
+
+    def test_listening_everywhere_still_means_this_pc_and_others_are_refused(self) -> None:
+        import agent
+        for setting, expected in (("0.0.0.0:11434", "http://127.0.0.1:11434"), ("http://[::]:11500", "http://127.0.0.1:11500"),
+                                  ("127.0.0.1:11434", "http://127.0.0.1:11434")):
+            with mock.patch.dict(os.environ, {"OLLAMA_HOST": setting, "ALFRED_API_URL": ""}):
+                self.assertEqual(agent.local_base_url(), expected)
+        with mock.patch.dict(os.environ, {"OLLAMA_HOST": "http://10.0.0.5:11434", "ALFRED_API_URL": ""}):
+            with self.assertRaises(agent.OllamaError):
+                agent.local_base_url()

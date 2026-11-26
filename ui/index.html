@@ -659,18 +659,6 @@
           <li>Something wrong after an update? <b>Install the previous version</b> rolls back.</li>
         </ol>
       </details>
-      <details class="sub" id="need-self-update">
-        <summary><span class="folder" aria-hidden="true"></span>Self-update · GitHub <span class="need-state" id="need-self-update-state"></span></summary>
-        <ol class="need-steps">
-          <li>“Update now” (under a REA or Shannon full report) applies the fixes to Nova's code, rechecks it, runs the tests until they're green, then pushes to GitHub.</li>
-          <li>The push needs a token: <b>github.com/settings/tokens → Generate new token (classic)</b> → tick <b>repo</b> → <b>Generate token</b>, and copy it.</li>
-          <li>Paste it below (and the repo if yours isn't the usual one) and click <b>Save</b>. It stays on this PC only — Nova never shows it again.</li>
-        </ol>
-        <div class="row"><input id="github-token" class="field" type="password" maxlength="200" autocomplete="off" spellcheck="false" placeholder="GitHub token (classic, repo scope)">
-          <input id="github-repo" class="field" maxlength="120" autocomplete="off" spellcheck="false" placeholder="owner/repo">
-          <button class="box" id="github-token-save">Save</button></div>
-        <p id="github-token-status" class="status-line"></p>
-      </details>
       <details class="sub" id="need-discover">
         <summary><span class="folder" aria-hidden="true"></span>Discover · GitHub picks</summary>
         <ol class="need-steps">
@@ -997,7 +985,7 @@
 </footer>
 
 <div id="creative-layer" class="creative-layer" hidden>
-  <iframe id="creative-frame" title="Creative mode" allow="camera; fullscreen"></iframe>
+  <iframe id="creative-frame" title="Creative mode" allow="camera; fullscreen; autoplay"></iframe>
   <button class="box" id="creative-close">Close camera · Esc</button>
 </div>
 

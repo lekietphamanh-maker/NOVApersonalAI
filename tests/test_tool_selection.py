@@ -40,6 +40,15 @@ class ToolTests(unittest.TestCase):
         screen = names(pick.for_question("click save", [*EVERYTHING, *tools.SCREEN_TOOLS], screen=True))
         self.assertTrue({"click", "type_text", "scroll"} <= screen)
 
+    def test_every_tool_can_reach_the_model_on_this_pc(self) -> None:
+        import tool_registry
+        reachable = set(pick.CORE) | {name for group, _words in pick.GROUPS for name in group}
+        screen = {tool["function"]["name"] for tool in tools.SCREEN_TOOLS}
+        self.assertEqual(tool_registry.names() - screen - reachable, set())  # a tool in no group never reaches it
+        self.assertIn("network", names(pick.for_question("how fast is my internet?", EVERYTHING + tools.GENERAL_TOOLS)))
+        self.assertIn("trading", names(pick.for_question("scan the market for day trade setups", EVERYTHING + tools.GENERAL_TOOLS)))
+        self.assertNotIn("network", names(pick.for_question("I'm typing a shopping list", EVERYTHING + tools.GENERAL_TOOLS)))
+
     def test_far_less_to_read_and_a_stable_order(self) -> None:
         everything = len(json.dumps(EVERYTHING)) // 4
         core = len(json.dumps(pick.for_question("tell me a joke", EVERYTHING))) // 4

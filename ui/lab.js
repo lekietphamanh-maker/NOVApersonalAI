@@ -96,27 +96,9 @@ export function reportToHtml(text) {
   return out.join("\n");
 }
 
-// --- "Update now": one click, progress shown, a summary afterwards ---
-export const UPDATE_STAGE_LABELS = {
-  apply: "Applying the fixes", recheck: "Rechecking the code", test: "Running the tests",
-  fix: "Fixing the test failures", push: "Pushing to GitHub", done: "Done", failed: "Stopped",
-};
-
-// Poll the pipeline's status until it is done or failed, calling onState with each state.
-// Returns a stop() for the caller. The pipeline runs on Nova's side; this only watches.
-export function pollSelfUpdate(act, onState, intervalMs = 2000) {
-  const timer = setInterval(async () => {
-    const state = await act("self_update_status");
-    if (!state) return;
-    onState(state);
-    if (state.stage === "done" || state.stage === "failed") clearInterval(timer);
-  }, intervalMs);
-  return () => clearInterval(timer);
-}
-
 // A full report as a readable panel inside the HUD, on top of the screen that opened it: the
-// whole text (not a summary, not a link), scrollable, with a footer for the caller's buttons
-// ("Update now", …). Returns a close() that removes it. Esc closes it too.
+// whole text (not a summary, not a link), scrollable, with a footer for the caller's buttons.
+// Returns a close() that removes it. Esc closes it too.
 export function openReportPanel(root, { title, text, footer = [] }) {
   const close = () => panel.remove();
   const body = h("div", { class: "report-body" });

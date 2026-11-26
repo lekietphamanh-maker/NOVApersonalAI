@@ -24,7 +24,6 @@ import piper_voice
 import whisper_engine
 
 SAMPLE_RATE = 16_000
-COMMAND_SECONDS = 8.0
 HOLD_MAX_SECONDS = 60.0
 SYSTEM_DEFAULT = "System default"
 SVSF_ASYNC, SVSF_PURGE_BEFORE_SPEAK = 1, 2
@@ -54,12 +53,6 @@ def _read_voice_settings() -> dict[str, object]:
 DEFAULT_VOICE = "Emma (British, female, most natural)"
 
 
-def saved_voice_name() -> str | None:
-    """The voice the owner actually picked in Settings, or None when they never picked one."""
-    name = _read_voice_settings().get("voice")
-    return name if isinstance(name, str) and name in piper_voice.VOICES else None
-
-
 def load_voice_name() -> str | None:
     """The chosen natural voice, or None for Windows' built-in voice.
 
@@ -80,6 +73,9 @@ def load_voice_name() -> str | None:
 MIN_PAUSE_SECONDS = 1.35
 MAX_PAUSE_SECONDS = 5.0
 DEFAULT_PAUSE_SECONDS = 2.0
+
+VOSK_ENDPOINT_SECONDS = 0.5  # the quiet after which the bundled Vosk model ends a sentence
+
 
 def clamp_pause_seconds(value: object) -> float:
     """A pause setting, kept inside the range Nova can use: never below the old 1.35 s, never above 5 s."""
@@ -296,38 +292,41 @@ def _open_input(sd, input_key: str | None, callback, *, blocksize: int = 4000) -
         candidates.append(selected)
     candidates.append(None)
     errors: list[str] = []
+    stream = None
     for device in dict.fromkeys(candidates):
-        stream = None
         try:
             stream = sd.RawInputStream(
                 device=device, samplerate=SAMPLE_RATE, blocksize=blocksize,
                 channels=1, dtype="int16", callback=callback,
             )
             stream.start()
-            if input_key and (missing or device != selected):
-                note = "The saved microphone is unavailable; using the current system default instead."
-                if _active_controller and _active_controller._notice_callback:
-                    _active_controller._notify(note)
-            try:
-                yield stream
-            finally:
-                try:
-                    stream.stop()
-                finally:
-                    stream.close()
-            return
-        except Exception as exc:
+            break
+        except Exception as exc:  # noqa: BLE001 - any failure to open means: try the next microphone
             errors.append(str(exc))
             if stream is not None:
                 try:
                     stream.close()
-                except Exception:
+                except Exception:  # noqa: BLE001 - it never opened; nothing to keep
                     pass
-    detail = errors[-1] if errors else "No input endpoint is available."
-    raise RuntimeError(
-        "Could not open the selected microphone or the Windows default input. "
-        "Check that a microphone is connected and Windows microphone privacy is enabled. " + detail
-    )
+            stream = None
+    if stream is None:
+        detail = errors[-1] if errors else "No input endpoint is available."
+        raise RuntimeError(
+            "Could not open the selected microphone or the Windows default input. "
+            "Check that a microphone is connected and Windows microphone privacy is enabled. " + detail
+        )
+    if input_key and (missing or device != selected):
+        note = "The saved microphone is unavailable; using the current system default instead."
+        if _active_controller and _active_controller._notice_callback:
+            _active_controller._notify(note)
+    # Only opening is retried: an error from the caller's own code inside the with-block is theirs, not the mic's.
+    try:
+        yield stream
+    finally:
+        try:
+            stream.stop()
+        finally:
+            stream.close()
 
 
 _active_controller: "VoiceController | None" = None
@@ -447,18 +446,14 @@ def _beep(going_to_sleep: bool = False) -> None:
 def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, seconds: float,
                        input_key: str | None = None,
                        level_callback: Callable[[float], None] | None = None,
-                       end_on_silence: bool = True, keep_audio: list[bytes] | None = None,
-                       silence_seconds: float = 1.35) -> str:
-    """Capture a bounded mic interval to RAM, transcribe locally, discard buffers.
+                       keep_audio: list[bytes] | None = None) -> str:
+    """Capture the mic to RAM until `stop_event` (the hold key let go) or `seconds`, transcribe locally, discard buffers.
 
     Only final recognizer results are returned; partial guesses are provisional and never used.
     """
     audio_queue: queue.Queue[bytes] = queue.Queue(maxsize=32)
-    overflow = threading.Event()
 
     def callback(indata, frames, time_info, status):
-        if status:
-            overflow.set()
         if level_callback:
             try:
                 level_callback(_normalized_audio_level(indata))
@@ -467,12 +462,11 @@ def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, 
         try:
             audio_queue.put_nowait(bytes(indata))
         except queue.Full:
-            overflow.set()
+            pass  # a slow moment drops a block; audio is never kept
 
     recognizer = KaldiRecognizer(model, SAMPLE_RATE)
     recognizer.SetWords(False)
     finals: list[str] = []
-    last_speech_at: float | None = None
     start = time.monotonic()
     try:
         with _open_input(sd, input_key, callback):
@@ -487,11 +481,6 @@ def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, 
                     text = str(json.loads(recognizer.Result()).get("text", "")).strip()
                     if text:
                         finals.append(text)
-                        last_speech_at = time.monotonic()
-                elif json.loads(recognizer.PartialResult()).get("partial", "").strip():
-                    last_speech_at = time.monotonic()
-                if end_on_silence and last_speech_at is not None and time.monotonic() - last_speech_at > silence_seconds:
-                    break
         finals.append(str(json.loads(recognizer.FinalResult()).get("text", "")).strip())
         collected = " ".join(finals)
     except Exception as exc:
@@ -502,8 +491,6 @@ def _transcribe_window(model, sd, KaldiRecognizer, stop_event: threading.Event, 
                 level_callback(0.0)
             except Exception:
                 pass
-    if overflow.is_set():
-        pass  # Drop overflowed buffers; never persist audio.
     return re.sub(r"\s+", " ", collected).strip()
 
 
@@ -887,6 +874,7 @@ class VoiceController:
                                 ended = wake_end(name_words)
                                 command = " ".join(word["word"] for word in words if word.get("start", 0) >= ended - 0.05)
                                 if command:
+                                    command = f"{command} {self._rest_of_request(words_recognizer, audio_queue, utterance)}".strip()
                                     break
                                 # Only "Hey Nova": the request comes next, no name needed (same stream, nothing lost).
                                 listening_until = time.monotonic() + FOLLOW_UP_SECONDS
@@ -894,6 +882,7 @@ class VoiceController:
                                 continue
                             if listening_until and follow_up_heard(words):
                                 command = " ".join(word["word"] for word in words)
+                                command = f"{command} {self._rest_of_request(words_recognizer, audio_queue, utterance)}".strip()
                                 break
                             utterance, name_words = [], []
                     if command is None or self._stop.is_set():
@@ -915,6 +904,30 @@ class VoiceController:
         except Exception as exc:
             if not self._stop.is_set() and self._error_callback:
                 self._error_callback(str(exc))
+
+    def _rest_of_request(self, recognizer, audio_queue: "queue.Queue[bytes]", utterance: list[bytes]) -> str:
+        """Vosk ends a sentence after about half a second of quiet; the owner's pause setting (Settings, 2 s by default)
+        says how long a quiet moment may last mid-request. Keeps listening on the same stream until that much quiet (or
+        12 s more at most), adds the audio to `utterance` for Whisper, and returns the words said after the pause."""
+        quiet_needed = max(0.0, float(self.whisper_settings["pause_seconds"]) - VOSK_ENDPOINT_SECONDS)
+        more: list[str] = []
+        quiet_since = time.monotonic()
+        deadline = quiet_since + 12
+        while time.monotonic() - quiet_since < quiet_needed and time.monotonic() < deadline and not self._stop.is_set():
+            try:
+                chunk = audio_queue.get(timeout=0.25)
+            except queue.Empty:
+                continue
+            utterance.append(chunk)
+            if recognizer.AcceptWaveform(chunk):
+                text = str(json.loads(recognizer.Result()).get("text", "")).strip()
+                if text:
+                    more.append(text)
+                    quiet_since = time.monotonic()
+            elif json.loads(recognizer.PartialResult()).get("partial", "").strip():
+                quiet_since = time.monotonic()
+        del utterance[:-64]  # about 16 seconds: what Whisper re-hears
+        return " ".join(more)
 
     def _watch_for_barge_in(self, sd, KaldiRecognizer, model) -> bool:
         """While Nova talks, the mic listens only for "Hey Nova", so you can cut her off. Her natural voice is taken
@@ -996,10 +1009,9 @@ class VoiceController:
             self._sleep_callback()
 
     def push_to_talk(self, on_start: Callable[[], None], on_result: Callable[[str], None],
-                     on_error: Callable[[str], None], on_notice: Callable[[str], None] | None = None,
-                     hold: threading.Event | None = None) -> None:
-        """Record one command. With `hold`, record until the event is set (key released) instead of
-        stopping at the first pause."""
+                     on_error: Callable[[str], None], hold: threading.Event,
+                     on_notice: Callable[[str], None] | None = None) -> None:
+        """Record one command while the key is held: until `hold` is set (key released)."""
         if self._thread and self._thread.is_alive():
             on_error("Wake listening is active; turn it off before push-to-talk.")
             return
@@ -1011,10 +1023,8 @@ class VoiceController:
                 KaldiRecognizer, _Model = _dependencies()
                 on_start()
                 audio: list[bytes] = []
-                result = _transcribe_window(model, sd, KaldiRecognizer, hold or threading.Event(),
-                                            HOLD_MAX_SECONDS if hold else COMMAND_SECONDS, self.input_key,
-                                            self._emit_level, end_on_silence=hold is None, keep_audio=audio,
-                                            silence_seconds=float(self.whisper_settings["pause_seconds"]))
+                result = _transcribe_window(model, sd, KaldiRecognizer, hold, HOLD_MAX_SECONDS, self.input_key,
+                                            self._emit_level, keep_audio=audio)
                 result = self._better_transcript(result, audio)
                 on_result(result)
             except Exception as exc:

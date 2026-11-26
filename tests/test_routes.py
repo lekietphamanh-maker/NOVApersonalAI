@@ -339,3 +339,15 @@ class LiveRouteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PartialRoadsTests(unittest.TestCase):
+    def test_an_overpass_timeout_is_a_failure_not_the_citys_roads(self) -> None:
+        import io
+        answer = json.dumps({"remark": "runtime error: Query timed out in \"query\" at line 1 after 181 seconds.",
+                             "elements": [{"type": "node", "id": 1, "lat": 10.0, "lon": 106.0}]}).encode()
+        router = routes.Router(Path(tempfile.mkdtemp()), opener=lambda request, timeout=0: io.BytesIO(answer),
+                               sleep=lambda _seconds: None)
+        with self.assertRaises(OSError):
+            router._roads_for_box((10.0, 106.0, 10.1, 106.1), tiled=False)
+        self.assertEqual(list(router.cache.glob("roads-*.json")), [])  # nothing half-downloaded kept for 30 days

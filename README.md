@@ -35,7 +35,7 @@ Everything else is set up from inside Nova: **SETTINGS → Need to** has step-by
 - By default nothing leaves your PC: the model, speech recognition and voices run locally.
 - Online brains are off until you choose one. Passwords and mail questions are asked about out loud before they go online. Start with "privately" to keep any question local.
 - Web searches send only the search words. The world feeds get plain requests, with nothing about you.
-- Secrets (API keys, the Google sign-in, tokens) stay on your PC, encrypted with Windows DPAPI where possible. None are in this repository.
+- Secrets (API keys, the Google sign-in, the Telegram and GitHub tokens) stay on your PC, sealed for your account (Windows DPAPI; the Keychain on the Mac). The phone and TV pairing codes, the local certificate's key and the MCP key file are plain files in your user folder. None are in this repository.
 
 ## Build from source
 

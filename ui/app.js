@@ -359,11 +359,6 @@ function render() {
   $("#mini-orb").checked = (state.settings || {}).mini_orb !== false;
   if (document.activeElement?.id !== "owner-name") $("#owner-name").value = (state.settings || {}).owner_name || "";
   if (document.activeElement?.id !== "nova-soul") $("#nova-soul").value = (state.settings || {}).soul || "";
-  // The token itself is never shown: only whether one is set, and which repo it pushes to.
-  const tokenSet = Boolean((state.settings || {}).github_token_set);
-  $("#need-self-update-state").textContent = tokenSet ? "SET" : "NOT SET";
-  $("#github-token-status").textContent = tokenSet ? "Token saved on this PC — “Update now” can push." : "No token yet — “Update now” still fixes and tests, but can't push.";
-  if (document.activeElement?.id !== "github-repo") $("#github-repo").value = (state.settings || {}).github_repo || "";
   $("#send").disabled = Boolean(state.busy);
 }
 
@@ -715,6 +710,10 @@ function renderClaude() {
     : `${activeAgent.label} isn't on this PC yet: Install, then Connect account and sign in.`) : "";
 }
 
+// The model the page last filled in by itself (a provider's default): a provider change replaces it with the next
+// provider's default, while a model the owner typed stays theirs.
+let autoModel = "";
+
 function providerChanged() {
   const providers = (state.claude?.api?.providers) || [];
   const chosen = providers.find((item) => item.key === $("#api-provider").value) || providers[0];
@@ -723,10 +722,12 @@ function providerChanged() {
   $("#api-base").hidden = chosen.kind === "anthropic";
   $("#api-key").placeholder = chosen.kind === "anthropic" ? "Anthropic API key (sk-ant-...)" : `API key${chosen.key_optional ? " (optional)" : ""}`;
   $("#api-hint").textContent = chosen.hint ? `Key from: ${chosen.hint}` : "";
-  if (!$("#api-model").value && chosen.default_model) $("#api-model").value = chosen.default_model;
+  const modelField = $("#api-model");
+  if (modelField.value === autoModel) modelField.value = chosen.default_model || "";
+  autoModel = chosen.default_model || "";
   const note = $("#api-note");
-  if (note) note.replaceChildren(...(chosen.note ? [chosen.note + " ",
-    h("a", { href: "https://www.omniroute.online/", target: "_blank", rel: "noopener" }, "omniroute.online")] : []));
+  if (note) note.replaceChildren(...(chosen.note ? [chosen.note + " ", chosen.key === "omniroute"
+    ? h("a", { href: "https://www.omniroute.online/", target: "_blank", rel: "noopener" }, "omniroute.online") : ""] : []));
   $("#api-models").replaceChildren(...(chosen.kind === "anthropic" ? Object.keys(state.claude?.models || {}) : []).map((id) => new Option(id, id)));
 }
 
@@ -1815,7 +1816,7 @@ $("#api-load-models").onclick = async () => {
 $("#api-add-save").onclick = async () => {
   const result = await act("api_brain_add", { provider: $("#api-provider").value, base_url: $("#api-base").value,
     key: $("#api-key").value, model: $("#api-model").value });
-  if (result && result.ok !== false) { $("#api-key").value = ""; $("#api-model").value = ""; $("#api-add").open = false; }
+  if (result && result.ok !== false) { $("#api-key").value = ""; $("#api-model").value = ""; autoModel = ""; $("#api-add").open = false; }
 };
 $("#free-cloud-signin").onclick = () => act("free_cloud_signin");
 $("#free-cloud-save").onclick = () => act("free_cloud_settings", { model: $("#free-cloud-model").value });
@@ -1907,12 +1908,6 @@ $("#keep-city-save").onclick = async () => {
   if (result?.error) btn.disabled = false; // never started, so no knowledge patch is coming
 };
 $("#node-path-save").onclick = () => act("node_path", { path: $("#node-path").value });
-$("#github-token-save").onclick = () => {
-  act("github_token", { token: $("#github-token").value, repo: $("#github-repo").value });
-  $("#github-token").value = ""; // never leave it sitting in the field
-  toast("Saved on this PC.", "ok");
-};
-$("#github-token").addEventListener("keydown", (event) => { if (event.key === "Enter") $("#github-token-save").click(); });
 $("#drive-connect").onclick = () => {
   toast("Google opens in your browser: allow Drive too. If it says the Drive API is off, enable it in Google Cloud Console for your project first.", "info");
   act("gmail", { drive: true });
@@ -1982,6 +1977,7 @@ document.addEventListener("keydown", (event) => {
     else if (skills.isOpen()) skills.close();
     else if (trading.isOpen()) trading.close();
     else if (network.isOpen()) network.close();
+    else if (galaxy.isOpen()) galaxy.close();
     else if (mapOpen) openMap(false);
     else act("stop");
     return;

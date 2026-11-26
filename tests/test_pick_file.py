@@ -13,8 +13,9 @@ try:
     import tkinter  # noqa: F401  (Windows has it; a bare Linux Python may not)
     import tkinter.filedialog  # noqa: F401
 except ImportError:
-    sys.modules["tkinter"] = types.SimpleNamespace(Tk=object, TclError=Exception)
-    sys.modules["tkinter.filedialog"] = types.SimpleNamespace()
+    filedialog = types.SimpleNamespace(askopenfilename=None, askdirectory=None)
+    sys.modules["tkinter"] = types.SimpleNamespace(Tk=object, TclError=Exception, filedialog=filedialog)
+    sys.modules["tkinter.filedialog"] = filedialog
 
 try:
     import dashboard  # noqa: E402
@@ -50,11 +51,6 @@ class PickFileTests(unittest.TestCase):
             result = dashboard.AlfredApp._act_shannon_pick(self.app, {"kind": "app"})
         self.assertEqual(pick.call_args.kwargs["initialdir"], str(self.app.shannon.projects_folder))
         self.assertEqual(result, {"ok": True, "picked": True, "path": "/home/me/Documents/Nova Projects/shop"})
-
-    def test_shannon_pick_file_returns_the_clicked_file(self) -> None:
-        with unittest.mock.patch("tkinter.filedialog.askopenfilename", return_value="/home/me/notes.txt"):
-            result = dashboard.AlfredApp._act_shannon_pick(self.app, {"kind": "file"})
-        self.assertEqual(result, {"ok": True, "picked": True, "path": "/home/me/notes.txt"})
 
     def test_pick_actions_are_registered(self) -> None:
         self.assertIn("rea_pick", dashboard.AlfredApp.ACTIONS)

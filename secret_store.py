@@ -6,6 +6,7 @@ import os
 import re
 import sys
 from pathlib import Path
+from typing import Callable
 
 
 def _folder() -> Path:
@@ -57,3 +58,20 @@ def load(name: str) -> str | None:
 
 def forget(name: str) -> None:
     _path(name).unlink(missing_ok=True)
+
+
+def load_or_move(name: str, read_plain: "Callable[[], str | None]", plain: Path) -> str | None:
+    """A secret from the sealed store. One an earlier build left in a plain file (read by `read_plain`) is sealed once
+    and the plain file removed; when the store can't take it, the plain file keeps working as before."""
+    value = load(name)
+    if value is not None:
+        return value
+    value = read_plain()
+    if not value:
+        return None
+    try:
+        save(name, value)
+    except OSError:
+        return value
+    plain.unlink(missing_ok=True)
+    return value

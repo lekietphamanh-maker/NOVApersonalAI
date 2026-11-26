@@ -64,6 +64,8 @@ class ReminderTests(unittest.TestCase):
                       run({"action": "add", "text": "call mom", "when": "2026-11-20T17:00"}))
         self.assertIn("Not set", run({"action": "add", "text": "x", "when": "later"}))
         self.assertIn("call mom", run({"action": "list"}))
+        self.assertIn("Say which reminder", run({"action": "cancel"}))  # no words never means "all of them"
+        self.assertIn("call mom", run({"action": "list"}))
         self.assertIn("Cancelled", run({"action": "cancel", "text": "mom"}))
         self.assertEqual(run({"action": "list"}), "No reminders ahead.")
 

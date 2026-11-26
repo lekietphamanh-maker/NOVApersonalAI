@@ -3,7 +3,7 @@
 // for medium, yellow for low. Mark one fixed and it calms to green. Drag to turn, scroll or pinch to zoom, click a
 // spot; arrows, + and -, and webcam gestures work too. Stages, the log and past checks run along the bottom.
 
-import { h, when, screen, renderStrip, openReportPanel, pollSelfUpdate, UPDATE_STAGE_LABELS } from "./lab.js";
+import { h, when, screen, renderStrip, openReportPanel } from "./lab.js";
 import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const STAGES = [["recon", "Recon"], ["analysis", "Analysis"], ["exploit", "Exploit"], ["validate", "Validate"], ["report", "Report"]];
@@ -18,8 +18,6 @@ export function createShannon(root, { act, onOpenChange }) {
   const stagesBox = $("#shannon-stages"), logLine = $("#shannon-log"), strip = $("#shannon-strip");
   const problemLine = $("#shannon-problem"), form = $("#shannon-form"), stopButton = $("#shannon-stop");
   let jobs = [], job = null, log = [], running = "", selected = -1, frame = 0, spots = [];
-  let simKind = "web", simHits = [], simTimers = [];
-  const SIM_KINDS = ["app", "file", "web"];
   const view3d = { yaw: 0.4, pitch: 0.25, zoom: 1, target: null };
   const pointers = new Map();
   let drag = null, pinch = 0;
@@ -45,220 +43,11 @@ export function createShannon(root, { act, onOpenChange }) {
     onOpen: refresh,
   });
 
-  // ---------- Simulate attack: target picker below the shield, red blocks on it, AiSOC's verdict ----------
-  // Built here, not in index.html: the picker sits between the shield and the past checks, and only this file
-  // may change for the Shannon screen's layout.
-
-  const simStatus = h("p", { class: "muted small" });
-  const simError = h("p", { class: "muted small", style: "color:var(--warn)" });
-  const simResult = h("div", {});
-  const simInput = h("input", { class: "field", style: "flex:1;min-width:180px", placeholder: "Local address (localhost:3000)",
-    maxlength: "300", "aria-label": "Simulation target" });
-  const simBrowse = h("button", { class: "box small", type: "button", onclick: pickSimTarget }, "Browse…");
-  const simButton = h("button", { class: "box small on", type: "button", onclick: simulate }, "Simulate attack");
-  const simModes = SIM_KINDS.map((kind) => h("button", {
-    class: `box small${kind === simKind ? " on" : ""}`, type: "button", onclick: () => setSimKind(kind),
-  }, kind === "app" ? "App" : kind === "file" ? "File" : "Web (local)"));
-  const simBox = h("div", { style: "padding:12px 22px;border-top:1px solid var(--line)" },
-    h("h4", { style: "margin:0 0 4px;color:#fff;font:600 13px/1.3 var(--mono)" }, "Simulate attack"),
-    h("p", { class: "muted small", style: "margin:0 0 8px" },
-      "A scripted attack on your own app, file or local address, triaged by AiSOC. Nothing really runs: the same local-only checks as a real Shannon run apply, and anything else is refused."),
-    h("div", { class: "row wrap", style: "margin-top:0" }, ...simModes),
-    h("div", { class: "row wrap" }, simInput, simBrowse, simButton),
-    simStatus, simError, simResult);
-  root.insertBefore(simBox, root.querySelector(".lab-bottom"));
-  simBrowse.hidden = true;  // the default mode is Web (local), a typed address — no file window until App/File is picked
-
-  // ---------- Attack Nova herself: one click, no target to pick ----------
-  // The same Simulate attack machinery (AiSOC triage, shield blocks, verdict, report, Update now), but the
-  // target is Nova herself — her own code and her own running screen. Update now fixes Nova's own code.
-
-  const selfStatus = h("p", { class: "muted small" });
-  const selfError = h("p", { class: "muted small", style: "color:var(--warn)" });
-  const selfResult = h("div", {});
-  const selfButton = h("button", { class: "box small on", type: "button", onclick: attackSelf }, "Attack Nova herself");
-  const selfBox = h("div", { style: "padding:12px 22px;border-top:1px solid var(--line)" },
-    h("h4", { style: "margin:0 0 4px;color:#fff;font:600 13px/1.3 var(--mono)" }, "Attack Nova herself"),
-    h("p", { class: "muted small", style: "margin:0 0 8px" },
-      "One click: Shannon attacks Nova herself — her own code and her own running screen — and Update now fixes what it finds. No real exploit runs, nothing leaves this PC, and nothing is installed from anywhere."),
-    h("p", { class: "muted small", style: "margin:0 0 8px" },
-      "Fixes go into Nova's own code, and Nova needs a restart to pick them up."),
-    h("div", { class: "row wrap" }, selfButton),
-    selfStatus, selfError, selfResult);
-  root.insertBefore(selfBox, root.querySelector(".lab-bottom"));
-
-  function clearSelf() {
-    clearSimTimers();
-    selfStatus.textContent = "";
-    selfError.textContent = "";
-    selfResult.replaceChildren();
-  }
-
-  async function attackSelf() {
-    clearSelf();
-    simHits = [];
-    selfStatus.textContent = "Attacking Nova herself…";
-    selfButton.disabled = true;
-    const result = await act("shannon_simulate", { kind: "self" });
-    selfButton.disabled = false;
-    if (!result.ok) {
-      selfStatus.textContent = "";
-      selfError.textContent = result.error || "The self-attack didn't run.";
-      return;
-    }
-    job = result.job;  // the self-attack's proven holes become the shield's spots, like any other check
-    log = [];
-    selected = -1;
-    drawStrip();
-    render();
-    const steps = result.steps || [];
-    steps.forEach((step, index) => {  // a red block lands on the shield as each attack step lands
-      simTimers.push(setTimeout(() => {
-        if (step.landed) {  // its place is fixed at landing time, not recomputed every frame
-          const [lat, lon] = place(simHits.length, 12);
-          simHits.push({ index: simHits.length, lat, lon });
-        }
-        selfStatus.textContent = `${step.technique}: ${step.landed ? "landed" : "blocked"} — AiSOC: ${step.verdict}`;
-      }, index * 500));
-    });
-    simTimers.push(setTimeout(() => showSimResult(result,
-      { status: selfStatus, error: selfError, result: selfResult, clear: clearSelf }), steps.length * 500 + 150));
-  }
-
-  function clearSimTimers() {
-    for (const timer of simTimers) clearTimeout(timer);
-    simTimers = [];
-  }
-
-  function clearSim() {
-    clearSimTimers();
-    simHits = [];
-    simStatus.textContent = "";
-    simError.textContent = "";
-    simResult.replaceChildren();
-  }
-
-  function setSimKind(kind) {
-    simKind = kind;
-    simModes.forEach((button, index) => button.classList.toggle("on", SIM_KINDS[index] === kind));
-    simInput.placeholder = kind === "app" ? "Project folder (under Nova Projects)"
-      : kind === "file" ? "File path (in your user folder)" : "Local address (localhost:3000)";
-    simBrowse.hidden = kind === "web";  // a web address is typed, not picked from a file window
-    if (kind === "app") simInput.setAttribute("list", "shannon-projects");
-    else simInput.removeAttribute("list");
-    simInput.value = "";
-    simError.textContent = "";
-  }
-
-  async function pickSimTarget() {  // the file window: click the project folder or file, its path lands in the box
-    const result = await act("shannon_pick", { kind: simKind });
-    if (result.picked && result.path) simInput.value = result.path;
-  }
-
-  async function simulate() {
-    clearSim();
-    simStatus.textContent = "Simulating…";
-    simButton.disabled = true;
-    const result = await act("shannon_simulate", { kind: simKind, target: simInput.value.trim() });
-    simButton.disabled = false;
-    if (!result.ok) {
-      simStatus.textContent = "";
-      simError.textContent = result.error || "The simulation didn't run.";
-      return;
-    }
-    job = result.job;  // the simulation's incidents become the shield's spots, like a real check's findings
-    log = [];
-    selected = -1;
-    drawStrip();
-    render();
-    const steps = result.steps || [];
-    steps.forEach((step, index) => {  // a red block lands on the shield as each attack step lands
-      simTimers.push(setTimeout(() => {
-        if (step.landed) {  // its place is fixed at landing time, not recomputed every frame
-          const [lat, lon] = place(simHits.length, 12);
-          simHits.push({ index: simHits.length, lat, lon });
-        }
-        simStatus.textContent = `${step.technique}: ${step.landed ? "landed" : "blocked"} — AiSOC: ${step.verdict}`;
-      }, index * 500));
-    });
-    simTimers.push(setTimeout(() => showSimResult(result), steps.length * 500 + 150));
-  }
-
-  function showSimResult(result, els = { status: simStatus, error: simError, result: simResult, clear: clearSim }) {
-    const verdict = result.verdict || {};
-    const color = verdict.verdict === "needs review" ? "rgb(255, 45, 85)"
-      : verdict.verdict === "mitigated" ? "rgb(255, 181, 71)" : "rgb(92, 242, 176)";
-    els.status.textContent = "";
-    const open = (result.job?.findings || []).filter((finding) => !finding.fixed).length;
-    const updateButton = open ? h("button", { class: "box small on", type: "button" },
-      `Update now (${open} fix${open === 1 ? "" : "es"})`) : null;
-    if (updateButton) {
-      updateButton.onclick = () => startUpdate(updateButton, els.status, els.error, result.job?.id);
-    }
-    els.result.replaceChildren(
-      h("span", { class: "lab-tag", style: `color:${color};border-color:${color}` }, `AiSOC: ${verdict.verdict || "resolved"}`),
-      verdict.rationale ? h("p", { class: "muted small" }, verdict.rationale) : null,
-      h("p", { class: "muted small" }, `Report: ${result.report || ""}`),
-      result.kind === "self" && updateButton ? h("p", { class: "muted small" },
-        "These fixes go into Nova's own code. Nova needs a restart to pick them up.") : null,
-      h("div", { class: "row wrap" },
-        h("button", { class: "box small on", type: "button", onclick: () => openSimReport(result) }, "Open report"),
-        updateButton,
-        h("button", { class: "box small", type: "button", onclick: () => { els.clear(); render(); } }, "Clear")));
-  }
-
-  // ---------- the full report on screen, and "Update now" below it ----------
-  async function openReport(jobId, title, action) {
-    const result = await act(action, { id: jobId });
-    const current = job?.id === jobId ? job : null;
-    const open = (current?.findings || []).filter((finding) => !finding.fixed).length;
-    const progress = h("p", { class: "report-progress", hidden: true });
-    const note = h("p", { class: "report-note" });
-    const updateButton = open ? h("button", { class: "box small on", type: "button" },
-      `Update now (${open} fix${open === 1 ? "" : "es"})`) : null;
-    if (updateButton) updateButton.onclick = () => startUpdate(updateButton, progress, note, jobId);
-    openReportPanel(root, {
-      title,
-      text: result.ok ? result.text : (result.error || "The report isn't there any more."),
-      footer: result.ok ? [updateButton, progress, note].filter(Boolean) : [],
-    });
-  }
-
-  function openFullReport() {
-    openReport(job.id, job.title || "Full report", "shannon_report_text");
-  }
-
-  function openSimReport(result) {
-    openReport(result.job?.id, result.job?.title || "Simulated attack — full report", "shannon_simulate_report_text");
-  }
-
-  async function startUpdate(button, progressEl, noteEl, jobId) {
-    button.disabled = true;
-    progressEl.textContent = "Starting the update…";
-    const started = await act("shannon_update_now", { id: jobId });
-    if (!started?.ok) {
-      progressEl.textContent = started?.error || "The update didn't start.";
-      button.disabled = false;
-      return;
-    }
-    if (!started.token_set) {
-      noteEl.textContent = "No GitHub token yet — the fixes and tests run anyway, but the push waits. "
-        + "Add one in Settings → Self-update · GitHub (github.com/settings/tokens → classic token → repo scope).";
-    }
-    pollSelfUpdate(act, (state) => {
-      const running = state.steps.find((step) => step.status === "running");
-      const label = UPDATE_STAGE_LABELS[state.stage] || state.stage;
-      if (state.stage === "done") {
-        progressEl.textContent = state.summary || "Done.";
-        noteEl.textContent = "";
-      } else if (state.stage === "failed") {
-        progressEl.textContent = state.error || "The update stopped.";
-        button.disabled = false;
-      } else {
-        progressEl.textContent = `${label}…${running?.detail ? ` ${running.detail}` : ""}`
-          + (state.fix_round ? ` (fix round ${state.fix_round})` : "");
-      }
-    });
+  // ---------- the full report on screen ----------
+  async function openFullReport() {
+    const shown = job; // a job event during the wait must not retitle this panel
+    const result = await act("shannon_report_text", { id: shown.id });
+    openReportPanel(root, { title: shown.title || "Full report", text: result.ok ? result.text : (result.error || "The report isn't there any more.") });
   }
 
   async function refresh() {
@@ -278,8 +67,6 @@ export function createShannon(root, { act, onOpenChange }) {
     job = result.job;
     log = job.log || [];
     selected = -1;
-    clearSim();
-    clearSelf();
     drawStrip();
     render();
   }
@@ -483,21 +270,6 @@ export function createShannon(root, { act, onOpenChange }) {
     });
   }
 
-  function drawHits(g, now) {  // one red block on the shield per landed attack step; cleared on a new run
-    for (const hit of simHits) {
-      const [x, y, depth] = project(hit.lat, hit.lon, g);
-      if (depth < -0.05) continue;
-      const pulse = calm ? 0.4 : (Math.sin(now / 260) + 1) / 2, size = 9 * g.scale;
-      context.globalAlpha = 0.35 + 0.65 * Math.max(0, depth);
-      context.shadowColor = "rgb(255, 45, 85)";
-      context.shadowBlur = (10 + 18 * pulse) * g.scale;
-      context.fillStyle = `rgba(255, 45, 85, ${0.55 + 0.35 * pulse})`;
-      context.fillRect(x - size / 2, y - size / 2, size, size);
-      context.shadowBlur = 0;
-      context.globalAlpha = 1;
-    }
-  }
-
   function draw(now) {
     if (!view.isOpen()) return;
     frame = requestAnimationFrame(draw);
@@ -515,7 +287,6 @@ export function createShannon(root, { act, onOpenChange }) {
     drawStreaks(g, true, speed);
     drawShield(g);
     drawSpots(g, now);
-    drawHits(g, now);
     drawStreaks(g, false, speed);
   }
 
@@ -606,7 +377,7 @@ export function createShannon(root, { act, onOpenChange }) {
     job(next) {
       jobs = [next, ...jobs.filter((item) => item.id !== next.id)];
       running = next.status === "running" ? next.id : (running === next.id ? "" : running);
-      if (next.status === "running" && job?.id !== next.id && (!job || job.status !== "running")) { job = next; log = []; selected = -1; clearSim(); clearSelf(); }
+      if (next.status === "running" && job?.id !== next.id && (!job || job.status !== "running")) { job = next; log = []; selected = -1; }
       if (job?.id === next.id) { job = { ...job, ...next }; render(); }
       drawStrip();
     },

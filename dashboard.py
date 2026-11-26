@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import base64
 import copy
+import contextlib
 import ctypes
 import io
 import json
@@ -30,6 +31,8 @@ from urllib.parse import urlsplit
 
 if sys.platform == "darwin":  # every data folder below LOCALAPPDATA lands in the Mac's own place for app data
     os.environ.setdefault("LOCALAPPDATA", str(Path.home() / "Library" / "Application Support"))
+import data_folder  # noqa: E402 - before every module below reads where Nova's data lives
+data_folder.unify()
 
 import app_window
 import claude_expert
@@ -77,6 +80,7 @@ from brain_router import spoken_answer, spoken_place
 import agent as agent_module
 import knowledge_galaxy
 from agent import SCREEN_STEP_TOOLS, Agent, OllamaError, _http_json
+import screen_assist
 from screen_assist import risky_step
 from creative_mode import CreativeServer
 from fitness import HeartRateMonitor
@@ -104,7 +108,6 @@ from building_actions import BuildingActions
 import building
 import trading
 import network
-import update_pipeline
 import skills_board
 import shannon_runner
 from lab_jobs import JobLog
@@ -155,11 +158,16 @@ def _settings_path() -> Path:
 
 
 def _load_settings() -> dict[str, Any]:
+    path = _settings_path()
     try:
-        data = json.loads(_settings_path().read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {}
-    except (OSError, ValueError):
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except OSError:
         return {}
+    except ValueError:  # damaged: keep it for a look, and start from the defaults instead of failing to start
+        with contextlib.suppress(OSError):
+            os.replace(path, path.with_suffix(".bad"))
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _spoken_question(name: str, arguments: dict[str, Any]) -> str:
@@ -288,11 +296,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                                         region=lambda: self.settings.get("brief_region", "US"))
         self.agent.location = self.location
         self.agent.tv = self.show_on_tv
-        try:
-            import assist_helper
-            assist_helper.STOP_KEYS = list(self._hotkey("stop"))  # Nova's typing stops on the owner's stop key
-        except Exception:
-            pass
+        screen_assist.STOP_KEYS = list(self._hotkey("stop"))  # Nova's typing stops on the owner's stop key
         self.music = music_player.Music(on_change=lambda _track: self.events.put(("music", None)))
         self.pc = pc_sync.this_pc()
         self.brain = brain.SecondBrain(
@@ -316,8 +320,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.google_mcp = google_mcp.GoogleMcp(lambda: self.agent.gmail, lambda: self.agent.drive)  # for the owner's Claude apps
         self.updates = self_update.Updater(VERSION, self_update.default_folder())
         self.update_ready: Path | None = None  # a verified installer waiting for "Restart to update"
-        self.pipeline: update_pipeline.Pipeline | None = None  # the running self-update, if any
-        self._pipeline_lock = threading.Lock()
         self.telegram = telegram_remote.TelegramRemote(
             ask=self._ask_from_telegram, transcribe=self.voice_transcribe,
             load=lambda: dict(self.settings.get("telegram") or {}), save=lambda data: self._save_setting("telegram", data),
@@ -499,9 +501,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                          "keep_running": self.settings.get("keep_running", True),
                          "mini_orb": self.settings.get("mini_orb", True),
                          "soul": self.settings.get("soul", agent_module.DEFAULT_SOUL),
-                         "node_path": self.settings.get("node_path", ""), **self._advance_settings(),
-                         "github_token_set": update_pipeline.token_set(self._github_token()),
-                         "github_repo": self.settings.get("github_repo", update_pipeline.DEFAULT_REPO)},
+                         "node_path": self.settings.get("node_path", ""), **self._advance_settings()},
             "brief": None,
             "brief_loading": False,
             "notes": self._notes_state(),
@@ -516,7 +516,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def start(self, open_window: bool = True) -> str:
         url = self.ui.start()
         # Shannon's "Attack Nova herself" needs to know where her own screen is served from.
-        self.shannon.ui_origin = lambda: self.ui.url.split("#")[0].rstrip("/")
         self.ui.on_show = lambda: self.events.put(("open_window", ""))
         self.ui.on_replace = lambda: self.events.put(("quit", None))  # a newer Nova build is starting
         if open_window:
@@ -770,7 +769,9 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         try:
             path = _settings_path()
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(self.settings, indent=2), encoding="utf-8")
+            partial = path.with_suffix(".tmp")  # written whole, then swapped in: a crash never leaves half a file
+            partial.write_text(json.dumps(self.settings, indent=2), encoding="utf-8")
+            os.replace(partial, path)
         except OSError:
             pass  # the switch still works for this session
 
@@ -789,8 +790,8 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
 
     ACTIONS = {"send", "stop", "speak", "mic", "gestures", "phone", "phone_pairing", "phone_new_code", "assist", "autopilot", "gmail",
                "creative", "notes_save", "notes_load", "notes_new", "notes_delete", "map_expand", "read_screen", "audio_devices", "audio_save", "test_mic", "test_speaker",
-               "test_voice", "install_whisper", "whisper_save", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "claude_key", "claude_key_forget", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
-               "open_url", "status_refresh", "cancel_timer", "forget_fact",
+               "test_voice", "install_whisper", "whisper_save", "install_vietnamese_voice", "location_city", "location_device", "location_forget", "open_photos", "second_brain", "second_brain_settings", "second_brain_now", "second_brain_ingest", "open_vault", "pc_sync", "wiki_here", "claude", "claude_settings", "telegram", "telegram_token", "telegram_token_forget", "telegram_unpair", "telegram_relay", "update_check", "update_auto", "update_install", "update_rollback", "discover_refresh", "discover_add", "discover_skip", "discover_settings", "discover_install_skill", "discover_drop_skill", "reverse_toggle", "free_cloud_settings", "free_cloud_signin", "brain_choose", "privacy", "downloads", "hotkey", "media", "tv_allow", "tv_show", "tv_clear", "tv_forget", "screens_info", "approve", "set_model", "pull_model", "pull_vision", "settings", "brief", "brief_refresh",
+               "open_url", "cancel_timer", "forget_fact",
                "setup_everything", "setup_stop", "workplace_sync", "workplace_save", "workplace_list", "workplace_load",
                "workplace_delete", "workplace_file", "build_sync", "build_save", "build_list", "build_load", "build_delete", "build_anatomy", "trading", "network", "advance", "advance_widgets", "advance_board", "advance_apps", "app_open", "app_stop", "app_page", "app_add", "app_remove",
                "walkthrough_next", "walkthrough_stop", "heart", "library", "library_topic", "library_save",
@@ -799,12 +800,10 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                "version_create", "version_delete", "model_compare", "skill_run", "skills_suggest", "open_outputs", "reminder_cancel",
                "world", "claude_connectors", "google_mcp", "node_path", "route",
                "knowledge_catalog", "knowledge_download", "knowledge_remove", "notes_index", "keep_city",
-               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_report", "rea_fit_add", "rea_pick",
+               "obs_password", "lab_view", "rea_view", "rea_start", "rea_open", "rea_fit_add", "rea_pick",
                "tune_now", "auto_tune", "cloud_fallback", "api_brain_add", "api_brain_use", "api_brain_remove",
-               "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_report",
-               "shannon_fix", "shannon_simulate", "shannon_simulate_report", "shannon_pick", "galaxy_data", "update_now", "google_pick_client",
-               "github_token", "rea_report_text", "shannon_report_text", "shannon_simulate_report_text",
-               "rea_update_now", "shannon_update_now", "self_update_status"}
+               "api_brain_models", "cloud_agent_use", "cloud_agent_install", "cloud_agent_connect", "skills_board", "shannon_view", "shannon_start", "shannon_stop", "shannon_open", "shannon_fix", "shannon_pick", "galaxy_data", "update_now", "google_pick_client",
+               "rea_report_text", "shannon_report_text"}
 
     def _action_from_page(self, name: str, args: dict[str, Any]) -> dict[str, Any]:
         """Runs on an HTTP thread: hand the action to the main thread and wait for its result."""
@@ -955,7 +954,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         if not self.settings.get("mic_consented") and not args.get("consented"):
             return {"need_consent": "mic"}
         self._save_setting("mic_consented", True)
-        if not whisper_engine.installed() and not self.settings.get("whisper_offered"):
+        if not whisper_engine.installed_any() and not self.settings.get("whisper_offered"):
             self._save_setting("whisper_offered", True)
             self._toast("Tip: Whisper understands accents and mixed English much better than the basic recognizer "
                         f"(about {whisper_engine.DOWNLOAD_MB} MB, runs on this PC).", "info",
@@ -1691,8 +1690,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             if problem:
                 return {"ok": False, "error": problem}
             self._save_setting(f"hotkey_{which}", keys)
-        import assist_helper
-        assist_helper.STOP_KEYS = list(self._hotkey("stop"))
+        screen_assist.STOP_KEYS = list(self._hotkey("stop"))
         self._update(hotkeys=self._hotkey_state())
         return None
 
@@ -1731,7 +1729,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                          name="NovaSecondBrainIngest", daemon=True).start()
 
     def _brain_summary(self) -> dict[str, Any]:
-        videos_ready = self.voice.whisper is not None and whisper_engine.installed()
+        videos_ready = self.voice.whisper is not None  # set only when a Whisper model is installed
         return {"on": bool(self.settings.get("second_brain")), "running": self.brain.running, "status": self.brain.status,
                 "last": self.brain.last_summary, "notes_today": self.brain.vault.notes_today(),
                 "vault": str(self._vault_folder()), "videos": bool(self.settings.get("second_brain_videos", True)),
@@ -1744,8 +1742,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         self.skills.vault = self._vault_folder()
         self.brain.exclude = brain.keywords(self.settings.get("second_brain_exclude", brain.DEFAULT_EXCLUDE))
         on = bool(self.settings.get("second_brain")) and sys.platform == "win32"
-        videos = (on and self.settings.get("second_brain_videos", True) and self.voice.whisper is not None
-                  and whisper_engine.installed())
+        videos = on and self.settings.get("second_brain_videos", True) and self.voice.whisper is not None
         if self.brain.running:
             self.brain.stop(summarize=not on)
         self.brain.listen_to_videos = (brain.make_video_ear(self.voice.whisper.transcribe,
@@ -2094,20 +2091,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             self._toast("Connect Google first (Settings → Connections); then Nova serves Gmail and Drive.", "warn")
         return None
 
-    def _act_claude_key(self, args: dict[str, Any]) -> dict[str, Any] | None:
-        try:
-            claude_expert.save_key(str(args.get("key", "")))
-        except ValueError as exc:
-            return {"ok": False, "error": str(exc)}
-        self._apply_claude()
-        self._toast(f"Key saved on this PC ({claude_expert.key_hint()}).", "ok")
-        return None
-
-    def _act_claude_key_forget(self, _args: dict[str, Any]) -> None:
-        claude_expert.forget_key()
-        self._apply_claude()
-        self._toast("Key removed from this PC. Nova answers with the local AI only.", "ok")
-
     # ---------- SETTINGS → Downloads: everything Nova can still get, with a button each ----------
 
     def _downloads_state(self) -> list[dict[str, Any]]:
@@ -2164,7 +2147,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                     done=claude_code.find() is not None)
             elif brain_choice == "claude":
                 add(id="claude_key", name="Anthropic API key", why="For Claude, Nova's chosen brain (no download).",
-                    size="", done=claude_expert.key() is not None, focus="#claude-key")
+                    size="", done=claude_expert.key() is not None, focus="#api-key")
             if self.settings.get("reverse_on") or self.settings.get("google_mcp_on"):
                 add(id="node", name="Node.js (LTS)", why="Runs REA for reverse engineering, and the bridge Claude Desktop "
                     "uses to reach Nova's Gmail and Drive.", size="about 30 MB", optional=True, url="https://nodejs.org/en/download",
@@ -2715,9 +2698,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
                       else "Ollama isn't running" if "couldn't reach" in low else f"not ready: {str(exc)[:160]}")
         self.events.put(("free_cloud", status))
 
-    def _act_free_cloud(self, args: dict[str, Any]) -> dict[str, Any] | None:
-        return self._act_brain_choose({**args, "brain": "free" if args.get("on") else "local"})
-
     def _act_free_cloud_settings(self, args: dict[str, Any]) -> dict[str, Any] | None:
         model = " ".join(str(args.get("model", "")).split())[:80]
         if not re.fullmatch(r"[\w.\-/]+:[\w.\-]*cloud", model):
@@ -2881,9 +2861,6 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_forget_fact(self, args: dict[str, Any]) -> None:
         self.memory.delete_fact(int(args.get("id") or 0))
         self._refresh_tasks()
-
-    def _act_status_refresh(self, _args: dict[str, Any]) -> None:
-        threading.Thread(target=self._status_worker, daemon=True).start()
 
     # ---------- model ----------
 
@@ -3372,13 +3349,10 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
     def _act_rea_open(self, args: dict[str, Any]) -> dict[str, Any]:
         return {"ok": True, "job": self._lab_job(args, "rea")}
 
-    def _act_rea_report(self, args: dict[str, Any]) -> None:
-        self._open_file(str(self._lab_job(args, "rea").get("report") or ""))
-
     def _act_rea_fit_add(self, args: dict[str, Any]) -> dict[str, Any] | None:
         """“Add it to Nova” for a REA fit: with the owner's yes, pin the source (when it is a GitHub repo),
         record its license, and hand a read-only study to Claude Code — treated as an update to Nova's code.
-        Nothing is installed here; if the study's plan needs code installed, Nova asks the owner first."""
+        Nothing is installed: Nova never installs the studied code."""
         job = self._lab_job(args, "rea")
         findings = job.get("fit") or []
         try:
@@ -3407,7 +3381,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             self.discover_studies[title] = pinned["repo"] if pinned else job.get("target", "")
             self.deep_work.start(title, handoff["study_task"])
             self._toast(f"Claude Code is studying {handoff['title']} (read-only). "
-                        "Nothing is installed yet — Nova asks you first if the plan needs code installed.", "info")
+                        "Nothing is installed: the plan is yours to act on.", "info")
             self._update(discover=self._discover_state())
         threading.Thread(target=work, name="NovaReaFitAdd", daemon=True).start()
         return None
@@ -3416,8 +3390,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         def check() -> None:
             self.ui.emit({"type": "shannon_ready", "problem": self.shannon.problem()})
         threading.Thread(target=check, name="NovaShannonCheck", daemon=True).start()
-        return {"ok": True, "jobs": sorted(self.lab_jobs.recent("shannon") + self.lab_jobs.recent("shannon_simulate"),
-                                           key=lambda item: item.get("started") or "", reverse=True),
+        return {"ok": True, "jobs": self.lab_jobs.recent("shannon"),
                 "projects": self.shannon.projects(),
                 "running": self.shannon.job_id if self.shannon.process is not None else ""}
 
@@ -3446,16 +3419,11 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         threading.Thread(target=self.shannon.stop, name="NovaShannonStop", daemon=True).start()
 
     def _act_shannon_open(self, args: dict[str, Any]) -> dict[str, Any]:
-        job = self.lab_jobs.get(str(args.get("id") or ""))
-        if job is None or job.get("kind") not in ("shannon", "shannon_simulate"):
-            raise ValueError("That report isn't there any more.")
-        return {"ok": True, "job": job}
+        return {"ok": True, "job": self._lab_job(args, "shannon")}
 
     def _act_shannon_fix(self, args: dict[str, Any]) -> dict[str, Any]:
         """The owner solved a weak spot (or reopens it): kept with the check, so the shield remembers."""
-        job = self.lab_jobs.get(str(args.get("id") or ""))
-        if job is None or job.get("kind") not in ("shannon", "shannon_simulate"):
-            raise ValueError("That report isn't there any more.")
+        job = self._lab_job(args, "shannon")
         cards = [dict(card) for card in job.get("findings") or []]
         index = int(args.get("index", -1))
         if not 0 <= index < len(cards):
@@ -3463,247 +3431,30 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
         cards[index]["fixed"] = bool(args.get("fixed"))
         return {"ok": True, "job": self.lab_jobs.update(job["id"], findings=cards)}
 
-    def _act_shannon_report(self, args: dict[str, Any]) -> None:
-        job = self.lab_jobs.get(str(args.get("id") or ""))
-        if job is None or job.get("kind") not in ("shannon", "shannon_simulate"):
-            raise ValueError("That report isn't there any more.")
-        self._open_file(str(job.get("report") or ""))
-
-    def _act_shannon_simulate(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Simulate attack: Shannon's stages + AiSOC triage on the owner's own app, file or local address.
-        Synchronous and fast (nothing really runs); a bad target is refused at once, like shannon_start."""
-        return self.shannon.simulate_attack(args.get("kind"), args.get("target"))
-
-    def _act_shannon_pick(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Opens the native file window so the owner clicks the project folder (app) or file to simulate on."""
+    def _act_shannon_pick(self, _args: dict[str, Any]) -> dict[str, Any]:
+        """Opens the native folder window, in Nova Projects, so the owner clicks the app's code to check."""
         from tkinter import filedialog
         projects = self.shannon.projects_folder
         start = projects if projects.is_dir() else Path.home()
         with app_window.dialog_on_top(getattr(self, "root", None), getattr(self, "window_hwnd", None)):
-            if str(args.get("kind") or "file") == "app":
-                path = filedialog.askdirectory(title="Pick a project folder to simulate on", initialdir=str(start))
-            else:
-                path = filedialog.askopenfilename(title="Pick a file to simulate on", initialdir=str(Path.home()),
-                                                  filetypes=[("All files", "*.*")])
+            path = filedialog.askdirectory(title="Pick the app's project folder", initialdir=str(start))
         return {"ok": True, "picked": bool(path), "path": path or ""}
-
-    def _act_shannon_simulate_report(self, args: dict[str, Any]) -> None:
-        self._open_file(str(self._lab_job(args, "shannon_simulate").get("report") or ""))
 
     # ---------- the full report on screen, and "Update now" ----------
 
-    def _github_token(self) -> str:
-        """The stored GitHub token, from the sealed store (Windows DPAPI, Mac Keychain).
-        A plaintext one left in settings by an earlier build is moved into the store once
-        and removed from the settings, so the settings file never holds it again."""
-        token = secret_store.load("github_token") or ""
-        legacy = str(self.settings.pop("github_token", None) or "").strip()
-        if legacy:
-            if not token:
-                try:
-                    secret_store.save("github_token", legacy)
-                except OSError:
-                    pass  # the sealed store is unavailable; the token still works this session
-                else:
-                    token = legacy
-            self._save_setting("github_repo", str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO))
-        return token
-
-    def _act_github_token(self, args: dict[str, Any]) -> dict[str, Any]:
-        """The token for pushing to GitHub: sealed on this PC only, never sent back to the page.
-        The page only ever learns whether one is set (state.settings.github_token_set)."""
-        token = str(args.get("token") or "").strip()[:200]
-        repo = update_pipeline.valid_repo(args.get("repo")) or update_pipeline.DEFAULT_REPO
-        if token:
-            try:
-                secret_store.save("github_token", token)
-            except OSError:
-                return {"ok": False, "error": "The token couldn't be saved on this PC."}
-        self.settings.pop("github_token", None)  # never in the plaintext settings file again
-        self._save_setting("github_repo", repo)
-        token_is_set = update_pipeline.token_set(self._github_token())
-        self._update(settings={"github_token_set": token_is_set,
-                               "github_repo": repo})
-        return {"ok": True, "token_set": token_is_set, "repo": repo}
-
     def _report_text(self, job: dict[str, Any]) -> dict[str, Any]:
         """The full report as text, for the panel inside the HUD — not a file to chase."""
-        return {"ok": True, "title": str(job.get("title") or "Report"),
-                "text": update_pipeline.read_report(str(job.get("report") or ""))}
+        try:
+            text = Path(str(job.get("report") or "")).read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            raise ValueError("The report file isn't there any more.") from exc
+        return {"ok": True, "title": str(job.get("title") or "Report"), "text": text}
 
     def _act_rea_report_text(self, args: dict[str, Any]) -> dict[str, Any]:
         return self._report_text(self._lab_job(args, "rea"))
 
     def _act_shannon_report_text(self, args: dict[str, Any]) -> dict[str, Any]:
         return self._report_text(self._lab_job(args, "shannon"))
-
-    def _act_shannon_simulate_report_text(self, args: dict[str, Any]) -> dict[str, Any]:
-        return self._report_text(self._lab_job(args, "shannon_simulate"))
-
-    def _nova_repo_dir(self) -> Path | None:
-        """Nova's own code, when this copy runs from a git checkout (the PC's repo)."""
-        root = Path(__file__).resolve().parent
-        return root if (root / ".git").is_dir() else None
-
-    def _shannon_target_dir(self, job: dict[str, Any]) -> Path | None:
-        """Where the simulated app's code lives: its project folder (App), the file's folder
-        (File), or nothing when the target was only a local address."""
-        path = Path(str(job.get("target") or ""))
-        if path.is_dir():
-            return path
-        if path.is_file():
-            return path.parent
-        return None
-
-    def _start_pipeline(self, source: str, fixes: list[dict[str, str]], target: Path) -> dict[str, Any]:
-        """One pipeline at a time; it runs on a worker thread and the screens poll its status."""
-        with self._pipeline_lock:
-            if self.pipeline is not None and self.pipeline.state()["running"]:
-                return {"ok": False, "error": "An update is already running — let it finish first."}
-            if not fixes:
-                return {"ok": False, "error": "Nothing to update in this report."}
-            if not self.deep_work.available:
-                return {"ok": False,
-                        "error": "Updating needs Claude Code on this PC (claude.com/product/claude-code)."}
-            repo = str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO)
-            self.pipeline = update_pipeline.Pipeline(source, fixes, str(target), repo)
-            # Reserve it before the lock is released: the pipeline starts idle, and the guard
-            # only sees a running one, so a second "Update now" could otherwise slip in while
-            # the first worker is still checking the tree. _run_pipeline re-marks the stage.
-            self.pipeline.start_stage("apply", "Starting…")
-        threading.Thread(target=self._run_pipeline_safe, args=(self.pipeline,), name="NovaSelfUpdate", daemon=True).start()
-        return {"ok": True, "started": True, "token_set": update_pipeline.token_set(self._github_token()),
-                "fixes": len(fixes), "target": str(target)}
-
-    def _act_rea_update_now(self, args: dict[str, Any]) -> dict[str, Any]:
-        """REA's upgrades go into Nova's own code: the report's fit findings, applied in one go."""
-        job = self._lab_job(args, "rea")
-        target = self._nova_repo_dir()
-        if target is None:
-            return {"ok": False,
-                    "error": "Nova's code isn't a git checkout on this PC, so there's nothing to update here."}
-        return self._start_pipeline("rea", update_pipeline.fixes_from_rea_job(job), target)
-
-    def _act_shannon_update_now(self, args: dict[str, Any]) -> dict[str, Any]:
-        """Shannon's open holes, fixed in the app they were found in — or in Nova herself, for a self-attack."""
-        try:
-            job = self._lab_job(args, "shannon_simulate")
-        except ValueError:
-            job = self._lab_job(args, "shannon")
-        if job.get("target_kind") == "self":
-            target = self._nova_repo_dir()
-            if target is None:
-                return {"ok": False,
-                        "error": "Nova's own code isn't a git checkout on this PC, so there's nothing to update here."}
-            return self._start_pipeline("shannon", update_pipeline.fixes_from_shannon_job(job), target)
-        target = self._shannon_target_dir(job)
-        if target is None:
-            return {"ok": False,
-                    "error": "Nova doesn't know where that app's code lives — run Simulate attack on its "
-                             "project folder (App) and the fixes will go there."}
-        return self._start_pipeline("shannon", update_pipeline.fixes_from_shannon_job(job), target)
-
-    def _act_self_update_status(self, _args: dict[str, Any]) -> dict[str, Any]:
-        if self.pipeline is None:
-            return {"stage": "idle", "running": False, "fix_round": 0, "fixes": 0, "target": "",
-                    "repo": str(self.settings.get("github_repo") or update_pipeline.DEFAULT_REPO),
-                    "steps": [{"stage": stage, "status": "waiting", "detail": ""}
-                              for stage in update_pipeline.STAGES],
-                    "error": "", "summary": ""}
-        return self.pipeline.state()
-
-    def _run_pipeline_safe(self, pipe: update_pipeline.Pipeline) -> None:
-        """The worker wrapper: any unexpected failure still ends the pipeline instead of
-        leaving it 'running' in the UI until Nova restarts."""
-        try:
-            self._run_pipeline(pipe)
-        except Exception as exc:  # noqa: BLE001 - a failed update is a failed update, not a crash
-            pipe.fail(pipe.stage if pipe.stage not in ("idle", "done", "failed") else "apply",
-                      f"Update failed: {exc}")
-            self.ui.emit({"type": "self_update", "state": pipe.state()})
-
-    def _run_pipeline(self, pipe: update_pipeline.Pipeline) -> None:
-        """Apply -> recheck -> test -> (fix, test, up to 3 rounds) -> push -> done. Never pushes
-        unless the tests are green; never installs anything from GitHub."""
-        target = Path(pipe.target)
-        command = claude_code.find()
-        already_here = update_pipeline.dirty_files(target)  # uncommitted work from before: named, not swept in silently
-
-        def emit() -> None:
-            self.ui.emit({"type": "self_update", "state": pipe.state()})
-
-        pipe.start_stage("apply", f"{len(pipe.fixes)} fix{'es' if len(pipe.fixes) != 1 else ''} from the {pipe.source} report")
-        emit()
-        if command is None:
-            pipe.fail("apply", "Claude Code isn't installed on this PC.")
-            emit()
-            return
-        try:
-            applied = claude_code.run(update_pipeline.build_fix_task(pipe.fixes, str(target)), target,
-                                      command, building=True)
-            pipe.finish_stage("apply", applied[:300])
-        except Exception as exc:  # noqa: BLE001 - a failed apply is a failed update, not a crash
-            pipe.fail("apply", f"Claude Code couldn't apply the fixes: {exc}")
-            emit()
-            return
-        emit()
-        pipe.start_stage("recheck", "Removing dead code")
-        emit()
-        try:
-            removed = update_pipeline.remove_unused_imports(target)
-        except Exception as exc:  # noqa: BLE001 - a failed recheck is a failed update, not a crash
-            pipe.fail("recheck", f"Couldn't remove unused imports: {exc}")
-            emit()
-            return
-        gone = sum(len(entry["names"]) for entry in removed)
-        pipe.finish_stage("recheck",
-                          f"Removed {gone} unused import{'s' if gone != 1 else ''} from {len(removed)} file{'s' if len(removed) != 1 else ''}"
-                          if gone else "No dead imports to remove")
-        emit()
-        while True:
-            pipe.start_stage("test", f"fix round {pipe.fix_round + 1}" if pipe.fix_round else "first run")
-            emit()
-            results = update_pipeline.run_tests(target)
-            if results.get("error"):
-                pipe.fail("test", str(results["error"]))
-                emit()
-                return
-            if results["ok"]:
-                pipe.finish_stage("test", f"{results['passed']} passed")
-                emit()
-                break
-            tails = "\n".join(str(suite.get("tail") or "") for suite in results["suites"].values() if not suite.get("ok"))
-            if not pipe.can_retry_tests():
-                pipe.fail("test", f"Tests still failing after {update_pipeline.MAX_FIX_ROUNDS} fix rounds:\n{tails[:600]}")
-                emit()
-                return
-            pipe.note_fix_round()
-            pipe.start_stage("fix", f"fix round {pipe.fix_round}")
-            emit()
-            try:
-                fixed = claude_code.run(update_pipeline.build_test_fix_task(tails, str(target)), target,
-                                        command, building=True)
-                pipe.finish_stage("fix", fixed[:300])
-            except Exception as exc:  # noqa: BLE001 - a failed fix round is a failed update, not a crash
-                pipe.fail("fix", f"Claude Code couldn't fix the test failures: {exc}")
-                emit()
-                return
-            emit()
-        pipe.start_stage("push", f"Pushing to {pipe.repo}")
-        emit()
-        token = self._github_token()
-        pushed = update_pipeline.push_to_github(target, pipe.repo, token)
-        if not pushed["ok"]:
-            pipe.fail("push", str(pushed["error"]))
-            emit()
-            return
-        pipe.finish_stage("push", str(pushed["message"]))
-        emit()
-        note = (f" (Note: {len(already_here)} uncommitted change{'s' if len(already_here) != 1 else ''} "
-                "that were already here went up with it.)" if already_here else "")
-        pipe.finish(f"Done: {len(pipe.fixes)} fix{'es' if len(pipe.fixes) != 1 else ''} applied, "
-                    f"the code rechecked, tests green, {pushed['message']}{note}")
-        emit()
 
     def _act_galaxy_data(self, _args: dict[str, Any]) -> None:
         vault_folder = self._vault_folder()
@@ -4011,9 +3762,7 @@ class AlfredApp(AdvanceMode, SetupActions, WorkplaceActions, BuildingActions):
             self.gestures.pause(True)
             self.creative_has_camera_since = time.monotonic()
             self.events.put(("creative_opened", None))
-            # Wait until the reader has actually let go (usually a fraction of a second, at most 2 s),
-            # so the page's first camera request doesn't hit a webcam that is still busy.
-            self.gestures.wait_camera_free(2.0)
+            # No waiting here (this is Nova's main thread): the page retries a webcam that is still busy for a moment.
 
     def _watch_creative(self) -> None:
         if self.closing or self.creative_has_camera_since is None:
@@ -4727,14 +4476,21 @@ def _voice_self_test() -> int:
     return 0 if "help" in heard.lower() and "help" in heard_note.lower() else 1
 
 
+def _release(version: object) -> tuple[int, ...] | None:
+    """(2, 15, 5) for "v2.15.5"; None for "dev" or anything else."""
+    match = re.fullmatch(r"v?(\d+)\.(\d+)\.(\d+)", str(version or ""))
+    return tuple(int(part) for part in match.groups()) if match else None
+
+
 def _show_running_alfred() -> bool:
     """Nova is already running (maybe only in the tray): show its window instead of starting twice.
     An older build still running (e.g. Alfred from before the rename) is closed instead, so this one starts."""
     from urllib.request import Request, urlopen
-    from build_info import BUILD
+    from build_info import BUILD, VERSION
     from ui_server import PREFERRED_PORT
     try:
-        with urlopen(f"http://127.0.0.1:{PREFERRED_PORT}/api/show", timeout=1.5) as response:
+        with urlopen(Request(f"http://127.0.0.1:{PREFERRED_PORT}/api/show", headers={"X-Nova-Show": "1"}),
+                     timeout=1.5) as response:
             running = json.loads(response.read())
     except (OSError, ValueError):
         return False
@@ -4742,6 +4498,9 @@ def _show_running_alfred() -> bool:
         return False
     if running.get("build") == BUILD:
         return True
+    theirs, ours = _release(running.get("version")), _release(VERSION)
+    if theirs and ours and theirs > ours:
+        return True  # a newer, auto-updated Nova is running: show it rather than close it for this older copy
     _console_log(f"An older build ({running.get('build', 'Alfred')}) is running; closing it so Nova {BUILD} starts.")
     try:
         urlopen(Request(f"http://127.0.0.1:{PREFERRED_PORT}/api/replace", data=b"{}",

@@ -47,7 +47,7 @@ export class HandMusicSynth {
     const ctx = this.ctx = new AC({ latencyHint: "interactive" });
     try {
       await ctx.resume();
-      if (ctx.state !== "running") throw new Error("Audio is suspended. Tap START AUDIO again.");
+      if (ctx.state !== "running") throw new Error("the browser kept audio paused; press Test sound once");
       // Chain: voices -> highpass -> lowpass -> dry/delay -> mix -> limiter -> master -> destination.
       // Destination is the default output: the same speaker Nova's voice uses.
       this.source = ctx.createGain(); this.source.gain.value = 0;
@@ -64,14 +64,12 @@ export class HandMusicSynth {
       this.limiter.threshold.value = -12; this.limiter.knee.value = 8; this.limiter.ratio.value = 10;
       this.limiter.attack.value = 0.004; this.limiter.release.value = 0.14;
       this.master = ctx.createGain(); this.master.gain.value = this.volume;
-      this.analyser = ctx.createAnalyser(); this.analyser.fftSize = 256;
-      this.levelData = new Uint8Array(this.analyser.fftSize);
       this.source.connect(this.highpass); this.highpass.connect(this.filter);
       this.filter.connect(this.dryGain); this.dryGain.connect(mix);
       this.filter.connect(this.delay); this.delay.connect(this.wetGain); this.wetGain.connect(mix);
       this.delay.connect(this.feedback); this.feedback.connect(this.delay);
       mix.connect(this.tailGate); this.tailGate.connect(this.pan); this.pan.connect(this.limiter);
-      this.limiter.connect(this.master); this.master.connect(this.analyser); this.analyser.connect(ctx.destination);
+      this.limiter.connect(this.master); this.master.connect(ctx.destination);
       this.osc = [];
       for (let i = 0; i < 3; i++) {
         const osc = ctx.createOscillator(), gain = ctx.createGain();
@@ -200,19 +198,11 @@ export class HandMusicSynth {
   async resume() {
     if (!this.ready) return this.start();
     await this.ctx.resume();
-    if (this.ctx.state !== "running") { this.muted = true; throw new Error("Audio remains suspended. Tap START AUDIO again."); }
+    if (this.ctx.state !== "running") { this.muted = true; throw new Error("the browser kept audio paused; press Test sound once"); }
     // Resume quietly: old held gestures and delay tails cannot restart a drone.
     this.release();
     this.master.gain.cancelScheduledValues(this.ctx.currentTime);
     this.master.gain.setTargetAtTime(this.volume, this.ctx.currentTime, 0.04);
     this.muted = false;
-  }
-
-  meter() {
-    if (!this.analyser || !this.levelData) return 0;
-    this.analyser.getByteTimeDomainData(this.levelData);
-    let sum = 0;
-    for (const v of this.levelData) { const d = (v - 128) / 128; sum += d * d; }
-    return Math.sqrt(sum / this.levelData.length);
   }
 }

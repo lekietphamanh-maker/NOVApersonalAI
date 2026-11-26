@@ -172,10 +172,9 @@ class LiveCatalogTests(unittest.TestCase):
         for pack in wiki.PACKS:
             try:
                 found[pack.key] = reader.find(pack)
-            except Exception as exc:  # the live catalog is unreachable right now: not our code failing
+            except OSError as exc:  # the live catalog is unreachable right now: not our code failing
                 self.skipTest(f"Kiwix catalog unreachable: {exc}")
-        if not any(found.values()):  # the live catalog came back empty just now
-            self.skipTest("Kiwix catalog returned no entries right now")
+        # Every pack missing is the regression this test exists for (a broken find()), so it fails, not skips.
         for pack in wiki.PACKS:
             item = found[pack.key]
             if item is None:  # what Kiwix lists under that name, so a renamed pack is easy to fix

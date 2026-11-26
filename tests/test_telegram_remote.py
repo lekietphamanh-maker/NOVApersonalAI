@@ -265,3 +265,16 @@ class PollingTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SealedTokenTests(unittest.TestCase):
+    def test_a_plain_token_from_an_earlier_build_is_sealed_once(self) -> None:
+        import secret_store
+        with patch.dict(os.environ, {"LOCALAPPDATA": tempfile.mkdtemp()}):
+            remote.token_path().parent.mkdir(parents=True, exist_ok=True)
+            remote.token_path().write_text("123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqr", encoding="utf-8")
+            self.assertEqual(remote.stored_token(), "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqr")
+            self.assertFalse(remote.token_path().exists())  # no plain copy left behind
+            self.assertEqual(secret_store.load(remote.TOKEN_SECRET), "123456789:AAbbccddeeffgghhiijjkkllmmnnooppqqr")
+            remote.forget_token()
+            self.assertIsNone(remote.stored_token())

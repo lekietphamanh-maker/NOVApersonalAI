@@ -76,11 +76,17 @@ class UiServerTests(unittest.TestCase):
         connection.close()
 
     def test_a_newer_build_can_replace_this_one_but_a_web_form_cannot(self) -> None:
-        replaced = []
+        replaced, shown = [], []
         self.server.on_replace = lambda: replaced.append(True)
+        self.server.on_show = lambda: shown.append(True)
         status, body = self.request("GET", "/api/show")
         self.assertEqual(status, 200)
         self.assertIn("build", json.loads(body))
+        self.assertEqual(shown, [])  # a web page's request (no Nova header) can't pull the window forward
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        connection.request("GET", "/api/show", headers={"Host": f"127.0.0.1:{self.port}", "X-Nova-Show": "1"})
+        connection.getresponse().read()
+        self.assertEqual(shown, [True])
         connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
         connection.request("POST", "/api/replace", body="x", headers={"Host": f"127.0.0.1:{self.port}", "Content-Type": "text/plain"})
         connection.getresponse().read()

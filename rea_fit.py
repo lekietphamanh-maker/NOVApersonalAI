@@ -12,8 +12,7 @@ A report with no overlap returns no findings and a plain message.
 
 Nothing here installs anything. handoff() only PREPARES the Discover-style proposal for a fit: the pinned
 study task (read-only study of the source at one commit, license recorded) and a skill-note draft for the
-owner to read and approve. Installing code is a separate step Nova asks the owner about first — the study
-itself says so, and the button that uses this handoff asks first too.
+owner to read and approve. Nova never installs the studied code: the plan is for the owner to act on.
 """
 from __future__ import annotations
 
@@ -242,8 +241,7 @@ def handoff(finding: dict[str, Any], target: str, report: str = "", pin: dict[st
             "skill_note": skill_note_draft(finding, target),
             "repo": (pin or {}).get("repo", ""), "sha": (pin or {}).get("sha", ""),
             "license": (pin or {}).get("license", ""),
-            "note": "Prepared only — nothing installed. The study is read-only; if its plan needs code installed, "
-                    "Nova asks the owner first and installs it only with their approval."}
+            "note": "Prepared only — nothing installed. The study is read-only, and Nova never installs the studied code."}
 
 
 def write_fit(folder: Path, fit: dict[str, Any]) -> Path:

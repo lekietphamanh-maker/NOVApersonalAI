@@ -321,6 +321,8 @@ class Overlays:
 
 
 def _handle(request: dict, overlays: Overlays) -> dict:
+    global STOP_KEYS
+    STOP_KEYS = [int(key) for key in request.get("stop_keys") or STOP_KEYS]  # Nova sends the owner's stop hotkey
     command = request.get("cmd")
     if command == "snapshot":
         return _snapshot(int(request["hwnd"]))

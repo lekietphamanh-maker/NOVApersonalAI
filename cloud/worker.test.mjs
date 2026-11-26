@@ -118,3 +118,18 @@ test("the prompt keeps Nova honest about what she can do from the cloud", () => 
   assert.match(prompt, /can't use the PC/);
   assert.doesNotMatch(prompt, /owner's name/);
 });
+
+test("a refused takeover is tried again the next minute", async () => {
+  const { env, store, calls } = setup();
+  store.set("pc", JSON.stringify({ seen: Date.now() - 20 * 60_000, off: false, owner: OWNER, name: "", facts: [],
+    offset: 0, reminders: [] }));
+  const answer = globalThis.fetch;
+  let refusals = 1;
+  globalThis.fetch = async (url, options) => (String(url).endsWith("/setWebhook") && refusals-- > 0
+    ? (calls.push({ url: String(url) }), Response.json({ ok: false, error_code: 429 })) : answer(url, options));
+  await everyMinute(env, Date.now());
+  assert.notEqual(store.get("hook"), "on");
+  await everyMinute(env, Date.now());
+  assert.equal(calls.filter((call) => call.url.endsWith("/setWebhook")).length, 2);
+  assert.equal(store.get("hook"), "on");
+});

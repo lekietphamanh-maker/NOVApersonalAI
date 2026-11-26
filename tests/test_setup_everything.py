@@ -96,3 +96,17 @@ class InstallerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NaturalVoiceTests(unittest.TestCase):
+    """Set up everything installs the natural voice only for a Nova still on it: a voice the owner picked stays."""
+
+    def test_a_picked_voice_stays_and_the_default_is_installed(self) -> None:
+        from types import SimpleNamespace
+        import setup_actions
+        for current, expected in (("Amy (US, female)", []), (None, []),
+                                  (setup_actions.NATURAL_VOICE, [setup_actions.NATURAL_VOICE])):
+            installed: list[str] = []
+            app = SimpleNamespace(voice=SimpleNamespace(voice_name=current), _voice_installed=installed.append)
+            setup_actions.SetupActions._natural_voice(app)
+            self.assertEqual(installed, expected, current)

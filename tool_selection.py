@@ -27,6 +27,10 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("second_brain", "library", "search_my_notes"), r"second brain|notes?|wiki|learn(ed|t)?|watched|read about|obsidian|vault|library|i wrote|i saved|i kept|"
                                   r"projects?|ideas?|repos?"),
     (("mind_map", "add_to_map"), r"map|brainstorm|visuali[sz]e|ideas?"),
+    (("network",), r"internet|wi-?fi|\bnetwork|router|speed ?test|download speed|upload speed|\bping\b|latency|bandwidth|"
+                   r"ip address|who'?s on my"),
+    (("trading",), r"\btrad(e|es|er|ing)\b|\bstocks?\b|\btickers?\b|day ?trad\w*|stop[- ]loss|paper trad\w*|\bmarkets?\b|"
+                   r"watchlist|position size"),
     (("knowledge_galaxy",), r"galaxy|star ?map|knowledge (map|graph|view)|everything (you|i|nova) know|show (me |my )?knowledge"),
     (("optimize_prompt",), r"prompt"),
     (("screen_record",), r"record|recording|screen ?cap|capture (my|the) screen"),
@@ -35,7 +39,8 @@ GROUPS: tuple[tuple[tuple[str, ...], str], ...] = (
     (("run_code",), r"statistic|average|median|standard deviation|regression|percent(age)?|compound|interest rate|"
                     r"probabilit|simulat|analy[sz]e (these|this|the) (numbers|data|table)|convert|how many (days|weeks)|"
                     r"code|python|algorithm|prime|factorial|equation|solve"),
-    (("creative_mode",), r"camera|creative|holograms?|photo|selfie|lens|kiss ?cam|webcam|3d|reactor"),
+    (("creative_mode",), r"camera|creative|holograms?|photo|selfie|lens|kiss ?cam|webcam|3d|reactor|hand ?music|"
+                          r"music with (my )?hands"),
     (("show_on_tv",), r"\btv\b|television|big screen"),
     (("deep_work", "build"), r"research|report|explainer|write (me )?(a|an)|essay|build|make (me )?(a|an)|website|"
                              r"\bapp\b|script|program|code|deep work"),

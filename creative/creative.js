@@ -11,8 +11,8 @@ import {
 } from "./gestures.js";
 import { LENSES, LENS_NAMES, createKissCam, createLensRenderer } from "./lenses.js";
 import { describeCameraError, requestCamera } from "./camera.js";
-import { VOICES, createHandMusicInstrument, createZoneEngine } from "./handmusic.js";
-import { HandMusicSynth } from "./handmusic-audio.js";
+import { createHandMusicInstrument, createZoneEngine } from "./handmusic.js";
+import { HandMusicSynth, VOICES } from "./handmusic-audio.js";
 
 // Holograms take Nova's color, passed as #accent=r, g, b; gold by default.
 const ACCENT_RGB = (() => {
@@ -384,8 +384,7 @@ async function startTracking() {
   setStatus("Starting camera…");
   let camera;
   try {
-    // 1080p first, stepping down if the camera can't do it; a camera that is briefly busy
-    // (Nova's gesture reader letting go, another app holding it) is retried, not given up on.
+    // A camera that is briefly busy (Nova's gesture reader letting go, another app holding it) is retried, not given up on.
     camera = await requestCamera(video, (constraints) => navigator.mediaDevices.getUserMedia(constraints));
   } catch (error) {
     const problem = describeCameraError(error);
@@ -488,6 +487,7 @@ async function setHandMusic(on) {
     }
     handMusic.synth.setVolume(handMusic.volume / 100);
     handMusic.zones.reset(); handMusic.instrument.reset();
+    for (const pointer of pointers.values()) endGrab(pointer); // the pinch plays notes now, it doesn't hold holograms
     handMusic.on = true;
     button.classList.add("on"); panel.hidden = false;
     stateLine.textContent = "Listening — pinch to play";
@@ -529,6 +529,7 @@ function updateHandMusic(now) {
   for (const event of events) {
     if (event.type === "ZONE_ENTER") handMusic.synth.triggerZone(event.zone);
     else if (event.type === "ZONE_LOST") lost = true; // hand vanished: fade, never invent a note-off
+    else if (event.type === "TIMBRE_CHANGE") document.getElementById("handmusic-voice").value = String(event.value);
   }
   if (lost || !left && !right) handMusic.synth.release();
   handMusic.synth.update(params, now);
@@ -1029,10 +1030,11 @@ let lastTime = performance.now();
 let fps = 0;
 function frame(now) {
   requestAnimationFrame(frame);
-  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  const elapsed = (now - lastTime) / 1000;
+  const dt = Math.min(0.05, elapsed); // clamped for motion; the fps readout uses the real frame time
   lastTime = now;
   holoTime.value = now / 1000;
-  fps += ((dt > 0 ? 1 / dt : 0) - fps) * 0.05;
+  fps += ((elapsed > 0 ? 1 / elapsed : 0) - fps) * 0.05;
   track(now, dt);
   updateHandMusic(now);
   if (lens !== "normal") lensRenderer.draw(lens, video, now, faceWidth);

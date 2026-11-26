@@ -6,22 +6,27 @@ import binascii
 import io
 import json
 import os
-import subprocess
 import sys
 import threading
 import time
-import webbrowser
 from typing import Callable
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from app_window import bring_window_titled_to_front, close_window, find_edge, find_window, is_window
+import app_window
 
 # A fixed port keeps the page's origin stable, so the browser remembers the camera permission.
 PREFERRED_PORT = 8765
 SHAPES = ("reactor", "cube", "sphere", "torus", "cone", "cylinder")
-ACTIONS = ("open", "add", "explode", "assemble", "clear", "look", "photo", "lens", "kiss_cam", "style")
+ACTIONS = ("open", "add", "explode", "assemble", "clear", "look", "photo", "lens", "kiss_cam", "hand_music", "style")
+# On/off modes of the page, and what Nova tells the owner when each turns on or off.
+SWITCHES = {
+    "kiss_cam": ("Kiss cam is on: when two faces stay in the picture for 3 seconds, it counts down and takes a photo.",
+                 "Kiss cam is off."),
+    "hand_music": ("Hand music is on: pinch thumb and index to play a note, move a fingertip into a glowing circle to "
+                   "ring it, raise the hand for louder, open it for brighter.", "Hand music is off."),
+}
 STYLES = {"wire": "glowing wireframe", "solid": "solid glass"}
 CONTROLS = ("volume_up", "volume_down", "play_pause", "next", "previous", "exit")
 SNAPSHOT_BYTES = 1_500_000  # one cropped JPEG of the object (the page sends at most 384 x 384)
@@ -165,50 +170,8 @@ class _Handler(SimpleHTTPRequestHandler):
 
 
 def creative_profile_dir() -> Path:
-    """A browser profile of Nova's own for the standalone creative window, so nothing about
-    it leaks into the owner's own browser profile."""
+    """A browser profile of Nova's own for the standalone creative window, apart from the owner's own browser."""
     return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Alfred" / "creative-browser"
-
-
-def _origin(url: str) -> str:
-    from urllib.parse import urlsplit
-    parts = urlsplit(url)
-    return f"{parts.scheme}://{parts.netloc}"
-
-
-def seed_media_permission(profile_dir: Path, origin: str) -> None:
-    """Grant camera + mic to exactly one origin in this profile — the same store Edge's own
-    Allow button writes (profile.content_settings.exceptions) — so every other site still
-    gets the normal prompt. Best effort: if the grant doesn't stick, the page falls back to
-    the normal prompt instead of failing silently."""
-    prefs_path = Path(profile_dir) / "Preferences"
-    try:
-        prefs = json.loads(prefs_path.read_text(encoding="utf-8")) if prefs_path.exists() else {}
-    except (OSError, ValueError):
-        prefs = {}
-    if not isinstance(prefs, dict):
-        prefs = {}
-    profile = prefs.get("profile")
-    if not isinstance(profile, dict):
-        profile = prefs["profile"] = {}
-    content = profile.get("content_settings")
-    if not isinstance(content, dict):
-        content = profile["content_settings"] = {}
-    exceptions = content.get("exceptions")
-    if not isinstance(exceptions, dict):
-        exceptions = content["exceptions"] = {}
-    # Chrome timestamps: microseconds since 1601-01-01, as a string.
-    now = str(int((time.time() + 11644473600) * 1_000_000))
-    for kind in ("media_stream_camera", "media_stream_mic"):
-        grants = exceptions.get(kind)
-        if not isinstance(grants, dict):
-            grants = exceptions[kind] = {}
-        grants[f"{origin},*"] = {"expiration": "0", "last_modified": now, "model": 0, "setting": 1}
-    try:
-        prefs_path.parent.mkdir(parents=True, exist_ok=True)
-        prefs_path.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
-    except OSError:
-        pass  # the grant didn't stick; the page falls back to the normal prompt
 
 
 class CreativeServer:
@@ -326,34 +289,11 @@ class CreativeServer:
         return commands
 
     def open_window(self) -> str:
-        """Show the page inside Nova's window when it is open, else as an Edge app window or in the browser."""
+        """Show the page inside Nova's window when it is open, else in an app window of its own."""
         url = self.start()
         self.before_open()
-        if self.open_in_app(url):
-            return url
-        edge = find_edge()
-        if edge is not None:
-            # No process-wide media bypass: this window runs in a profile of Nova's own, and
-            # only the creative page's own loopback origin is granted the camera and mic there
-            # (seeded into that profile before launch). Any other site still gets the prompt.
-            profile = creative_profile_dir()
-            # A running Edge never re-reads the Preferences file the grant is seeded into:
-            # when a creative window is already open, the seed is silently ignored, the page's
-            # camera request pends on a prompt nobody sees, and the screen stays black. Close
-            # that window first (it is Nova's own window) so the fresh launch reads the grant.
-            existing = find_window("Nova · Creative Mode")
-            if existing is not None:
-                close_window(existing)
-                deadline = time.monotonic() + 3
-                while is_window(existing) and time.monotonic() < deadline:
-                    time.sleep(0.2)
-            seed_media_permission(profile, _origin(url))
-            subprocess.Popen([str(edge), f"--app={url}", f"--user-data-dir={profile}", "--no-first-run",
-                              "--no-default-browser-check", "--start-maximized"])
-            # The creative window is Nova's too: lift it above the HUD once it appears.
-            bring_window_titled_to_front("Nova · Creative Mode")
-        else:
-            webbrowser.open(url)
+        if not self.open_in_app(url):
+            app_window.open_window(url, creative_profile_dir(), title="Nova · Creative Mode")
         return url
 
     def stop(self) -> None:
@@ -386,13 +326,12 @@ def run_tool(server: CreativeServer, arguments: object) -> str:
             server.open_window()
         server.send({"action": "lens", "lens": lens})
         return f"Camera lens: {lens}, {LENSES[lens]}."
-    if action == "kiss_cam":
+    if action in SWITCHES:
         on = arguments.get("on") is not False
         if on and not server.active:
             server.open_window()
-        server.send({"action": "kiss_cam", "on": on})
-        return ("Kiss cam is on: when two faces stay in the picture for 3 seconds, it counts down and takes a photo."
-                if on else "Kiss cam is off.")
+        server.send({"action": action, "on": on})
+        return SWITCHES[action][0 if on else 1]
     if action == "photo":
         return _take_photo(server, describe=bool(arguments.get("describe")))
     if action == "style":

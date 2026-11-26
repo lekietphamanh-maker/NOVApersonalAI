@@ -8,8 +8,8 @@ import { h, screen } from "./lab.js";
 import { mountWhatCanIDo } from "./whatcanido.js";
 
 const CARDS = [
-  { id: "scan", title: "Scan", what: "Scans the watchlist for setups: opening-range breakouts, flags, oversold bounces." },
-  { id: "news", title: "News", what: "Breaking headlines and filings for one symbol — and Congress trades from the House Clerk." },
+  { id: "scan", title: "Scan", what: "Scans the watchlist for setups: breakouts above the 20-day high, flags, oversold bounces." },
+  { id: "news", title: "News", what: "Breaking headlines for one symbol, and a link to the House Clerk's search for Congress trades." },
   { id: "entry", title: "Entry", what: "Watches the setup and says the moment to get in: the first close above the range." },
   { id: "exit", title: "Exit", what: "Sets the stop and the target before you enter, so you know when to get out." },
   { id: "odds", title: "Time Machine odds", what: "Replays the trade 10,000 times from the stock's own history and tells you the honest odds." },
@@ -135,7 +135,7 @@ export function createTrading(root, { act, onOpenChange }) {
     resultBoxes = [...cardsBox.querySelectorAll(".trading-result")];
     setupBox = h("p", { class: "lab-problem", hidden: true, role: "status" });
     const hint = h("p", { class: "lib-hint" },
-      "Free public data only (Yahoo Finance, SEC EDGAR, House Clerk) · Not financial advice — most people who day trade lose money · Esc");
+      "Free public data only (Yahoo Finance, House Clerk) · Not financial advice — most people who day trade lose money · Esc");
     const helpWrap = h("div", { style: "padding: 0 22px;" });
     mountWhatCanIDo(helpWrap, "trading", { onPhrase: runPhrase });
     root.append(head, banner, chips, heroBox, cardsBox, setupBox, helpWrap, hint);

@@ -51,3 +51,60 @@ test("every part module the bench loads by name is there", () => {
   assert.ok(ids.length >= 14);
   for (const id of ids) assert.ok(existsSync(`ui/circuit/lab/modules/${id}.js`), `lab/modules/${id}.js is missing`);
 });
+
+// A named import its module doesn't export stops the whole page at load, and `--check` can't see it: creative mode was
+// dead for days from `import { VOICES } from "./handmusic.js"` (VOICES lives in handmusic-audio.js). So every import of
+// every HUD and creative module must name something its target exports. Creative's page has an import map for three.js.
+const CREATIVE_IMPORTS = JSON.parse(readFileSync("creative/index.html", "utf8").match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]).imports;
+const STATIC_IMPORT = /\bimport\s+([^'"`;]*?)\s*from\s*(['"])([^'"`]+)\2/g;
+const DYNAMIC_IMPORT = /\bimport\(\s*(['"])([^'"`]+)\1\s*\)/g;
+
+function resolveImport(file, specifier) {
+  if (specifier.startsWith(".")) return join(dirname(file), specifier);
+  if (!file.startsWith("creative")) return null; // the HUD's CSP rules out an import map: bare names can't load there
+  const prefix = Object.keys(CREATIVE_IMPORTS).find((key) => key.endsWith("/") ? specifier.startsWith(key) : specifier === key);
+  return prefix && join("creative", CREATIVE_IMPORTS[prefix] + specifier.slice(prefix.length));
+}
+
+const exportCache = new Map();
+function exportsOf(file) {
+  if (exportCache.has(file)) return exportCache.get(file);
+  const source = readFileSync(file, "utf8"), names = new Set();
+  exportCache.set(file, names);
+  for (const [, list] of source.matchAll(/\bexport\s*\{([^}]*)\}/g)) {
+    for (const item of list.split(",")) { const name = item.trim().split(/\s+as\s+/).pop(); if (name) names.add(name); }
+  }
+  for (const [, name] of source.matchAll(/\bexport\s+(?:default\s+)?(?:async\s+)?(?:function\s*\*?|class|const|let|var)\s*([\w$]+)/g)) names.add(name);
+  if (/\bexport\s+default\b/.test(source)) names.add("default");
+  for (const [, name] of source.matchAll(/\bexport\s*\*\s*as\s+([\w$]+)/g)) names.add(name);
+  for (const [, , specifier] of source.matchAll(/\bexport\s*\*\s*from\s*(['"])([^'"`]+)\1/g)) {
+    for (const name of exportsOf(resolveImport(file, specifier))) if (name !== "default") names.add(name);
+  }
+  return names;
+}
+
+function importedNames(clause) {
+  const named = clause.match(/\{([^}]*)\}/)?.[1].split(",").map((item) => item.trim().split(/\s+as\s+/)[0]).filter(Boolean) ?? [];
+  return /^[\w$]/.test(clause.trim()) ? [...named, "default"] : named;
+}
+
+const pageModules = [...sourceFiles("ui"), ...sourceFiles("creative"), ...readdirSync("creative").filter((name) => name.endsWith(".mjs")).map((name) => join("creative", name))]
+  .filter((file) => !file.split(/[\\/]/).includes("vendor"));
+test("every HUD and creative import names something its module exports", () => {
+  assert.ok(pageModules.length > 30, `only ${pageModules.length} modules found`);
+  const problems = [];
+  for (const file of pageModules) {
+    const source = readFileSync(file, "utf8");
+    for (const [, , specifier] of source.matchAll(DYNAMIC_IMPORT)) {
+      const target = resolveImport(file, specifier);
+      if (!target || !existsSync(target)) problems.push(`${file}: import("${specifier}") has no file`);
+    }
+    for (const [, clause, , specifier] of source.matchAll(STATIC_IMPORT)) {
+      const target = resolveImport(file, specifier);
+      if (!target || !existsSync(target)) { problems.push(`${file}: "${specifier}" has no file`); continue; }
+      const available = exportsOf(target);
+      for (const name of importedNames(clause)) if (!available.has(name)) problems.push(`${file}: ${specifier} doesn't export ${name}`);
+    }
+  }
+  assert.deepEqual(problems, []);
+});

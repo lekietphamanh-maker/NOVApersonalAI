@@ -82,9 +82,9 @@ class HeartRateMonitor:
         return self._thread is not None and self._thread.is_alive()
 
     def start(self) -> None:
+        self._stop.clear()  # turned off and on within one scan: the running loop just carries on
         if self.running:
             return
-        self._stop.clear()
         self.stats = HeartStats()
         self._thread = threading.Thread(target=lambda: asyncio.run(self._run()), name="AlfredHeartRate", daemon=True)
         self._thread.start()

@@ -1,9 +1,7 @@
 // Run: node --test tests/handmusic.test.mjs
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  ZONE_NOTES, bendDeg, createHandMusicInstrument, createZoneEngine, defaultZones, handBends, palmDistance,
-} from "../creative/handmusic.js";
+import { createHandMusicInstrument, createZoneEngine, defaultZones, palmDistance } from "../creative/handmusic.js";
 import { ZONE_PINGS } from "../creative/handmusic-audio.js";
 
 /** A flat hand: wrist at (0.5, 0.8), middle knuckle 0.2 above it, thumb and index tips `gap` apart (palm units: palm = 0.2). */
@@ -30,20 +28,6 @@ function rng(seed) {
   let s = seed >>> 0;
   return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; };
 }
-
-test("bendDeg: straight is 0, a right angle is 90, folded back is 180", () => {
-  assert.equal(bendDeg({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 2, y: 0, z: 0 }), 0);
-  assert.ok(Math.abs(bendDeg({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 1, y: 1, z: 0 }) - 90) < 1e-9);
-  assert.equal(bendDeg({ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }, { x: 0, y: 0, z: 0 }), 180);
-  assert.equal(bendDeg(null, { x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }), null);
-});
-
-test("handBends reads the 21-point layout and drops the metacarpals", () => {
-  const bends = handBends(hand());
-  assert.equal(Object.keys(bends).length, 10);
-  assert.ok(!("index-mcp-metacarpal" in bends));
-  assert.ok(Number.isFinite(bends["index-pip"]));
-});
 
 test("palmDistance measures in palm units", () => {
   assert.ok(Math.abs(palmDistance(hand(1), 4, 8) - 1) < 1e-9);
@@ -102,21 +86,14 @@ test("tracking loss never fabricates an EXIT: it reports TRACKING_LOST", () => {
   assert.equal(engine.update("right", inside, 760)[0].type, "ENTER");
 });
 
-test("each zone has its own note and pan, matching where it sits on screen", () => {
-  assert.deepEqual(ZONE_NOTES.map((z) => z.id), ["A", "B", "C"]);
-  assert.ok(ZONE_NOTES[0].freq < ZONE_NOTES[1].freq && ZONE_NOTES[1].freq < ZONE_NOTES[2].freq);
-  // A sits left (cx 0.2), B sits right (cx 0.8), C sits centre (cx 0.5): the pans must match.
-  assert.ok(ZONE_NOTES[0].pan < 0 && ZONE_NOTES[1].pan > 0 && ZONE_NOTES[2].pan === 0);
-});
-
-test("zone pings in the synth match the logic's notes and pans", () => {
-  // The note/pan table lives in two files (logic + synth); they must never drift apart again.
-  assert.deepEqual(ZONE_PINGS.map((p) => p.zone), ZONE_NOTES.map((z) => z.id));
-  for (const note of ZONE_NOTES) {
-    const ping = ZONE_PINGS.find((p) => p.zone === note.id);
-    assert.equal(ping.freq, note.freq);
-    assert.equal(ping.pan, note.pan);
+test("each zone rings its own note, panned to where it sits on screen", () => {
+  const zones = defaultZones();
+  assert.deepEqual(ZONE_PINGS.map((ping) => ping.zone), zones.map((zone) => zone.id));
+  for (const zone of zones) {
+    const ping = ZONE_PINGS.find((p) => p.zone === zone.id);
+    assert.equal(Math.sign(ping.pan), Math.sign(Math.round((zone.cx - 0.5) * 10)), zone.id); // left zone pans left, centre stays centre
   }
+  assert.ok(new Set(ZONE_PINGS.map((ping) => ping.freq)).size === ZONE_PINGS.length);
 });
 
 test("pinch gate has hysteresis and opens the filter as the hand opens", () => {
@@ -133,32 +110,34 @@ test("pinch gate has hysteresis and opens the filter as the hand opens", () => {
   assert.ok(open > closed);
 });
 
-test("no hands means no gate, and losing both hands releases a HOLD", () => {
+test("no hands means no gate, and a pinched left hand plays only while the right is away", () => {
   const music = createHandMusicInstrument();
-  music.update({ left: hand(0.2), right: hand(0.2), now: 0 });
-  music.update({ left: hand(0.2), right: hand(0.2), now: 300 }); // both pinched 300 ms: HOLD on
-  assert.equal(music.state.hold, true);
-  const out = music.update({ now: 400 }); // both hands vanish
-  assert.equal(out.params.gate, 0);
-  assert.equal(out.params.hold, 0);
-  assert.ok(out.events.some((e) => e.type === "HOLD_RELEASE"));
+  assert.equal(music.update({ left: hand(0.2), right: hand(0.2), now: 0 }).params.gate, 1);
+  assert.equal(music.update({ now: 100 }).params.gate, 0); // both hands vanish
+  assert.equal(music.update({ left: hand(0.2), now: 200 }).params.gate, 1);
+  assert.equal(music.update({ left: hand(0.2), right: hand(1.2), now: 300 }).params.gate, 0); // the open right hand rules
 });
 
-test("both pinches held toggle HOLD, and the voice cycles on index-to-middle contact", () => {
+test("the voice cycles on index-to-middle contact, then a cooldown blocks a repeat", () => {
   const music = createHandMusicInstrument();
-  let out = music.update({ left: hand(0.2), right: hand(0.2), now: 0 });
-  assert.ok(!out.events.some((e) => e.type === "HOLD_TOGGLE")); // held 0 ms: not yet
-  out = music.update({ left: hand(0.2), right: hand(0.2), now: 300 });
-  assert.ok(out.events.some((e) => e.type === "HOLD_TOGGLE" && e.value === 1));
-  // Index tip on the middle PIP joint: timbre cycles, then the cooldown blocks a repeat.
-  // (A fresh instrument: the fixture hand's index tip already sits near the middle PIP.)
-  const fresh = createHandMusicInstrument();
   const touching = hand(1);
   touching[8] = { ...touching[10] };
-  out = fresh.update({ right: touching, now: 1000 });
+  let out = music.update({ right: touching, now: 1000 });
   assert.ok(out.events.some((e) => e.type === "TIMBRE_CHANGE" && e.value === 1));
-  out = fresh.update({ right: touching, now: 1100 });
+  out = music.update({ right: touching, now: 1100 });
   assert.ok(!out.events.some((e) => e.type === "TIMBRE_CHANGE"));
+});
+
+test("reset puts the instrument back to its starting sound", () => {
+  const music = createHandMusicInstrument();
+  music.update({ right: hand(1.2, 0.3), now: 0 });
+  music.setTimbre(2);
+  music.reset();
+  const { state } = music;
+  assert.equal(state.timbre, 0);
+  assert.equal(state.gate, false);
+  assert.equal(state.cutoff, 0.45);
+  assert.equal(state.lastTime, null);
 });
 
 test("continuous values smooth toward their target instead of jumping", () => {

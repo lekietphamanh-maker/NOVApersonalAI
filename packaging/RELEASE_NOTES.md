@@ -1,3 +1,59 @@
+## New in v2.16.0
+
+A clean-up release: every module was re-checked, fake features were taken out, and the bugs found were fixed.
+
+**Creative mode works again**
+- It had been dead since v2.15.0: one wrong import (`VOICES`) stopped the whole page from loading, so the camera never started. The camera-permission changes made since then never touched the cause. Fixed, and checked in a real browser with a stand-in camera.
+- The camera asks for a steady 720p at 30 fps, retries a webcam that is busy for a moment, and says in plain words what went wrong.
+- New: say "turn on hand music" (or "play music with my hands") and Nova opens creative mode and starts it. The sound starts without a click.
+- The hand-music "hold" latch is gone: this synth never holds a note, so it only blocked new notes. The fps readout now shows the real frame rate.
+- Two new automatic checks: every page import must name something its file exports, and creative mode is opened in a real browser on every build.
+
+**Taken out, because they faked results**
+- *Simulate attack* and AiSOC triage. They reported the same scripted holes for any app, file or address (for example "SQL injection, proven") without testing anything, and Update now then edited real code to "fix" them.
+- *Attack Nova herself*. Four of its five "checks" only searched the code for sentences.
+- *Update now* (the self-update pipeline under REA and Shannon reports). It never pushed: the repo check always failed, and its test step always failed on Node 22. It would also have committed everything in the folder, then pushed edits made from untrusted text, unreviewed, to `main`. The GitHub token setting for it is gone too.
+- The trading tab's SEC EDGAR line. It could never show real data.
+- The real Shannon pentest, its reports, and REA's read-only "Add it to Nova" all stay.
+
+**Fixed**
+- Voice:
+  - "Auto-detect" in Whisper now really detects the language. It used to always mean English.
+  - The *pause before Nova decides you finished* setting works now, for "Hey Nova" requests.
+  - *Set up everything* no longer replaces the voice you picked.
+  - A changed Stop hotkey now also stops Nova's typing.
+- The model on this PC now gets the network and trading tools, so "how fast is my internet?" works.
+- Network:
+  - It no longer flashes a console window for every ping.
+  - It reads the adapter that reaches your router, not a WSL or Hyper-V one.
+  - Broadcast entries no longer show as devices.
+- Memory and idea maps:
+  - The installed Nova and the zip copy now use the same folder. Whichever copy is newer is carried over once; the other is kept as `.bak`.
+  - Settings are written in one piece, so a crash can't reset them.
+- Secrets: the Telegram bot token, the relay secret, the Anthropic key and the Discover token are now sealed for your account (DPAPI, or the Keychain on the Mac), not plain files. Old files are moved in automatically.
+- Google sign-in no longer says "connected" when you click Deny.
+- The Telegram relay retries if Telegram refuses it once.
+- Autopilot:
+  - Asks before opening installers, programs given by path, network shares and the Windows tools that run other code.
+  - Reading a long page returns you to where you were.
+- Small fixes:
+  - Esc closes the Knowledge Galaxy.
+  - An empty "cancel reminder" no longer cancels all of them.
+  - A huge power like `((10^999)^999)^999` no longer freezes Nova.
+  - `OLLAMA_HOST=0.0.0.0` (Ollama shared on your network) works.
+  - An older copy of Nova no longer closes a newer one.
+  - Long phone messages work.
+  - A timed-out road download is no longer saved as the city's roads.
+- Claude Code builds can no longer run `git commit`, because a commit runs any hook script the build had just written.
+- The packaged app now includes the archmancer skills. Searching them used to crash.
+
+**Corrections to the v2.15 notes**
+- OmniRoute needs a key: connect a provider in its dashboard, then paste its key. It is not keyless.
+- Shannon had one real "Attack Nova" check, not five, and the AiSOC ledger was never replayable in the app.
+- Nova never installs code from GitHub.
+- Trading has no SEC filings.
+- Long routes still need to fit in eight map tiles.
+
 ## New in v2.15.5
 
 - **OmniRoute brain**: one more brain option in Settings — "OmniRoute (one gateway, many models)". OmniRoute is a free gateway that runs on this PC (install it with `npm install -g omniroute`): one address for many AI providers, with a fallback when one runs out, and no key needed on a fresh install. It's off by default, and Nova falls back to your local model if the gateway is down.

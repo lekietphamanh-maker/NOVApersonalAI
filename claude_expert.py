@@ -7,6 +7,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+import secret_store
+
 MODEL = "claude-opus-5-5"
 SYSTEM = ("You are helping Nova, a local desktop assistant, answer one hard question for its user. "
           "Answer completely and correctly. Show the key steps briefly. Write plain text that reads well aloud: "
@@ -17,7 +19,7 @@ def key_path() -> Path:
     return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Alfred" / "anthropic_api_key"
 
 
-def _stored_key() -> str | None:
+def _plain_key() -> str | None:
     try:
         raw = key_path().read_bytes()
     except OSError:
@@ -25,6 +27,11 @@ def _stored_key() -> str | None:
     # PowerShell's ">" writes UTF-16; Notepad may add a byte-order mark.
     text = raw.decode("utf-16") if raw[:2] in (b"\xff\xfe", b"\xfe\xff") else raw.decode("utf-8-sig", errors="ignore")
     return text.strip() or None
+
+
+def _stored_key() -> str | None:
+    """The key, sealed for this account; a plain key file (an earlier build, or typed in by hand) is sealed on first use."""
+    return secret_store.load_or_move("anthropic_api_key", _plain_key, key_path())
 
 
 def available() -> bool:
@@ -49,16 +56,13 @@ def save_key(value: str) -> None:
     value = value.strip()
     if not value.startswith("sk-ant-") or len(value) < 30 or any(char.isspace() for char in value):
         raise ValueError("That doesn't look like an Anthropic API key (it starts with sk-ant-).")
-    path = key_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
+    secret_store.save("anthropic_api_key", value)
+    key_path().unlink(missing_ok=True)
 
 
 def forget_key() -> None:
-    try:
-        key_path().unlink()
-    except FileNotFoundError:
-        pass
+    secret_store.forget("anthropic_api_key")
+    key_path().unlink(missing_ok=True)
 
 
 def ask(question: str) -> str:

@@ -95,10 +95,10 @@ GENERAL_TOOLS: list[dict[str, Any]] = [
           "objects the user is showing the camera (use look for 'what am I holding' / 'what is this'), photo: take a "
           "photo after a 3-2-1 countdown (describe=true when they also ask what's in it), lens: a live camera effect "
           "(normal, pixel, ascii, glitch, slitscan, echo), kiss_cam: two faces in the picture for 3 seconds and it "
-          "takes a photo (on=false turns it off), style: how holograms look (wire: glowing wireframe, solid). Photos "
-          "stay on this PC.",
+          "takes a photo (on=false turns it off), hand_music: play music with the hands, pinch for notes (on=false "
+          "turns it off), style: how holograms look (wire: glowing wireframe, solid). Photos stay on this PC.",
           {"action": {"type": "string", "enum": ["open", "add", "explode", "assemble", "clear", "look", "photo", "lens",
-                                                  "kiss_cam", "style"]},
+                                                  "kiss_cam", "hand_music", "style"]},
            "style": {"type": "string", "enum": ["wire", "solid"]},
            "shape": {"type": "string", "enum": ["reactor", "cube", "sphere", "torus", "cone", "cylinder"]},
            "lens": {"type": "string", "enum": ["normal", "pixel", "ascii", "glitch", "slitscan", "echo"]},
@@ -387,6 +387,8 @@ def execute_reminder_tool(arguments: dict[str, Any], reminders: Any) -> str:
     if action == "list":
         return "\n".join(f"- {describe(item)}" for item in reminders.items()) or "No reminders ahead."
     if action == "cancel":
+        if not text.strip():
+            return "Say which reminder to cancel (some of its words)."
         gone = reminders.cancel(text)
         return ("Cancelled: " + "; ".join(describe(item) for item in gone)) if gone else "No reminder matched that."
     try:

@@ -102,6 +102,27 @@ class ParserTests(unittest.TestCase):
         self.assertEqual(info["gateway"], "192.168.1.1")
         self.assertEqual(info["dns"], ["1.1.1.1", "8.8.8.8"])
 
+    def test_the_adapter_with_the_router_wins_and_gateways_run_on(self) -> None:
+        output = """
+Wireless LAN adapter Wi-Fi:
+
+   IPv4 Address. . . . . . . . . . . : 192.168.1.23(Preferred)
+   Subnet Mask . . . . . . . . . . . : 255.255.255.0
+   Default Gateway . . . . . . . . . : fe80::1%11
+                                       192.168.1.1
+   DNS Servers . . . . . . . . . . . : 192.168.1.1
+
+Ethernet adapter vEthernet (WSL):
+
+   IPv4 Address. . . . . . . . . . . : 172.24.112.1
+   Subnet Mask . . . . . . . . . . . : 255.255.240.0
+   Default Gateway . . . . . . . . . :
+"""
+        self.assertEqual(network.parse_ipconfig(output),
+                         {"ipv4": "192.168.1.23", "mask": "255.255.255.0", "gateway": "192.168.1.1", "dns": ["192.168.1.1"]})
+        self.assertEqual(network.parse_arp(ARP + "  192.168.1.255         ff-ff-ff-ff-ff-ff     static\n"),
+                         network.parse_arp(ARP))  # the broadcast entry is not a device
+
     def test_parse_ipconfig_empty_is_blank_not_guessed(self) -> None:
         self.assertEqual(network.parse_ipconfig(""), {"ipv4": "", "mask": "", "gateway": "", "dns": []})
 

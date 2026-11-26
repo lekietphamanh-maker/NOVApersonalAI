@@ -5,8 +5,8 @@ purpose: there is no live-order code path anywhere in this file, no broker keys 
 placed. Paper trading is the default, and anything that would risk real money needs the owner's explicit say-so
 first — the UI says so on every card.
 
-Free public data only: Yahoo Finance charts and news, SEC EDGAR company facts, and the House Clerk's disclosure
-search (linked, not scraped — its filings are PDFs). Plain Python, standard library only, nothing to install.
+Free public data only: Yahoo Finance charts and news, and a link to the House Clerk's disclosure search (its
+filings are PDFs). Plain Python, standard library only, nothing to install.
 Every network call has a short timeout and comes back as a clear error string instead of failing silently, so the
 UI can say what went wrong. Not financial advice: most people who day trade lose money.
 
@@ -100,14 +100,6 @@ def _money(value: Any, default: float) -> float:
 
 def _dollars(number: float) -> str:
     return f"${number:,.2f}"
-
-
-def _big_dollars(number: float) -> str:
-    if abs(number) >= 1e9:
-        return f"${number / 1e9:,.1f}B"
-    if abs(number) >= 1e6:
-        return f"${number / 1e6:,.1f}M"
-    return _dollars(number)
 
 
 def _bars_from_chart(data: Any) -> list[dict[str, Any]] | None:
@@ -248,7 +240,7 @@ def time_machine_odds(bars: list[dict[str, Any]], entry: float, stop: float, tar
 
 
 def _scan_setups(bars: list[dict[str, Any]]) -> list[str]:
-    """The scanner's setups on daily bars: an opening-range breakout (a close above the 20-day high), an oversold
+    """The scanner's setups on daily bars: a breakout (a close above the 20-day high), an oversold
     bounce (RSI under 30 and up on the day), and a flag (a tight 5-day range after a 10%+ run)."""
     setups: list[str] = []
     last = bars[-1]
@@ -307,43 +299,12 @@ class TradingDesk:
         items: list[dict[str, Any]] = []
         for entry in (data.get("news") or [])[:8]:
             if isinstance(entry, dict) and entry.get("title"):
-                when = entry.get("providerTime")
+                when = entry.get("providerPublishTime")
                 items.append({"title": str(entry["title"])[:160], "source": str(entry.get("publisher") or "")[:40],
                               "when": datetime.fromtimestamp(when, timezone.utc).strftime("%d %b %H:%M")
                               if isinstance(when, (int, float)) else "",
                               "link": str(entry.get("link") or "")[:400]})
         return items, ""
-
-    def _edgar_line(self, symbol: str) -> str:
-        """The latest annual revenue and net income from SEC EDGAR, or "" when EDGAR can't be read right now."""
-        try:
-            tickers = self._fetch("https://www.sec.gov/files/company_tickers.json")
-            match = next((entry for entry in tickers.values()
-                          if isinstance(entry, dict) and str(entry.get("ticker") or "").upper() == symbol), None)
-            if match is None:
-                return ""
-            facts = self._fetch(f"https://data.sec.gov/api/xbrl/companyfacts/CIK{int(match['cik_str']):010d}.json")
-            us_gaap = facts["facts"]["us-gaap"]
-
-            def latest(tag: str) -> tuple[float, str] | None:
-                entries = [entry for entry in us_gaap.get(tag, {}).get("unit", {}).get("USD", [])
-                           if isinstance(entry, dict) and isinstance(entry.get("val"), (int, float))]
-                if not entries:
-                    return None
-                entry = sorted(entries, key=lambda item: str(item.get("end") or ""))[-1]
-                return float(entry["val"]), str(entry.get("end") or "")[:4]
-
-            revenue, net = latest("Revenues"), latest("NetIncomeLoss")
-            if revenue is None and net is None:
-                return ""
-            bits = []
-            if revenue is not None:
-                bits.append(f"revenue {_big_dollars(revenue[0])} ({revenue[1]})")
-            if net is not None:
-                bits.append(f"net income {_big_dollars(net[0])} ({net[1]})")
-            return "Filings (SEC EDGAR): latest annual " + ", ".join(bits) + "."
-        except Exception:  # noqa: BLE001 - EDGAR is a bonus line; its failure is silence, not an error
-            return ""
 
     # ---------- the cards ----------
 
@@ -400,9 +361,6 @@ class TradingDesk:
         if problem:
             return {"ok": False, "error": problem}
         lines = [f"{symbol}: {len(items)} headline{'s' if len(items) != 1 else ''} from Yahoo Finance."]
-        edgar = self._edgar_line(symbol)
-        if edgar:
-            lines.append(edgar)
         if not items:
             lines.append("No headlines for it right now.")
         return {"ok": True, "title": f"News — {symbol}", "lines": lines,

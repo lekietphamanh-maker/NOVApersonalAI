@@ -5,7 +5,6 @@ rectangles are physical desktop pixels measured by Windows UI Automation.
 """
 from __future__ import annotations
 
-import time
 import uuid
 from dataclasses import dataclass, field
 from typing import Any, Iterable
@@ -43,7 +42,6 @@ class ScreenContext:
     window_title: str
     elements: tuple[ScreenElement, ...]
     capture_id: str = field(default_factory=lambda: uuid.uuid4().hex[:8])
-    captured_at: float = field(default_factory=time.time)
 
     def element(self, element_id: Any) -> ScreenElement | None:
         return next((item for item in self.elements if item.element_id == element_id), None)

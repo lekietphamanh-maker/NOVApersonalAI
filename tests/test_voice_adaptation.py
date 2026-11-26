@@ -32,8 +32,7 @@ class ModelRegistryTests(unittest.TestCase):
 
     def test_default_model_is_unchanged(self) -> None:
         self.assertEqual(whisper_engine.DEFAULT_MODEL, "small.en")
-        self.assertEqual(whisper_engine.MODEL_NAME, "ggml-small.en-q5_1.bin")
-        self.assertEqual(whisper_engine.MODEL_URL, whisper_engine.MODELS["small.en"][1])
+        self.assertEqual(whisper_engine.MODELS[whisper_engine.DEFAULT_MODEL][0], "ggml-small.en-q5_1.bin")
         self.assertEqual(whisper_engine.DOWNLOAD_MB, 190)
 
 
@@ -105,13 +104,13 @@ class TranscribeLanguageTests(unittest.TestCase):
             return Reply(json.dumps({"text": "hello"}).encode())
         return bodies, fake_urlopen
 
-    def test_auto_detect_sends_no_language(self) -> None:
+    def test_auto_detect_is_asked_for_by_name(self) -> None:
         bodies, fake = self._capture_body()
         engine = self._engine(model="small", language="auto")
         self.assertEqual(engine.language, "auto")
         with patch.object(whisper_engine, "urlopen", fake):
             self.assertEqual(engine.transcribe(b"\x00\x00" * 8000), "hello")
-        self.assertNotIn(b'name="language"', bodies[0])
+        self.assertIn(b'name="language"\r\n\r\nauto\r\n', bodies[0])  # left out, the server would use "en"
         self.assertIn(b"Kiet", bodies[0])  # the owner's words travel in the prompt
 
     def test_english_model_forces_english_even_when_auto_is_asked(self) -> None:
@@ -160,7 +159,6 @@ class WhisperSettingsTests(unittest.TestCase):
             path.write_text(broken, encoding="utf-8")
             self.assertEqual(voice.load_whisper_settings()["model"], "small.en")
             self.assertEqual(voice.load_voice_name(), voice.DEFAULT_VOICE)
-            self.assertIsNone(voice.saved_voice_name())
         # Saving over a broken file repairs it instead of crashing.
         voice.save_whisper_settings(model="medium.en")
         self.assertEqual(voice.load_whisper_settings()["model"], "medium.en")
@@ -183,7 +181,6 @@ class DefaultVoiceTests(unittest.TestCase):
 
     def test_fresh_nova_defaults_to_emma(self) -> None:
         self.assertEqual(voice.load_voice_name(), "Emma (British, female, most natural)")
-        self.assertIsNone(voice.saved_voice_name())  # nothing picked yet
 
     def test_an_explicit_built_in_choice_stays_built_in(self) -> None:
         voice.save_voice_name(None)
@@ -192,7 +189,6 @@ class DefaultVoiceTests(unittest.TestCase):
     def test_a_saved_voice_wins_over_the_default(self) -> None:
         voice.save_voice_name("Heart (US, female, most natural)")
         self.assertEqual(voice.load_voice_name(), "Heart (US, female, most natural)")
-        self.assertEqual(voice.saved_voice_name(), "Heart (US, female, most natural)")
 
 
 class PersonaTests(unittest.TestCase):
@@ -241,3 +237,58 @@ class PersonaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MicrophoneTests(unittest.TestCase):
+    """Only opening the microphone is retried: an error from the code that uses it is that code's own."""
+
+    def test_a_callers_error_is_not_a_microphone_failure(self) -> None:
+        opened: list[object] = []
+
+        class Stream:
+            def __init__(self, device: object, **_options: object) -> None:
+                opened.append(device)
+
+            def start(self) -> None: ...
+            def stop(self) -> None: ...
+            def close(self) -> None: ...
+
+        fake_sounddevice = type("SD", (), {"RawInputStream": Stream})
+        with self.assertRaises(KeyError):
+            with voice._open_input(fake_sounddevice, None, lambda *_: None):
+                raise KeyError("a bug in a wake-word callback")
+        self.assertEqual(opened, [None])  # one stream, not a second "fallback" microphone
+
+
+class PauseTests(unittest.TestCase):
+    """"Hey Nova, open notepad ... and type hello": a quiet moment shorter than the pause setting doesn't end it."""
+
+    def test_the_request_runs_on_until_the_pause_setting_passes(self) -> None:
+        import queue
+        import threading
+        script = iter([("", ""), ("", "and type"), ("and type hello", ""), *[("", "")] * 4000])
+
+        class Recognizer:
+            def __init__(self) -> None:
+                self.partial = ""
+
+            def AcceptWaveform(self, _chunk: bytes) -> bool:  # noqa: N802 - Vosk's name
+                final, self.partial = next(script)
+                self.final = final
+                return bool(final)
+
+            def Result(self) -> str:  # noqa: N802
+                return json.dumps({"text": self.final})
+
+            def PartialResult(self) -> str:  # noqa: N802
+                return json.dumps({"partial": self.partial})
+
+        audio: queue.Queue[bytes] = queue.Queue()
+        for _ in range(4000):
+            audio.put(b"\x00" * 10)
+        controller = voice.VoiceController.__new__(voice.VoiceController)
+        controller.whisper_settings = {"pause_seconds": 0.8}
+        controller._stop = threading.Event()
+        utterance: list[bytes] = []
+        self.assertEqual(controller._rest_of_request(Recognizer(), audio, utterance), "and type hello")
+        self.assertTrue(utterance)  # the extra audio is there for Whisper to re-hear

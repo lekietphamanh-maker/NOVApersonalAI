@@ -189,6 +189,9 @@ def local_base_url() -> str:
     if "://" not in raw:
         raw = "http://" + raw
     parts = urlsplit(raw)
+    if parts.hostname in {"0.0.0.0", "::"}:  # Ollama shared on the LAN listens everywhere; Nova still asks it here
+        raw = f"http://127.0.0.1:{parts.port or 11434}"
+        parts = urlsplit(raw)
     if parts.scheme != "http" or parts.hostname not in {"127.0.0.1", "localhost", "::1"}:
         raise OllamaError("OLLAMA_HOST must be a local loopback URL, such as http://127.0.0.1:11434.")
     if parts.username or parts.password or parts.query or parts.fragment:

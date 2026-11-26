@@ -1,26 +1,14 @@
 // Run: node --test tests/camera.test.mjs
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  CAMERA_LADDER, CAMERA_TRIES, CAMERA_WAIT_MS, cameraDelayMs, cameraTimeoutError, describeCameraError,
-  requestCamera, requestWithTimeout,
-} from "../creative/camera.js";
+import { CAMERA_CONSTRAINTS, CAMERA_TRIES, cameraDelayMs, describeCameraError, requestCamera } from "../creative/camera.js";
 
-function error(name) {
-  return Object.assign(new Error(name), { name });
-}
+const error = (name) => Object.assign(new Error(name), { name });
+const fakeVideo = () => ({ srcObject: null, videoWidth: 1280, videoHeight: 720, play: async () => {} });
+const stream = (onStop = () => {}) => ({ getTracks: () => [{ stop: onStop }] });
 
-function fakeVideo(width = 1920, height = 1080) {
-  return { srcObject: null, videoWidth: width, videoHeight: height, play: async () => {} };
-}
-
-test("the picture ladder starts sharp and steps down only when the camera cannot do it", () => {
-  assert.equal(CAMERA_LADDER[0].width.ideal, 1920);
-  assert.equal(CAMERA_LADDER[0].height.ideal, 1080);
-  assert.equal(CAMERA_LADDER[1].width.ideal, 1280);
-  assert.equal(CAMERA_LADDER[1].height.ideal, 720);
-  assert.deepEqual(CAMERA_LADDER[2], { facingMode: "user" });
-  assert.equal(CAMERA_LADDER[3], true);
+test("asks for a smooth 720p picture from the front camera", () => {
+  assert.deepEqual(CAMERA_CONSTRAINTS, { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 }, facingMode: "user" });
 });
 
 test("retry waits grow, then cap at two seconds", () => {
@@ -28,131 +16,57 @@ test("retry waits grow, then cap at two seconds", () => {
 });
 
 test("every failure names what happened and the exact thing to check", () => {
-  const blocked = describeCameraError(error("NotAllowedError"));
-  assert.match(blocked.title, /blocked/i);
-  assert.match(blocked.detail, /Allow/i);
-  const busy = describeCameraError(error("NotReadableError"));
-  assert.match(busy.title, /using the camera/i);
-  assert.match(busy.detail, /Try camera again/i);
-  const missing = describeCameraError(error("NotFoundError"));
-  assert.match(missing.detail, /Privacy & security > Camera/);
-  const size = describeCameraError(error("OverconstrainedError"));
-  assert.match(size.detail, /step down/i);
-  const insecure = describeCameraError(error("SecurityError"));
-  assert.match(insecure.detail, /Nova's own window/);
-  const waiting = describeCameraError(error("CameraTimeoutError"));
-  assert.match(waiting.title, /waiting for camera permission/i);
-  assert.match(waiting.detail, /click Allow/i);
-  assert.match(waiting.detail, /Try camera again/i);
-  const unknown = describeCameraError(error("SomethingElse"));
-  assert.match(unknown.title, /didn't start/);
+  assert.match(describeCameraError(error("NotAllowedError")).title, /blocked/i);
+  assert.match(describeCameraError(error("NotReadableError")).detail, /Try camera again/);
+  assert.match(describeCameraError(error("NotFoundError")).detail, /Privacy & security > Camera/);
+  assert.match(describeCameraError(error("SecurityError")).detail, /Nova's own window/);
+  assert.match(describeCameraError(error("SomethingElse")).title, /didn't start/);
 });
 
-test("a working camera is used at the sharpest size on the first try", async () => {
-  const video = fakeVideo();
-  const seen = [];
-  const stream = { getTracks: () => [] };
-  const got = await requestCamera(video, async (constraints) => { seen.push(constraints); return stream; }, async () => {});
-  assert.equal(got.stream, stream);
-  assert.equal(got.width, 1920);
-  assert.equal(got.height, 1080);
-  assert.equal(seen.length, 1);
-  assert.equal(seen[0].video, CAMERA_LADDER[0]);
-  assert.equal(video.srcObject, stream);
+test("a working camera starts on the first try and plays in the video", async () => {
+  const video = fakeVideo(), seen = [], camera = stream();
+  const got = await requestCamera(video, async (constraints) => { seen.push(constraints); return camera; }, async () => {});
+  assert.deepEqual(got, { stream: camera, width: 1280, height: 720 });
+  assert.deepEqual(seen, [{ video: CAMERA_CONSTRAINTS, audio: false }]);
+  assert.equal(video.srcObject, camera);
 });
 
 test("a busy camera is retried with growing waits instead of failing once", async () => {
-  const video = fakeVideo();
   const waits = [];
   let calls = 0;
-  const stream = { getTracks: () => [] };
-  const got = await requestCamera(video, async () => {
+  const got = await requestCamera(fakeVideo(), async () => {
     calls += 1;
     if (calls < 3) throw error("NotReadableError");
-    return stream;
+    return stream();
   }, async (ms) => { waits.push(ms); });
-  assert.equal(got.stream, stream);
+  assert.ok(got.stream);
   assert.equal(calls, 3);
   assert.deepEqual(waits, [600, 1200]);
 });
 
-test("a blocked camera stops at once instead of retrying", async () => {
-  const video = fakeVideo();
-  let calls = 0;
-  await assert.rejects(
-    requestCamera(video, async () => { calls += 1; throw error("NotAllowedError"); }, async () => {}),
-    (caught) => caught.name === "NotAllowedError");
-  assert.equal(calls, 1);
+test("a blocked or missing camera stops at once instead of retrying", async () => {
+  for (const name of ["NotAllowedError", "NotFoundError", "SecurityError"]) {
+    let calls = 0;
+    await assert.rejects(requestCamera(fakeVideo(), async () => { calls += 1; throw error(name); }, async () => {}),
+      (caught) => caught.name === name);
+    assert.equal(calls, 1, name);
+  }
 });
 
-test("a camera that cannot do 1080p drops to 720p", async () => {
-  const video = fakeVideo(1280, 720);
-  const seen = [];
-  const stream = { getTracks: () => [] };
-  const got = await requestCamera(video, async (constraints) => {
-    seen.push(constraints);
-    if (seen.length === 1) throw error("OverconstrainedError");
-    return stream;
-  }, async () => {});
-  assert.equal(got.width, 1280);
-  assert.equal(seen.length, 2);
-  assert.equal(seen[1].video, CAMERA_LADDER[1]);
-});
-
-test("a stream whose video will not play is stopped before retrying", async () => {
+test("a stream whose video will not play is stopped, so it doesn't hold the camera", async () => {
   let stopped = 0;
-  const stream = { getTracks: () => [{ stop: () => { stopped += 1; } }] };
   const video = fakeVideo();
-  let plays = 0;
-  video.play = async () => { plays += 1; if (plays === 1) throw error("NotAllowedError"); };
-  await assert.rejects(
-    requestCamera(video, async () => stream, async () => {}),
+  video.play = async () => { throw error("NotAllowedError"); };
+  await assert.rejects(requestCamera(video, async () => stream(() => { stopped += 1; }), async () => {}),
     (caught) => caught.name === "NotAllowedError");
   assert.equal(stopped, 1);
-  assert.equal(plays, 1);
-});
-
-test("a camera request that never answers fails after the wait instead of hanging", async () => {
-  const video = fakeVideo();
-  await assert.rejects(
-    requestCamera(video, () => new Promise(() => {}), async () => {}, 30),
-    (caught) => caught.name === "CameraTimeoutError");
-});
-
-test("a timed-out request stops at once instead of retrying for a minute", async () => {
-  const video = fakeVideo();
-  let calls = 0;
-  await assert.rejects(
-    requestCamera(video, () => { calls += 1; return new Promise(() => {}); }, async () => {}, 30),
-    (caught) => caught.name === "CameraTimeoutError");
-  assert.equal(calls, 1);
-});
-
-test("a late answer's stream is stopped instead of holding the camera", async () => {
-  let stopped = 0;
-  const stream = { getTracks: () => [{ stop: () => { stopped += 1; } }] };
-  const video = fakeVideo();
-  await assert.rejects(
-    requestCamera(video, () => new Promise((resolve) => setTimeout(() => resolve(stream), 100)), async () => {}, 20),
-    (caught) => caught.name === "CameraTimeoutError");
-  await new Promise((resolve) => setTimeout(resolve, 150));
-  assert.equal(stopped, 1);
-});
-
-test("requestWithTimeout passes a fast answer through and keeps its error", async () => {
-  assert.equal(await requestWithTimeout(async () => "ok", 50), "ok");
-  await assert.rejects(requestWithTimeout(async () => { throw error("NotFoundError"); }, 50),
-    (caught) => caught.name === "NotFoundError");
-  assert.equal(cameraTimeoutError().name, "CameraTimeoutError");
-  assert.equal(CAMERA_WAIT_MS, 10_000);
 });
 
 test("a camera that stays busy gives up after the tries run out", async () => {
-  const video = fakeVideo();
   let calls = 0;
   const waits = [];
   await assert.rejects(
-    requestCamera(video, async () => { calls += 1; throw error("NotReadableError"); }, async (ms) => { waits.push(ms); }),
+    requestCamera(fakeVideo(), async () => { calls += 1; throw error("NotReadableError"); }, async (ms) => { waits.push(ms); }),
     (caught) => caught.name === "NotReadableError");
   assert.equal(calls, CAMERA_TRIES);
   assert.equal(waits.length, CAMERA_TRIES - 1);

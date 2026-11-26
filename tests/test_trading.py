@@ -28,11 +28,7 @@ def chart_json(closes: list[float]) -> dict[str, Any]:
 
 BREAKOUT = [100 + i * 0.5 for i in range(20)] + [110.0] * 9 + [112.0]  # a close above the 20-day high
 NEWS_JSON = {"news": [{"title": "Apple unveils a new chip", "publisher": "Reuters",
-                       "providerTime": 1_763_000_000, "link": "https://example.com/apple-chip"}]}
-TICKERS_JSON = {"0": {"cik_str": 320193, "ticker": "AAPL", "title": "Apple Inc."}}
-FACTS_JSON = {"facts": {"us-gaap": {
-    "Revenues": {"unit": {"USD": [{"val": 391_000_000_000, "end": "2024-09-28", "form": "10-K"}]}},
-    "NetIncomeLoss": {"unit": {"USD": [{"val": 93_740_000_000, "end": "2024-09-28", "form": "10-K"}]}}}}}
+                       "providerPublishTime": 1_763_000_000, "link": "https://example.com/apple-chip"}]}
 
 
 def fake_fetch(url: str) -> Any:
@@ -40,10 +36,6 @@ def fake_fetch(url: str) -> Any:
         return chart_json(BREAKOUT)
     if "v1/finance/search" in url:
         return NEWS_JSON
-    if "company_tickers.json" in url:
-        return TICKERS_JSON
-    if "companyfacts" in url:
-        return FACTS_JSON
     raise urllib.error.URLError("no network in tests")
 
 
@@ -171,7 +163,7 @@ class DeskTests(unittest.TestCase):
         self.assertTrue(news["ok"])
         self.assertIn("Apple unveils a new chip", [item["title"] for item in news["items"]])
         self.assertIn("House Clerk", [item["source"] for item in news["items"]])
-        self.assertIn("revenue $391.0B (2024)", " ".join(news["lines"]))
+        self.assertTrue(all(item["when"] for item in news["items"][:-1]))  # Yahoo's providerPublishTime
         odds = desk.act("odds", {"symbol": "AAPL"})
         self.assertTrue(odds["ok"])
         self.assertIn("10,000 replays", odds["lines"][1])

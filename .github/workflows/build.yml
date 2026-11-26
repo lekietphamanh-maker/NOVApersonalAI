@@ -67,7 +67,7 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - name: unit tests
         timeout-minutes: 20
-        run: python -m unittest discover -s tests -v
+        run: python -m pytest tests -v -p no:cacheprovider  # pytest also runs the plain-function tests unittest skips
       - name: the Mac's own pieces, for real
         env:
           NOVA_TEST_MAC: "1"
@@ -92,9 +92,10 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - name: unit tests and screen assist end to end
         timeout-minutes: 25  # about 8 normally: a stuck test fails the run instead of holding it for hours
-        run: python -m unittest discover -s tests -v
-      - name: creative mode gesture tests
-        run: node --test tests/pages_parse.test.mjs tests/creative_gestures.test.mjs tests/creative_lenses.test.mjs tests/mindmap.test.mjs
+        run: python -m pytest tests -v -p no:cacheprovider  # pytest also runs the plain-function tests unittest skips
+      - name: page, creative mode and relay tests (every .test.mjs)
+        shell: bash
+        run: node --test tests/*.test.mjs cloud/*.test.mjs
       - name: Whisper, voices, daily brief, weather and local news, real downloads
         timeout-minutes: 10
         run: |
@@ -150,7 +151,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "packaged gesture test exit code $($process.ExitCode)" }
       - name: packaged HUD, creative mode and phone files
         run: |
-          foreach ($file in "creative/index.html", "creative/lenses.js", "creative/vendor/mediapipe/wasm/vision_wasm_internal.wasm", "creative/vendor/models/hand_landmarker.task", "creative/vendor/models/efficientdet_lite0.tflite", "phone/index.html", "phone/icon.png", "ui/index.html", "ui/app.js", "ui/fonts/rajdhani-latin-700-normal.woff2", "packaging/nova.png", "cloud/worker.js") {
+          foreach ($file in "creative/index.html", "creative/lenses.js", "creative/vendor/mediapipe/wasm/vision_wasm_internal.wasm", "creative/vendor/models/hand_landmarker.task", "creative/vendor/models/efficientdet_lite0.tflite", "phone/index.html", "phone/icon.png", "ui/index.html", "ui/app.js", "ui/fonts/rajdhani-latin-700-normal.woff2", "packaging/nova.png", "cloud/worker.js", "archmancer_docs/agent-system-engineering/SKILL.md", "creative/camera.js", "creative/handmusic-audio.js", "ui/circuit/catalog.json") {
             if (-not (Test-Path "dist/Nova/_internal/$file")) { throw "missing $file in the package" }
           }
       - name: assemble Desktop and USB Editions

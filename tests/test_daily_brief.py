@@ -166,7 +166,7 @@ class LiveTests(unittest.TestCase):
         self.assertTrue(brief["on_this_day"], brief["errors"])
         try:
             bing = daily_brief.bing_news("AI", "US", 3)
-        except Exception as exc:  # the live source is unreachable right now: not our code failing
+        except OSError as exc:  # the live source is unreachable right now (a code bug still fails)
             self.skipTest(f"Bing News unreachable: {exc}")
         if not bing:  # Bing now and then answers with a robot-check page instead of the feed
             self.skipTest("Bing News returned nothing live right now")

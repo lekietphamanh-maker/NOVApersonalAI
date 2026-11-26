@@ -46,7 +46,8 @@ def _evaluate(node: ast.AST) -> int | float:
     if isinstance(node, ast.BinOp) and type(node.op) in _OPERATORS:
         left, right = _evaluate(node.left), _evaluate(node.right)
         # Keeps 9^9^9-style input from freezing Nova.
-        if isinstance(node.op, ast.Pow) and abs(right) > 1000:
+        if isinstance(node.op, ast.Pow) and (abs(right) > 1000 or (
+                isinstance(left, int) and isinstance(right, int) and left.bit_length() * abs(right) > 200_000)):
             raise ValueError("exponent is too large")
         return _OPERATORS[type(node.op)](left, right)
     if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in _FUNCTIONS

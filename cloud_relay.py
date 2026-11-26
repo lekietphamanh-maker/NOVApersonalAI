@@ -21,18 +21,22 @@ from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import secret_store
+
 CLOUDFLARE = "https://api.cloudflare.com/client/v4"
 SCRIPT_NAME = "nova-telegram"
 KV_TITLE = "nova-telegram"
 COMPATIBILITY_DATE = "2025-09-01"
 WORKER_FILE = Path(__file__).resolve().parent / "cloud" / "worker.js"
 BRAINS = {"claude": "claude-haiku-5-5", "ollama": "gpt-oss:120b", "none": ""}
-CHECK_IN_SECONDS = 5 * 60
 TOKEN_SHAPE = re.compile(r"^[A-Za-z0-9_-]{30,80}$")
 
 
 class RelayError(RuntimeError):
     """Cloudflare or the relay said no, in words the owner can act on. Never carries a token."""
+
+
+SECRET_NAME = "telegram_relay"
 
 
 def secret_path() -> Path:
@@ -59,21 +63,29 @@ class Relay:
             raise RelayError(f"couldn't reach the relay ({type(exc).__name__})") from None
 
 
-def load() -> Relay | None:
+def _plain() -> str | None:
     try:
-        data = json.loads(secret_path().read_text(encoding="utf-8"))
+        return secret_path().read_text(encoding="utf-8")
+    except OSError:
+        return None
+
+
+def load() -> Relay | None:
+    """The relay's address and secret, sealed for this account (a plain file from an earlier build is sealed once)."""
+    try:
+        data = json.loads(secret_store.load_or_move(SECRET_NAME, _plain, secret_path()) or "")
         return Relay(str(data["url"]), str(data["secret"]), str(data.get("brain", "none")))
-    except (OSError, ValueError, KeyError, TypeError):
+    except (ValueError, KeyError, TypeError):
         return None
 
 
 def save(relay: Relay) -> None:
-    path = secret_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"url": relay.url, "secret": relay.secret, "brain": relay.brain}), encoding="utf-8")
+    secret_store.save(SECRET_NAME, json.dumps({"url": relay.url, "secret": relay.secret, "brain": relay.brain}))
+    secret_path().unlink(missing_ok=True)
 
 
 def forget() -> None:
+    secret_store.forget(SECRET_NAME)
     secret_path().unlink(missing_ok=True)
 
 

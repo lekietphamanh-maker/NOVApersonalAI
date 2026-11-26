@@ -46,7 +46,9 @@ _PING_MS = re.compile(r"time[=<]\s*(\d+(?:\.\d+)?)\s*ms", re.IGNORECASE)
 
 def _default_runner(cmd: list[str]) -> str:
     """One local command, its stdout as text. Raises on failure or timeout; callers turn that into words."""
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_SECONDS)
+    # Nova.exe has no console: without CREATE_NO_WINDOW every ping of a device sweep would flash one.
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=TIMEOUT_SECONDS,
+                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if result.returncode != 0:
         raise RuntimeError(f"command {cmd[0]} exited {result.returncode}")
     return result.stdout
@@ -98,35 +100,42 @@ def parse_ping(output: str) -> float | None:
 
 
 def parse_ipconfig(output: str) -> dict[str, Any]:
-    """The local network from `ipconfig` output: IPv4 address, subnet mask, gateway and DNS servers.
-    Missing fields stay "" — never guessed."""
-    info: dict[str, Any] = {"ipv4": "", "mask": "", "gateway": "", "dns": []}
-    current: str | None = None
+    """The local network from `ipconfig` output: IPv4 address, subnet mask, gateway and DNS servers of the adapter that
+    reaches the router (the first with an IPv4 address and a gateway: a WSL or Hyper-V adapter has no gateway).
+    A gateway or DNS list can run on to the next lines (an IPv6 gateway comes first). Missing fields stay "", never guessed."""
+    adapters: list[dict[str, Any]] = []
+    current: dict[str, Any] | None = None
+    field: str | None = None
     for raw in (output or "").splitlines():
         line = raw.strip()
-        lowered = line.lower()
-        if "ipv4 address" in lowered or "ipv4-address" in lowered:
-            found = _IP.search(line)
-            info["ipv4"] = found.group(0) if found else ""
-            current = None
-        elif "subnet mask" in lowered:
-            found = _IP.search(line)
-            info["mask"] = found.group(0) if found else ""
-            current = None
-        elif "default gateway" in lowered:
-            found = _IP.search(line)
-            info["gateway"] = found.group(0) if found else ""
-            current = None
-        elif "dns servers" in lowered:
-            found = _IP.search(line)
-            if found:
-                info["dns"].append(found.group(0))
-            current = "dns"
-        elif current == "dns" and _IP.search(line):
-            info["dns"].append(_IP.search(line).group(0))  # type: ignore[union-attr]
-        elif line and ":" not in line:
-            current = None
-    return info
+        if not line:
+            continue
+        if not raw[0].isspace():  # "Wireless LAN adapter Wi-Fi:" starts a new adapter
+            current, field = None, None
+            continue
+        if current is None:
+            current = {"ipv4": "", "mask": "", "gateway": "", "dns": []}
+            adapters.append(current)
+        lowered, found = line.lower(), _IP.search(line)
+        value = found.group(0) if found else ""
+        if " : " in line or line.endswith(":"):  # a "Label . . . : value" line
+            field = None
+            if "ipv4" in lowered and "address" in lowered:
+                current["ipv4"] = value
+            elif "subnet mask" in lowered:
+                current["mask"] = value
+            elif "default gateway" in lowered:
+                current["gateway"], field = value, "gateway"
+            elif "dns servers" in lowered:
+                current["dns"] += [value] if value else []
+                field = "dns"
+        elif field == "gateway" and value and not current["gateway"]:
+            current["gateway"] = value
+        elif field == "dns" and value:
+            current["dns"].append(value)
+    best = next((item for item in adapters if item["ipv4"] and item["gateway"]),
+                next((item for item in adapters if item["ipv4"]), None))
+    return best or {"ipv4": "", "mask": "", "gateway": "", "dns": []}
 
 
 def parse_netsh_wlan(output: str) -> dict[str, str]:
@@ -149,7 +158,7 @@ def parse_arp(output: str) -> list[dict[str, str]]:
     for raw in (output or "").splitlines():
         ip = _IP.search(raw)
         mac = _MAC.search(raw)
-        if ip and mac:
+        if ip and mac and mac.group(0).lower().replace("-", ":") != "ff:ff:ff:ff:ff:ff":  # broadcast, not a device
             devices.append({"ip": ip.group(0), "mac": mac.group(0).lower().replace("-", ":")})
     return devices
 

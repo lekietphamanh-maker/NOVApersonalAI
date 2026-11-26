@@ -246,6 +246,8 @@ def vscode(target: str, line: int = 0, run: Callable[..., Any] = subprocess.Pope
     code = which("code") or which("code.cmd")
     if code is None:
         raise ValueError("VS Code's `code` command isn't on this PC (install VS Code, or in it: Shell Command: Install 'code')")
+    if sys.platform == "win32" and re.search(r'[&|<>^%!"]', str(path)):
+        raise ValueError("that path has characters VS Code's launcher (a batch file) would run as commands")
     where = f"{path}:{line}" if line and path.is_file() else str(path)
     run([code, "--goto", where] if line and path.is_file() else [code, where],
         **({"creationflags": subprocess.CREATE_NO_WINDOW} if sys.platform == "win32" else {}))

@@ -150,16 +150,6 @@ def now_playing(run: Runner = subprocess.run) -> dict[str, str] | None:
     return None
 
 
-def open_app(name: str, run: Runner = subprocess.run) -> None:
-    result = run(["open", "-a", name], capture_output=True, text=True, timeout=15)
-    if result.returncode != 0:
-        raise OSError(f"there's no app called {name} on this Mac")
-
-
-def open_path(target: str | Path, run: Runner = subprocess.run) -> None:
-    run(["open", str(target)], capture_output=True, timeout=15)
-
-
 def sysctl(name: str, run: Runner = subprocess.run) -> str:
     try:
         return (run(["sysctl", "-n", name], capture_output=True, text=True, timeout=5).stdout or "").strip()

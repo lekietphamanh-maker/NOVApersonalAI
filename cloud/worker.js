@@ -76,10 +76,10 @@ export async function everyMinute(env, now) {
 async function takeOver(env, force) {
   if (!force && (await env.NOVA.get("hook")) === "on") return;
   // Telegram now brings the owner's messages here; the PC removes this when it starts again.
-  await telegramApi(env, "setWebhook", {
+  const answer = await telegramApi(env, "setWebhook", {
     url: `${env.SELF_URL}/telegram`, secret_token: env.HOOK_SECRET, allowed_updates: ["message"],
-  });
-  await env.NOVA.put("hook", "on");
+  }).catch(() => null);
+  if (answer?.ok) await env.NOVA.put("hook", "on"); // refused or unreachable: the next minute tries again
 }
 
 // ---------- a message while the PC is off ----------

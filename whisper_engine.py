@@ -34,8 +34,6 @@ MODELS = {
               "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small-q5_1.bin", 190, True),
 }
 DEFAULT_MODEL = "small.en"
-MODEL_NAME = MODELS[DEFAULT_MODEL][0]
-MODEL_URL = MODELS[DEFAULT_MODEL][1]
 DOWNLOAD_MB = MODELS[DEFAULT_MODEL][2]
 PORT = 8179
 # Words Whisper should expect; it biases recognition toward these spellings.
@@ -160,6 +158,8 @@ class WhisperEngine:
     def _ensure_started(self) -> None:
         if self._process is not None and self._process.poll() is None:
             return
+        if self._responding():  # left running by a Nova that crashed: a second server couldn't take the port
+            return
         threads = str(max(2, min(8, (os.cpu_count() or 4) - 2)))
         self._process = subprocess.Popen(
             [str(folder() / "whisper-server.exe"), "-m", str(folder() / self.model_file), "--host", "127.0.0.1",
@@ -179,10 +179,8 @@ class WhisperEngine:
     def transcribe(self, pcm16: bytes, sample_rate: int = 16_000) -> str:
         self._ensure_started()
         boundary = uuid.uuid4().hex
-        # No "language" field means the server detects it; an English-only model always gets "en".
-        fields = {"response_format": "json", "temperature": "0", "prompt": self.prompt}
-        if self.language != "auto":
-            fields["language"] = self.language
+        # whisper-server starts every request from its own default ("en"), so "auto" has to be asked for by name.
+        fields = {"response_format": "json", "temperature": "0", "prompt": self.prompt, "language": self.language}
         parts = [f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
                  for name, value in fields.items()]
         parts.append(f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="speech.wav"\r\n'

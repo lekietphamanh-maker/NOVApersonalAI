@@ -399,10 +399,14 @@ class Router:
     def _download_roads(self, box: tuple[float, float, float, float]) -> dict[str, Any]:
         kinds = "|".join(sorted({kind for speeds in SPEEDS.values() for kind in speeds}))
         query = f'[out:json][timeout:180];way["highway"~"^({kinds})(_link)?$"]{box};out body;>;out skel qt;'
-        return json.loads(self._fetch_retry(
+        data = json.loads(self._fetch_retry(
             lambda base: Request(base, data=urlencode({"data": query}).encode(),
                                  headers={"User-Agent": USER_AGENT}),
             240, OVERPASS_MIRRORS, "the road server"))
+        # Overpass answers a timeout with 200, part of the roads and a remark: never keep that as the city's roads.
+        if "error" in str(data.get("remark") or "").lower():
+            raise OSError(f"the road server stopped early ({str(data['remark'])[:120]})")
+        return data
 
     def _roads_for_box(self, box: tuple[float, float, float, float], tiled: bool) -> dict[str, Any] | None:
         """The roads for a box: a fresh copy kept on disk when there is one, else a download — in tiles when

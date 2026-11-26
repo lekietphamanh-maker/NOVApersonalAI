@@ -3,8 +3,8 @@ sign-in also gives Google Calendar (calendar_tools) and read-only Google Drive (
 after those were added.
 
 Uses the user's own Google Cloud OAuth client ("Desktop app"), saved as google_client.json in
-%LOCALAPPDATA%\\Nova. Sign-in is the official browser flow (loopback + PKCE); the refresh token is
-encrypted with Windows DPAPI for this Windows account only.
+%LOCALAPPDATA%\\Alfred. Sign-in is the official browser flow (loopback + PKCE); the refresh token is sealed
+for this account only (Windows DPAPI; the Keychain on the Mac).
 """
 from __future__ import annotations
 
@@ -115,12 +115,17 @@ def connect(timeout: float = 300) -> None:
     class Redirect(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802
             query = parse_qs(urlsplit(self.path).query)
-            if query.get("state", [""])[0] == state and "code" in query:
+            if query.get("state", [""])[0] != state:
+                self.send_error(404)  # not Google's redirect (a favicon, another program): keep waiting
+                return
+            if "code" in query:
                 result["code"] = query["code"][0]
             self.send_response(200)
             self.send_header("Content-Type", "text/html")
             self.end_headers()
-            self.wfile.write(b"<h3>Nova is connected to Gmail, Google Calendar and Google Drive. You can close this tab.</h3>")
+            self.wfile.write(b"<h3>Google said yes. Nova is finishing the sign-in; you can close this tab.</h3>"
+                             if "code" in result else
+                             b"<h3>Google sign-in didn't finish. Go back to Nova and try again.</h3>")
             done.set()
 
         def log_message(self, *_args) -> None:

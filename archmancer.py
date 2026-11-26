@@ -31,6 +31,8 @@ MAX_RESULT = 12_000
 def _all_docs() -> list[tuple[str, str, Path]]:
     """(skill_name, doc_title, path) for every markdown file."""
     docs = []
+    if not DOCS_DIR.is_dir():
+        return docs
     for skill_dir in sorted(DOCS_DIR.iterdir()):
         if not skill_dir.is_dir():
             continue

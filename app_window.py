@@ -34,20 +34,20 @@ def find_edge() -> Path | None:
     return next((path for path in paths if path.is_file()), None)
 
 
-def open_window(url: str, profile_dir: Path) -> subprocess.Popen | None:
-    """Edge with its own profile keeps camera permission for the HUD and never mixes with the user's tabs."""
+def open_window(url: str, profile_dir: Path, title: str = WINDOW_TITLE) -> subprocess.Popen | None:
+    """Edge with its own profile keeps camera permission for Nova and never mixes with the user's tabs."""
     edge = find_edge()
     if edge is None:
         webbrowser.open(url)
         return None
     profile_dir.mkdir(parents=True, exist_ok=True)
-    # This profile only ever loads Nova's own loopback pages (links open in the user's browser),
-    # so the camera prompt for creative mode is answered here once and for all.
+    # This profile only ever loads Nova's own loopback pages (links open in the user's browser), so the camera
+    # prompt is answered here once and for all, and sound may start without a click: Nova turns hand music on by voice.
     proc = subprocess.Popen([str(edge), f"--app={url}", f"--user-data-dir={profile_dir}", "--no-first-run",
                              "--no-default-browser-check", "--window-size=1360,880", "--disable-features=Translate",
-                             "--use-fake-ui-for-media-stream"])
+                             "--use-fake-ui-for-media-stream", "--autoplay-policy=no-user-gesture-required"])
     # Nova's own window must not open behind whatever the owner was doing.
-    bring_window_titled_to_front(WINDOW_TITLE)
+    bring_window_titled_to_front(title)
     return proc
 
 

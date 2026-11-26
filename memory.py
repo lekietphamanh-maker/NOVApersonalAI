@@ -90,8 +90,6 @@ class Memory:
                     fact TEXT NOT NULL,
                     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
                 );
-                CREATE INDEX IF NOT EXISTS idx_messages_id ON messages(id);
-                CREATE INDEX IF NOT EXISTS idx_tasks_id ON tasks(id);
                 """
             )
 

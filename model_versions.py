@@ -39,16 +39,6 @@ def create_payload(base: str, name: str, system: str = "", temperature: float | 
     return payload
 
 
-def custom_versions(installed: list[str]) -> list[str]:
-    return sorted(name for name in installed if name.split(":")[0].startswith(PREFIX))
-
-
-def create(post: Callable[[str, dict], dict], base_url: str, **fields: Any) -> str:
-    payload = create_payload(**fields)
-    post(f"{base_url}/api/create", payload)
-    return payload["model"]
-
-
 def delete(delete_request: Callable[[str, dict], Any], base_url: str, name: str) -> None:
     if not name.split(":")[0].startswith(PREFIX):
         raise ValueError("Only Nova's own versions (nova-…) can be deleted here; original models stay as they are.")

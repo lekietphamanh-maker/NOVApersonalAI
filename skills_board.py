@@ -36,7 +36,7 @@ CATALOG: tuple[Entry, ...] = (
     Entry("Brains", "Ask Claude", "A hard question goes to Claude; personal ones stay on this PC unless you say yes.",
           ("ask Claude to explain transformers simply",), ("ask_claude",), "claude", "SETTINGS → Model → Claude"),
     Entry("Brains", "API brain", "Any AI with your API key answers: Claude, OpenAI, Gemini, OpenRouter, Groq, DeepSeek, "
-          "Mistral, xAI, Together or your own server — or OmniRoute, a free gateway on this PC that needs no key. "
+          "Mistral, xAI, Together or your own server — or OmniRoute, a free gateway on this PC (connect a provider in its dashboard, then paste its key). "
           "Add several and pick one.", needs="api",
           where="SETTINGS → Model → API brain → Add an API brain"),
     Entry("Brains", "Cloud brain", "An AI you sign in to with an account, no key: Claude Code (Claude plan, uses Nova's "
@@ -138,9 +138,7 @@ CATALOG: tuple[Entry, ...] = (
           "Claude Code). After a report, Rea flags what would fit Nova — and with your yes, hands it to Nova to study.",
           ("reverse engineer notion.so and tell me how its sync works",), ("reverse_engineer",),
           "reverse", "REA screen (asks you to agree the first time)"),
-    Entry("Labs", "Shannon: break into your own app", "An AI pentester that proves real holes in your app, with the fix. "
-          "Simulate attack (on the same screen) runs a scripted attack on your own app, file or local address, "
-          "triaged by AiSOC — no Docker or API key needed for the simulation.",
+    Entry("Labs", "Shannon: break into your own app", "An AI pentester that proves real holes in your app, with the fix.",
           needs="shannon", where="SHANNON screen; needs WSL2, Docker Desktop and an API key"),
     Entry("Labs", "Trading", "Paper trading only: scan the market for day-trade setups, check the news, time an entry, "
           "plan the exit, replay the odds, and size the trade to your budget. No order is ever placed without your "

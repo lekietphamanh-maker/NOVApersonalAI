@@ -132,7 +132,7 @@ class _Handler(SimpleHTTPRequestHandler):
             return self._voice()
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            data = json.loads(self.rfile.read(length)) if 0 < length <= 10_000 else {}
+            data = json.loads(self.rfile.read(length)) if 0 < length <= 64_000 else {}  # text is cut to 2,000 below
         except (ValueError, json.JSONDecodeError):
             data = {}
         if self.path == "/api/chat":

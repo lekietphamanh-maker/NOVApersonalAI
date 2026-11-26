@@ -58,11 +58,8 @@ class SetupActions:
             not auto_tune.due(self.settings.get("tuning"), VERSION, self.hardware)
 
     def _natural_voice(self) -> None:
-        # The owner's own pick of another Kokoro voice stays; "never picked" (saved voice is None) is not a pick —
-        # the effective default is Emma, but only the saved choice counts here, so setup still installs her.
-        from voice import saved_voice_name
-        natural_already = (saved_voice_name() or "").split(" (")[0] in ("Heart", "Bella", "Emma")
-        if not natural_already:  # the owner's own pick of another Kokoro voice stays
+        # Only a Nova still on the natural default (Emma) gets it installed: any voice the owner picked stays theirs.
+        if self.voice.voice_name == NATURAL_VOICE:
             self._voice_installed(NATURAL_VOICE)
 
     def _ffmpeg(self, progress: setup_everything.Progress) -> None:

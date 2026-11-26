@@ -73,11 +73,12 @@ class _Handler(SimpleHTTPRequestHandler):
             return
         url = urlsplit(self.path)
         if url.path == "/api/show":
-            # A second Nova start asks this one to show its window instead (harmless, so no token).
-            if self.server_state.on_show is not None:
+            # A second Nova start asks this one to show its window instead. Only with Nova's own header: a web page
+            # can't add one without a preflight (never answered), so it can't keep pulling the window to the front.
+            if self.server_state.on_show is not None and self.headers.get("X-Nova-Show") == "1":
                 self.server_state.on_show()
-            from build_info import BUILD
-            self._json(200, {"ok": True, "app": "alfred", "build": BUILD})
+            from build_info import BUILD, VERSION
+            self._json(200, {"ok": True, "app": "alfred", "build": BUILD, "version": VERSION})
             return
         if url.path == "/api/events":
             token = parse_qs(url.query).get("token", [""])[0]

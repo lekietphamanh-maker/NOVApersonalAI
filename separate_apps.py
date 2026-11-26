@@ -185,7 +185,8 @@ class Docker:
         else:  # the first start pulls the image: a few minutes
             answer = self._call(run_arguments(docker, app, secret() if app.secret_env else ""), 1800)
         if answer.returncode != 0:
-            raise RuntimeError((answer.stderr or answer.stdout or "Docker said no").strip().splitlines()[-1][:200])
+            lines = (answer.stderr or answer.stdout or "").strip().splitlines()
+            raise RuntimeError((lines[-1] if lines else "Docker said no")[:200])
         return f"{app.name} is starting at {app.open_url} (the first start takes a few minutes)."
 
     def stop(self, app: App) -> str:

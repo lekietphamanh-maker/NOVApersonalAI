@@ -1,9 +1,8 @@
 """Discover: GitHub repos the owner might like, ranked by their interests and their own GitHub, learning from their picks.
 
-Nova asks the owner before installing any code from GitHub into herself. "Add to Nova" pins the repo to one commit, records its license, and
+Nova never installs code from GitHub into herself. "Add to Nova" pins the repo to one commit, records its license, and
 hands it to Claude Code (read-only) to study; what comes back is a plan in outputs/ and, when the repo is a workflow or a
-prompt, a skill note the owner reads and approves before it joins their skills. If the plan needs code installed, Nova asks
-the owner first and only installs it with their approval. Skills are text, not code.
+prompt, a skill note the owner reads and approves before it joins their skills. Skills are text, not code.
 
 What shapes the ranking: the interests in Settings, the topics and languages of the owner's own and starred repos (when
 they give their GitHub username), and every Add or Not for me so far (liked topics and languages count up, skipped ones
@@ -25,6 +24,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
+import secret_store
+
 GITHUB = "https://api.github.com"
 CACHE_HOURS = 12
 PER_INTEREST = 10
@@ -43,12 +44,20 @@ def token_path() -> Path:
     return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Alfred" / "github_token"
 
 
-def stored_token() -> str | None:
+TOKEN_SECRET = "github_read_token"
+
+
+def _plain_token() -> str | None:
     try:
-        value = token_path().read_text(encoding="utf-8-sig").strip()
+        return token_path().read_text(encoding="utf-8-sig").strip()
     except OSError:
         return None
-    return value if TOKEN_SHAPE.match(value) else None
+
+
+def stored_token() -> str | None:
+    """The optional token, sealed for this account (a plain file from an earlier build is sealed on first use)."""
+    value = secret_store.load_or_move(TOKEN_SECRET, _plain_token, token_path())
+    return value if value and TOKEN_SHAPE.match(value) else None
 
 
 def save_token(value: str) -> None:
@@ -56,12 +65,12 @@ def save_token(value: str) -> None:
     value = value.strip()
     if not TOKEN_SHAPE.match(value):
         raise ValueError("That doesn't look like a GitHub token (it starts with ghp_ or github_pat_).")
-    path = token_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
+    secret_store.save(TOKEN_SECRET, value)
+    token_path().unlink(missing_ok=True)
 
 
 def forget_token() -> None:
+    secret_store.forget(TOKEN_SECRET)
     token_path().unlink(missing_ok=True)
 
 

@@ -3,7 +3,7 @@
 // part's card on the right, the stages and the live timeline of steps along the bottom, past reports below that.
 // Drag to spin and tilt, scroll or pinch to zoom, click a part; arrows, + and -, and webcam gestures work too.
 
-import { h, when, screen, renderStrip, openReportPanel, pollSelfUpdate, UPDATE_STAGE_LABELS } from "./lab.js";
+import { h, when, screen, renderStrip, openReportPanel } from "./lab.js";
 import { askPhrase, mountWhatCanIDo } from "./whatcanido.js";
 
 const KINDS = { ui: ["#3be4ff", "UI"], logic: ["#5b8cff", "λ"], data: ["#a78bff", "DB"], storage: ["#ffb040", "▤"],
@@ -160,52 +160,11 @@ export function createRea(root, { act, onOpenChange }) {
     ].filter(Boolean));
   }
 
-  // ---------- the full report on screen, and "Update now" below it ----------
+  // ---------- the full report on screen ----------
   async function openFullReport() {
-    const reportJob = job; // the report's own job: a new job event must not retarget this panel's update
-    const result = await act("rea_report_text", { id: reportJob.id });
-    const upgrades = reportJob?.fit?.length || 0;
-    const progress = h("p", { class: "report-progress", hidden: true });
-    const note = h("p", { class: "report-note" });
-    const updateButton = upgrades ? h("button", { class: "box small on", type: "button" },
-      `Update now (${upgrades} upgrade${upgrades === 1 ? "" : "s"})`) : null;
-    if (updateButton) updateButton.onclick = () => startUpdate(updateButton, progress, note, reportJob.id);
-    openReportPanel(root, {
-      title: reportJob?.title || "Full report",
-      text: result.ok ? result.text : (result.error || "The report isn't there any more."),
-      footer: result.ok ? [updateButton, progress, note].filter(Boolean) : [],
-    });
-  }
-
-  async function startUpdate(button, progress, note, jobId) {
-    button.disabled = true;
-    progress.hidden = false;
-    progress.textContent = "Starting the update…";
-    const started = await act("rea_update_now", { id: jobId });
-    if (!started?.ok) {
-      progress.textContent = started?.error || "The update didn't start.";
-      button.disabled = false;
-      return;
-    }
-    if (!started.token_set) {
-      note.textContent = "No GitHub token yet — the fixes and tests run anyway, but the push waits. "
-        + "Add one in Settings → Self-update · GitHub (github.com/settings/tokens → classic token → repo scope).";
-    }
-    pollSelfUpdate(act, (state) => {
-      const running = state.steps.find((step) => step.status === "running");
-      const label = UPDATE_STAGE_LABELS[state.stage] || state.stage;
-      if (state.stage === "done") {
-        progress.textContent = "";
-        note.textContent = state.summary || "Done.";
-        note.className = "report-done";
-      } else if (state.stage === "failed") {
-        progress.textContent = state.error || "The update stopped.";
-        button.disabled = false;
-      } else {
-        progress.textContent = `${label}…${running?.detail ? ` ${running.detail}` : ""}`
-          + (state.fix_round ? ` (fix round ${state.fix_round})` : "");
-      }
-    });
+    const shown = job; // a job event during the wait must not retitle this panel
+    const result = await act("rea_report_text", { id: shown.id });
+    openReportPanel(root, { title: shown.title || "Full report", text: result.ok ? result.text : (result.error || "The report isn't there any more.") });
   }
 
   function choose(index) {

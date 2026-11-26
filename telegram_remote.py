@@ -25,6 +25,8 @@ from typing import Any, Callable
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import secret_store
+
 API = "https://api.telegram.org"
 TOKEN_SHAPE = re.compile(r"^\d{5,12}:[A-Za-z0-9_-]{30,50}$")
 POLL_SECONDS = 25
@@ -41,28 +43,36 @@ NO = re.compile(r"^(no|nope|nah|don'?t|stop|cancel|không|thôi|đừng)[.!]*$",
 SKIPPED_FOLDERS = {"node_modules", ".git", "appdata", "$recycle.bin", "__pycache__", ".venv", "venv"}
 
 
+TOKEN_SECRET = "telegram_bot_token"
+
+
 def token_path() -> Path:
     return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Alfred" / "telegram_bot_token"
 
 
-def stored_token() -> str | None:
+def _plain_token() -> str | None:
     try:
-        value = token_path().read_text(encoding="utf-8-sig").strip()
+        return token_path().read_text(encoding="utf-8-sig").strip()
     except OSError:
         return None
-    return value if TOKEN_SHAPE.match(value) else None
+
+
+def stored_token() -> str | None:
+    """The bot token, sealed for this account (one in a plain file from an earlier build is sealed on first use)."""
+    value = secret_store.load_or_move(TOKEN_SECRET, _plain_token, token_path())
+    return value if value and TOKEN_SHAPE.match(value) else None
 
 
 def save_token(value: str) -> None:
     value = value.strip()
     if not TOKEN_SHAPE.match(value):
         raise ValueError("That doesn't look like a bot token from @BotFather (it looks like 123456789:AA…).")
-    path = token_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(value, encoding="utf-8")
+    secret_store.save(TOKEN_SECRET, value)
+    token_path().unlink(missing_ok=True)
 
 
 def forget_token() -> None:
+    secret_store.forget(TOKEN_SECRET)
     token_path().unlink(missing_ok=True)
 
 

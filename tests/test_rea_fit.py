@@ -107,7 +107,7 @@ class HandoffTests(unittest.TestCase):
         self.assertTrue(made["title"].startswith("Rea fit: Trading & finance"))
         self.assertIn("```skill", made["skill_note"])  # a draft note for the owner to read and approve
         self.assertIn("study_task", made)
-        self.assertIn("asks the owner first", made["note"])
+        self.assertIn("never installs", made["note"])
 
     def test_skill_note_draft_is_a_draft(self) -> None:
         note = rea_fit.skill_note_draft(finding("Trading & finance"), "trading-app")
