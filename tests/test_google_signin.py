@@ -16,6 +16,7 @@ class SignInPageTests(unittest.TestCase):
     def sign_in(self, visits) -> tuple[list[object], str]:
         """Runs connect() with a stand-in browser that opens `visits(state)` on Nova's loopback page, in order."""
         pages: list[object] = []
+        visitors: list[threading.Thread] = []
 
         def browser(url: str) -> bool:
             query = parse_qs(urlsplit(url).query)
@@ -28,7 +29,8 @@ class SignInPageTests(unittest.TestCase):
                             pages.append(response.read().decode())
                     except HTTPError as error:
                         pages.append(error.code)
-            threading.Thread(target=visit, daemon=True).start()
+            visitors.append(threading.Thread(target=visit, daemon=True))
+            visitors[-1].start()
             return True
 
         with mock.patch.object(gmail_tools, "_client", return_value={"client_id": "id"}), \
@@ -36,6 +38,8 @@ class SignInPageTests(unittest.TestCase):
                 mock.patch.object(gmail_tools, "_post_form", return_value={}):
             with self.assertRaises(RuntimeError) as raised:
                 gmail_tools.connect(timeout=10)
+        for visitor in visitors:
+            visitor.join(10)  # the browser reads the page after Nova has already moved on
         return pages, str(raised.exception)
 
     def test_saying_no_is_not_called_connected(self) -> None:

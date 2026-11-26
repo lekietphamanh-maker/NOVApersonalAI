@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 
@@ -31,8 +32,8 @@ def unify() -> Path:
             if new.is_file():
                 os.replace(new, new.with_name(name + ".bak"))
             if name.endswith(".sqlite3"):  # SQLite's own copy: safe even with a write-ahead log beside it
-                with sqlite3.connect(old) as source, sqlite3.connect(new) as target:
-                    source.backup(target)
+                with closing(sqlite3.connect(old)) as source, closing(sqlite3.connect(new)) as target:
+                    source.backup(target)  # closed at once: Windows can't move a file that is still open
             else:
                 shutil.copy2(old, new)
         except (OSError, sqlite3.Error):
