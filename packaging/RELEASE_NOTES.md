@@ -1,3 +1,7 @@
+## New in v2.16.1
+
+- **Antigravity CLI in the Cloud brain**: Google's terminal agent (`agy`, the successor to Gemini CLI) is one more choice in SETTINGS → Model → Cloud brain, signed in with your Google account. Install opens Google's own install page. Connect account opens `agy` once so you can sign in. Nova runs it answer-only: in its `default` mode, file edits and commands need an approval that a background run can't give, so they're refused. Its own default (`auto`) would make edits and run commands without asking.
+
 ## New in v2.16.0
 
 A clean-up release: every module was re-checked, fake features were taken out, and the bugs found were fixed.

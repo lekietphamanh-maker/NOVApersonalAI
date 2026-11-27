@@ -40,7 +40,8 @@ CATALOG: tuple[Entry, ...] = (
           "Add several and pick one.", needs="api",
           where="SETTINGS → Model → API brain → Add an API brain"),
     Entry("Brains", "Cloud brain", "An AI you sign in to with an account, no key: Claude Code (Claude plan, uses Nova's "
-          "tools), Codex (ChatGPT plan) or Gemini CLI (Google account).", needs="cloud_brain",
+          "tools), Codex (ChatGPT plan), Gemini CLI or Antigravity CLI (Google account), OpenCode or Hermes Agent.",
+          needs="cloud_brain",
           where="SETTINGS → Model → Cloud brain → Install, Connect account"),
     Entry("Brains", "Claude does what this PC can't", "When a tool can't run here (no offline Wikipedia, map servers "
           "down, code to run), Claude does it in the cloud and Nova says so.",

@@ -1,14 +1,15 @@
 """The Cloud brain: AI agents the owner signs in to with an account (a subscription, no API key). Claude Code on the
 Claude plan is the full one: it runs Nova's tools over MCP (plan_brain.PlanBrain). The others (Codex, Gemini CLI,
-OpenCode, Hermes Agent) answer through their own command line: they can search the web and run their own tools, but
+OpenCode, Hermes Agent, Antigravity CLI) answer through their own command line: they can search the web and run their own tools, but
 don't use Nova's, so actions on this PC stay with Claude Code or the AI on this PC.
 
-Each agent installs with npm (Node.js) or, like Hermes, with its own installer, and connects by its own sign-in or setup,
-which Nova opens in a terminal window. Hermes and OpenCode can also run on the Ollama on this PC: that is chosen in
+Each agent installs with npm (Node.js), with its own installer (Hermes), or from its maker's install page (Antigravity),
+and connects by its own sign-in or setup, which Nova opens in a terminal window. Hermes and OpenCode can also run on the Ollama on this PC: that is chosen in
 their own setup.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -37,6 +38,8 @@ class Agent:
     ask: tuple[str, ...]        # one answer, non-interactive; the request goes in on standard input
     full: bool = False          # runs Nova's tools (only Claude Code, through MCP)
     installer: tuple[str, str] = ()  # the agent's own installer scripts (macOS/Linux, Windows) when it isn't an npm package
+    install_page: str = ""      # installed by the owner from its maker's page (no script Nova could check)
+    stream_json: bool = False   # takes the request as a JSON "user" event and answers in JSON events (Antigravity)
 
 
 AGENTS: tuple[Agent, ...] = (
@@ -51,6 +54,11 @@ AGENTS: tuple[Agent, ...] = (
     Agent("hermes", "Hermes Agent", "a Nous account, or a model you set up in it (Ollama too: it needs 64K context)",
           "hermes", "", ("hermes", "setup"), ("chat", "-Q", "--query-file", "-"),
           installer=("https://hermes-agent.nousresearch.com/install.sh", "https://hermes-agent.nousresearch.com/install.ps1")),
+    # --mode=default: file edits and commands ask first, and with no one to ask in headless mode they are refused, so it
+    # answers in words like the others. Its own default (auto) would edit files and run commands without asking.
+    Agent("antigravity", "Antigravity CLI", "your Google account", "agy", "", ("agy",),
+          ("--mode=default", "--input-format", "stream-json", "--output-format", "stream-json"),
+          install_page="https://antigravity.google/docs/cli/install", stream_json=True),
 )
 
 
@@ -108,7 +116,13 @@ def _run_npm_install(item: Agent, run: Callable[..., subprocess.CompletedProcess
 
 
 def install(item: Agent, run: Callable[..., subprocess.CompletedProcess] = subprocess.run,
-            download: Callable[[str], bytes] = _download) -> str:
+            download: Callable[[str], bytes] = _download, open_page: Callable[[str], None] | None = None) -> str:
+    if item.install_page:
+        if open_page is None:
+            import app_window
+            open_page = app_window.open_browser
+        open_page(item.install_page)
+        return f"{item.label}'s install page is open: install it there, then press Connect account."
     result = _run_own_installer(item, run, download) if item.installer else _run_npm_install(item, run)
     if result.returncode != 0:
         raise RuntimeError((result.stderr or result.stdout or "the installer failed").strip().splitlines()[-1][:200])
@@ -129,6 +143,20 @@ def connect(item: Agent, popen: Callable[..., Any] = subprocess.Popen) -> None:
         mac.osascript(f'tell application "Terminal" to do script "{" ".join(shlex.quote(part) for part in line)}"')
     else:
         popen(["x-terminal-emulator", "-e", *line])
+
+
+def _stream_answer(stdout: str | None) -> str:
+    """The response of the last "result" event in a stream-json reply ("" when it failed or never came)."""
+    answer = ""
+    for line in (stdout or "").splitlines():
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        result = event.get("result") if isinstance(event, dict) and event.get("event") == "result" else None
+        if isinstance(result, dict):
+            answer = str(result.get("response") or "").strip() if result.get("status") == "SUCCESS" else ""
+    return answer
 
 
 class CliBrain:
@@ -152,6 +180,8 @@ class CliBrain:
                    f"done on their PC, say it needs Claude Code or the AI on their PC.\n\n{prompt}")
         environment = {name: value for name, value in os.environ.items()
                        if name not in ("OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY")}  # the account, not a key
+        if self.item.stream_json:
+            request = json.dumps({"event": "user", "message": {"content": request}}) + "\n"
         try:
             result = self._run([command, *self.item.ask], input=request, capture_output=True, text=True, encoding="utf-8",
                                errors="replace", timeout=TIMEOUT_SECONDS, cwd=tempfile.gettempdir(), env=environment,
@@ -160,7 +190,7 @@ class CliBrain:
             raise Unavailable(f"{self.item.label} took too long") from exc
         except OSError as exc:
             raise Unavailable(f"{self.item.label} couldn't start ({exc})") from exc
-        answer = (result.stdout or "").strip()
+        answer = _stream_answer(result.stdout) if self.item.stream_json else (result.stdout or "").strip()
         if result.returncode != 0 or not answer:
             last = ((result.stderr or "").strip().splitlines() or ["no answer"])[-1][:200]
             signed_out = re.search(r"log ?in|logged|sign ?in|signed|auth|credential", last, re.IGNORECASE) is not None

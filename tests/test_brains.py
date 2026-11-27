@@ -165,7 +165,42 @@ class MoreAgentTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "git is required"):
             cloud_agents.install(cloud_agents.agent("hermes"), failing, lambda url: b"x")
         self.assertTrue(all(url.startswith("https://hermes-agent.nousresearch.com/") for url in cloud_agents.agent("hermes").installer))
-        self.assertEqual([item.key for item in cloud_agents.AGENTS], ["claude-code", "codex", "gemini", "opencode", "hermes"])
+        self.assertEqual([item.key for item in cloud_agents.AGENTS],
+                         ["claude-code", "codex", "gemini", "opencode", "hermes", "antigravity"])
+
+    def test_antigravity_answers_in_words_through_its_json_stream(self) -> None:
+        item = cloud_agents.agent("antigravity")
+        sent: list = []
+
+        def run(arguments, **options):
+            sent.append((arguments, options["input"]))
+            stream = "\n".join(json.dumps(event) for event in (
+                {"event": "init", "init": {"permission_mode": "request-review"}},
+                {"event": "step_update", "step_update": {"text_delta": "Ha"}},
+                {"event": "result", "result": {"status": "SUCCESS", "response": "Hanoi.\n"}}))
+            return subprocess.CompletedProcess(arguments, 0, stream, "")
+        with mock.patch.object(cloud_agents, "find", lambda agent: "agy"):
+            self.assertEqual(cloud_agents.CliBrain(item, run).turn("You are Nova.", "capital of Vietnam?", [], None, print), "Hanoi.")
+        arguments, request = sent[0]
+        self.assertIn("--mode=default", arguments)  # its own default (auto) would edit files and run commands unasked
+        self.assertEqual(arguments[arguments.index("--input-format") + 1], "stream-json")
+        self.assertIn("capital of Vietnam?", json.loads(request)["message"]["content"])
+        signed_out = lambda arguments, **options: subprocess.CompletedProcess(arguments, 1, "", "authentication required")  # noqa: E731
+        with mock.patch.object(cloud_agents, "find", lambda agent: "agy"):
+            with self.assertRaisesRegex(Unavailable, "Connect account"):
+                cloud_agents.CliBrain(item, signed_out).turn("s", "p", [], None, print)
+        failed = lambda arguments, **options: subprocess.CompletedProcess(  # noqa: E731
+            arguments, 0, json.dumps({"event": "result", "result": {"status": "ERROR", "response": "", "error": "quota"}}), "")
+        with mock.patch.object(cloud_agents, "find", lambda agent: "agy"):
+            with self.assertRaises(Unavailable):
+                cloud_agents.CliBrain(item, failed).turn("s", "p", [], None, print)
+
+    def test_antigravity_installs_from_googles_own_page(self) -> None:
+        opened: list[str] = []
+        never = lambda *_args, **_options: self.fail("nothing is downloaded or run for Antigravity")  # noqa: E731
+        said = cloud_agents.install(cloud_agents.agent("antigravity"), never, never, open_page=opened.append)
+        self.assertEqual(opened, ["https://antigravity.google/docs/cli/install"])
+        self.assertIn("Connect account", said)
 
 
 class AgentLoopTests(unittest.TestCase):
